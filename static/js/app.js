@@ -45,6 +45,7 @@
     matchModal:      $('#matchModal'),
     matchOrigName:   $('#matchOrigName'),
     matchCandidates: $('#matchCandidates'),
+    matchFilter:     $('#matchFilter'),
     chkSaveAlias:    $('#chkSaveAlias'),
     poPreviewModal:  $('#poPreviewModal'),
     poSupplierName:  $('#poSupplierName'),
@@ -314,13 +315,17 @@
       let matchHTML = '';
       if (item.status === 'auto' && item.matches.length) {
         const m = item.matches[0];
-        matchHTML = `<span class="badge badge-auto text-bg-success">${m.artname || m.artno}</span>`;
+        matchHTML = `<button class="btn btn-sm btn-success btn-review" data-idx="${idx}" title="Klik untuk ganti">
+          ${m.artname || m.artno}
+        </button>`;
       } else if (item.status === 'review') {
         matchHTML = `<button class="btn btn-sm btn-warning btn-review" data-idx="${idx}">
           <i class="bi bi-search"></i> Pilih
         </button>`;
       } else {
-        matchHTML = `<span class="badge text-bg-danger">Belum match</span>`;
+        matchHTML = `<button class="btn btn-sm btn-outline-danger btn-review" data-idx="${idx}">
+          <i class="bi bi-search"></i> Pilih
+        </button>`;
       }
 
       tr.innerHTML = `
@@ -429,33 +434,55 @@
     const item = state.items[idx];
 
     dom.matchOrigName.textContent = item.name;
-    dom.matchCandidates.innerHTML = '';
+    dom.matchFilter.value = '';
+    renderMatchCandidates(item.matches);
 
-    if (!item.matches.length) {
-      dom.matchCandidates.innerHTML = '<p class="text-muted">Tidak ada kandidat.</p>';
-    } else {
-      item.matches.forEach((m) => {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'list-group-item list-group-item-action';
-
-        const scoreClass = m.score >= 80 ? 'score-high' : m.score >= 60 ? 'score-mid' : 'score-low';
-        el.innerHTML = `
-          <div class="d-flex justify-content-between">
-            <div>
-              <strong>${m.artname || ''}</strong><br>
-              <small class="text-muted">${m.artno} | Barcode: ${m.artpabrik || '-'}</small>
-            </div>
-            <span class="match-score ${scoreClass}">${m.score}%</span>
-          </div>
-        `;
-
-        el.addEventListener('click', () => selectCandidate(m));
-        dom.matchCandidates.appendChild(el);
-      });
-    }
+    // Bind filter (replace listener each time)
+    dom.matchFilter.oninput = debounce(() => {
+      const q = dom.matchFilter.value.trim().toLowerCase();
+      if (!q) {
+        renderMatchCandidates(item.matches);
+      } else {
+        const filtered = item.matches.filter((m) =>
+          (m.artname || '').toLowerCase().includes(q) ||
+          (m.artno || '').toLowerCase().includes(q) ||
+          (m.artpabrik || '').toLowerCase().includes(q)
+        );
+        renderMatchCandidates(filtered);
+      }
+    }, 200);
 
     new bootstrap.Modal(dom.matchModal).show();
+    setTimeout(() => dom.matchFilter.focus(), 300);
+  }
+
+  function renderMatchCandidates(matches) {
+    dom.matchCandidates.innerHTML = '';
+
+    if (!matches || !matches.length) {
+      dom.matchCandidates.innerHTML = '<p class="text-muted">Tidak ada kandidat.</p>';
+      return;
+    }
+
+    matches.forEach((m) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'list-group-item list-group-item-action';
+
+      const scoreClass = m.score >= 80 ? 'score-high' : m.score >= 60 ? 'score-mid' : 'score-low';
+      el.innerHTML = `
+        <div class="d-flex justify-content-between">
+          <div>
+            <strong>${m.artname || ''}</strong><br>
+            <small class="text-muted">${m.artno} | Barcode: ${m.artpabrik || '-'}</small>
+          </div>
+          <span class="match-score ${scoreClass}">${m.score}%</span>
+        </div>
+      `;
+
+      el.addEventListener('click', () => selectCandidate(m));
+      dom.matchCandidates.appendChild(el);
+    });
   }
 
   async function selectCandidate(match) {

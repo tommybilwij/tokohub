@@ -31,20 +31,16 @@ def find_by_alias(name):
 
 
 def save_alias(alias_name, artno, created_by='RECEIPT_APP'):
-    """Save a new alias mapping. Returns True on success, False if duplicate."""
+    """Save or update an alias mapping. Overwrites artno if alias already exists."""
     normalized = normalize_alias(alias_name)
-    try:
-        execute_modify(
-            "INSERT INTO stock_alias (alias_name, artno, created_by) VALUES (%s, %s, %s)",
-            (normalized, artno, created_by)
-        )
-        logger.info("Alias saved: '%s' -> '%s'", normalized, artno)
-        return True
-    except Exception as e:
-        if 'Duplicate' in str(e):
-            logger.warning("Duplicate alias: '%s'", normalized)
-            return False
-        raise
+    execute_modify(
+        """INSERT INTO stock_alias (alias_name, artno, created_by)
+           VALUES (%s, %s, %s)
+           ON DUPLICATE KEY UPDATE artno = VALUES(artno), created_by = VALUES(created_by), created_at = CURRENT_TIMESTAMP""",
+        (normalized, artno, created_by)
+    )
+    logger.info("Alias saved: '%s' -> '%s'", normalized, artno)
+    return True
 
 
 def delete_alias(alias_id):

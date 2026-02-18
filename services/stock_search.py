@@ -98,17 +98,27 @@ def _compute_score(query_normalized, query_sizes, candidate):
     return round(composite, 1)
 
 
-def search_stock(query, top_n=None):
+def search_stock(query, top_n=None, min_score=None, score_against=None):
     """
     Multi-pass search for stock items.
+
+    Args:
+        query: Search text
+        top_n: Max results
+        min_score: Minimum fuzzy score
+        score_against: If provided, scores are computed against this text
+                       instead of query (used when filtering in match modal)
 
     Returns list of dicts: [{artno, artname, score, match_type, ...}]
     Match types: 'alias', 'barcode', 'fuzzy'
     """
     top_n = top_n or settings.fuzzy_top_n
+    min_score = min_score if min_score is not None else settings.fuzzy_min_score
     query = query.strip()
     if not query:
         return []
+
+    pinned = []
 
     # Pass 1: Alias lookup
     alias_artno = find_by_alias(query)
@@ -122,7 +132,7 @@ def search_stock(query, top_n=None):
         if stock:
             stock['score'] = 100.0
             stock['match_type'] = 'alias'
-            return [stock]
+            pinned.append(stock)
 
     # Pass 2: Barcode match (8-13 digits)
     if re.match(r'^\d{8,13}$', query):
@@ -132,24 +142,33 @@ def search_stock(query, top_n=None):
                FROM stock WHERE artpabrik = %s AND isactive = 1""",
             (query,)
         )
-        if stock:
+        if stock and stock['artno'] not in {p['artno'] for p in pinned}:
             stock['score'] = 100.0
             stock['match_type'] = 'barcode'
-            return [stock]
+            pinned.append(stock)
 
     # Pass 3: Fuzzy match against cached items
+    pinned_artnos = {p['artno'] for p in pinned}
     items = _load_stock_cache()
     query_normalized = _normalize_text(query)
     query_sizes = _extract_sizes(query)
 
+    # Score against a different text if provided (e.g. receipt name)
+    score_text = score_against.strip() if score_against else None
+    score_normalized = _normalize_text(score_text) if score_text else query_normalized
+    score_sizes = _extract_sizes(score_text) if score_text else query_sizes
+
     scored = []
     for item in items:
-        score = _compute_score(query_normalized, query_sizes, item)
-        if score >= settings.fuzzy_min_score:
+        if item['artno'] in pinned_artnos:
+            continue
+        search_score = _compute_score(query_normalized, query_sizes, item)
+        if search_score >= min_score:
+            display_score = _compute_score(score_normalized, score_sizes, item) if score_text else search_score
             result = {k: v for k, v in item.items() if not k.startswith('_')}
-            result['score'] = score
+            result['score'] = display_score
             result['match_type'] = 'fuzzy'
             scored.append(result)
 
     scored.sort(key=lambda x: x['score'], reverse=True)
-    return scored[:top_n]
+    return pinned + scored[:top_n]

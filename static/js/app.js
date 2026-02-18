@@ -429,35 +429,50 @@
   // -----------------------------------------------------------------------
   // Match Review Modal
   // -----------------------------------------------------------------------
-  function openMatchModal(idx) {
+  async function openMatchModal(idx) {
     state.currentReviewIdx = idx;
     const item = state.items[idx];
 
     dom.matchOrigName.textContent = item.name;
     dom.matchFilter.value = '';
-    renderMatchCandidates(item.matches);
 
-    // Bind filter (replace listener each time)
-    dom.matchFilter.oninput = debounce(() => {
-      const q = dom.matchFilter.value.trim().toLowerCase();
+    // Fresh search using the item name (more candidates for manual review)
+    renderMatchCandidates(null, true); // show loading
+    try {
+      const results = await api(`/api/stock/search?q=${encodeURIComponent(item.name)}&limit=20`);
+      item.matches = results;
+      renderMatchCandidates(results);
+    } catch (e) {
+      renderMatchCandidates([]);
+    }
+
+    // Bind filter — API search with no min score, scored against receipt name
+    dom.matchFilter.oninput = debounce(async () => {
+      const q = dom.matchFilter.value.trim();
       if (!q) {
         renderMatchCandidates(item.matches);
-      } else {
-        const filtered = item.matches.filter((m) =>
-          (m.artname || '').toLowerCase().includes(q) ||
-          (m.artno || '').toLowerCase().includes(q) ||
-          (m.artpabrik || '').toLowerCase().includes(q)
-        );
-        renderMatchCandidates(filtered);
+        return;
       }
-    }, 200);
+      renderMatchCandidates(null, true); // loading
+      try {
+        const results = await api(`/api/stock/search?q=${encodeURIComponent(q)}&limit=20&min_score=0&score_against=${encodeURIComponent(item.name)}`);
+        renderMatchCandidates(results);
+      } catch (e) {
+        renderMatchCandidates([]);
+      }
+    }, 300);
 
     new bootstrap.Modal(dom.matchModal).show();
     setTimeout(() => dom.matchFilter.focus(), 300);
   }
 
-  function renderMatchCandidates(matches) {
+  function renderMatchCandidates(matches, loading) {
     dom.matchCandidates.innerHTML = '';
+
+    if (loading) {
+      dom.matchCandidates.innerHTML = '<p class="text-muted">Mencari...</p>';
+      return;
+    }
 
     if (!matches || !matches.length) {
       dom.matchCandidates.innerHTML = '<p class="text-muted">Tidak ada kandidat.</p>';
@@ -470,10 +485,13 @@
       el.className = 'list-group-item list-group-item-action';
 
       const scoreClass = m.score >= 80 ? 'score-high' : m.score >= 60 ? 'score-mid' : 'score-low';
+      let badge = '';
+      if (m.match_type === 'alias') badge = '<span class="badge bg-info ms-1">alias</span>';
+      else if (m.match_type === 'barcode') badge = '<span class="badge bg-primary ms-1">barcode</span>';
       el.innerHTML = `
         <div class="d-flex justify-content-between">
           <div>
-            <strong>${m.artname || ''}</strong><br>
+            <strong>${m.artname || ''}</strong>${badge}<br>
             <small class="text-muted">${m.artno} | Barcode: ${m.artpabrik || '-'}</small>
           </div>
           <span class="match-score ${scoreClass}">${m.score}%</span>
@@ -498,7 +516,7 @@
       try {
         await api('/receipt/save-alias', {
           method: 'POST',
-          body: { alias_name: item.name, artno: match.artno },
+          body: { alias_name: item.name, artno: match.artno, userid: dom.userSelect.value },
         });
       } catch (e) {
         console.warn('Alias save failed:', e.message);

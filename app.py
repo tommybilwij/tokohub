@@ -66,8 +66,11 @@ def api_stock_search():
     query = request.args.get('q', '').strip()
     if not query:
         return jsonify([])
+    top_n = request.args.get('limit', None, type=int)
+    min_score = request.args.get('min_score', None, type=int)
+    score_against = request.args.get('score_against', '').strip() or None
     from services.stock_search import search_stock
-    results = search_stock(query)
+    results = search_stock(query, top_n=top_n, min_score=min_score, score_against=score_against)
     return jsonify(results)
 
 
@@ -202,12 +205,13 @@ def save_alias():
     data = request.get_json()
     alias_name = data.get('alias_name', '').strip()
     artno = data.get('artno', '').strip()
+    userid = data.get('userid', '').strip() or 'RECEIPT_APP'
 
     if not alias_name or not artno:
         return jsonify({'error': 'alias_name and artno are required'}), 400
 
     from services.alias_service import save_alias as _save
-    success = _save(alias_name, artno)
+    success = _save(alias_name, artno, created_by=userid)
     if success:
         return jsonify({'ok': True})
     return jsonify({'ok': False, 'error': 'Alias already exists'}), 409

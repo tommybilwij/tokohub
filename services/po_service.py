@@ -40,6 +40,22 @@ def _generate_po_number(cursor, order_date):
     return f"{prefix}{seq:05d}"
 
 
+def _generate_fp_number(cursor, order_date):
+    """Generate Faktur Pembelian number: FP{YYMMDD}{5-digit-seq}."""
+    prefix = f"FP{order_date.strftime('%y%m%d')}"
+    cursor.execute(
+        "SELECT nofaktur FROM sthist WHERE nofaktur LIKE %s ORDER BY nofaktur DESC LIMIT 1",
+        (f"{prefix}%",)
+    )
+    row = cursor.fetchone()
+    if row:
+        last_seq = int(row['nofaktur'][-5:])
+        seq = last_seq + 1
+    else:
+        seq = 1
+    return f"{prefix}{seq:05d}"
+
+
 def _decimal_default(obj):
     """JSON serializer for Decimal types."""
     if isinstance(obj, Decimal):
@@ -183,17 +199,19 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
     with get_connection() as conn:
         cursor = conn.cursor(dictionary=True)
         try:
-            # Read current becreff from nextrec
-            cursor.execute("SELECT newpo FROM nextrec LIMIT 1")
+            # Read current becreff counters from nextrec
+            cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1")
             nextrec_row = cursor.fetchone()
             if not nextrec_row:
                 raise POCreationError("nextrec table is empty")
             becreff = nextrec_row['newpo']
+            fp_becreff = nextrec_row['newpurch']
 
-            # Generate PO number
+            # Generate PO and FP numbers
             po_number = _generate_po_number(cursor, order_date)
+            fp_number = _generate_fp_number(cursor, order_date)
 
-            # Insert PO header
+            # Insert PO header (icpom)
             cursor.execute(
                 """INSERT INTO icpom
                    (noorder, becreff, suppid, tglorder, duedate,
@@ -201,6 +219,19 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
                    VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0)""",
                 (po_number, becreff, supplier_id, order_date,
                  order_date, preview['grand_total'], userid)
+            )
+
+            # Insert Purchase Invoice header (icbym)
+            cursor.execute(
+                """INSERT INTO icbym
+                   (nofaktur, tipe, becreff, suppid, tglfaktur, duedate,
+                    jlhfaktur, lokasi, userid, noorder,
+                    isupdateprice, islocked)
+                   VALUES (%s, '1', %s, %s, %s, %s,
+                           %s, 'LAPANGAN', %s, %s,
+                           1, 0)""",
+                (fp_number, fp_becreff, supplier_id, order_date, order_date,
+                 preview['grand_total'], userid, po_number)
             )
 
             # Insert line items and update stock balances
@@ -235,7 +266,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
                 cursor.execute(
                     """UPDATE stlastbal
                        SET curqty = curqty + %s
-                       WHERE artno = %s AND warehouseid = ''""",
+                       WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
                     (float(qty_small_unit), line['artno'])
                 )
 
@@ -243,18 +274,51 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
                 if cursor.rowcount == 0:
                     cursor.execute(
                         """INSERT INTO stlastbal (artno, curqty, warehouseid)
-                           VALUES (%s, %s, '')""",
+                           VALUES (%s, %s, 'LAPANGAN')""",
                         (line['artno'], float(qty_small_unit))
                     )
 
-            # Atomic counter increment
-            cursor.execute("UPDATE nextrec SET newpo = newpo + 1")
+                # Insert stock history (sthist) for purchase tracking
+                cursor.execute(
+                    """INSERT INTO sthist
+                       (stockid, artpabrik, artname, tanggal,
+                        qty, beli, packing, satuanbsr, satuankcl,
+                        hbelibsr, hbelikcl, hbelinetto,
+                        pctdisc1, pctdisc2, pctdisc3,
+                        jlhdisc1, jlhdisc2, jlhdisc3,
+                        pctppn, jlhppn,
+                        hjual, amount,
+                        suppid, whid, nofaktur, becreff, tipetrans,
+                        isupdateprice, isupdatepurchprice)
+                       VALUES (%s, %s, %s, %s,
+                               %s, %s, %s, %s, %s,
+                               %s, %s, %s,
+                               %s, %s, %s,
+                               0, 0, 0,
+                               %s, %s,
+                               %s, %s,
+                               %s, 'LAPANGAN', %s, %s, 1,
+                               1, 1)""",
+                    (line['artno'], line['artpabrik'], line['artname'], order_date,
+                     line['qty'], float(qty_small_unit), line['packing'],
+                     line['satuanbsr'], line['satuankcl'],
+                     line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['pctppn'], line['jlhppn'],
+                     line['hjual'], line['amount'],
+                     supplier_id, fp_number, fp_becreff)
+                )
+
+            # Atomic counter increments
+            cursor.execute("UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1")
 
             conn.commit()
 
             result = {
                 'po_number': po_number,
+                'fp_number': fp_number,
                 'becreff': becreff,
+                'fp_becreff': fp_becreff,
                 'supplier_id': supplier_id,
                 'order_date': order_date.isoformat(),
                 'grand_total': preview['grand_total'],
@@ -263,8 +327,8 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
             }
 
             _write_audit_log(po_number, result)
-            logger.info("PO created: %s (becreff=%d, total=%.2f)",
-                        po_number, becreff, preview['grand_total'])
+            logger.info("PO created: %s / FP %s (becreff=%d, fp_becreff=%d, total=%.2f)",
+                        po_number, fp_number, becreff, fp_becreff, preview['grand_total'])
             return result
 
         except Exception:

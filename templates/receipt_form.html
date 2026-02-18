@@ -93,6 +93,19 @@
               <input type="file" id="csvInput" class="form-control"
                      accept=".csv,.xlsx">
             </div>
+            <div class="alert alert-light border small py-2 mb-2">
+              <strong>Format file:</strong> CSV atau Excel (.xlsx) dengan kolom:<br>
+              <code>nama_barang</code>, <code>qty</code>, <code>harga</code><br>
+              <span class="text-muted">Contoh:</span>
+              <table class="table table-sm table-bordered mb-0 mt-1" style="font-size:0.8em">
+                <thead><tr><th>nama_barang</th><th>qty</th><th>harga</th></tr></thead>
+                <tbody>
+                  <tr><td>DIAMOND UHT 200ML</td><td>2</td><td>85000</td></tr>
+                  <tr><td>TANGO CO 5G</td><td>10</td><td>5000</td></tr>
+                </tbody>
+              </table>
+              <span class="text-muted mt-1 d-block">Header juga bisa: <code>nama</code>, <code>item</code>, <code>jumlah</code>, <code>harga_beli</code>, dll.</span>
+            </div>
             <button class="btn btn-outline-success w-100" type="button" id="btnUploadCSV">
               <i class="bi bi-upload"></i> Import File
             </button>

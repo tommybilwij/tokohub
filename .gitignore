@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.envrc
+.direnv/
+.venv/
+venv/
+uploads/
+logs/
+*.db
+.mariadb-data/
+backups/
+.DS_Store

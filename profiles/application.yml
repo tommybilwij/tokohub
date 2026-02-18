@@ -1,0 +1,16 @@
+# Default application settings
+# Override with environment variables or .env file
+
+db:
+  host: 192.168.5.25
+  port: 3306
+  user: root
+  password: ""
+  name: myposse
+  charset: latin1
+  pool_size: 5
+
+# Fuzzy matching
+fuzzy_cache_ttl: 300   # seconds
+fuzzy_top_n: 5
+fuzzy_min_score: 40

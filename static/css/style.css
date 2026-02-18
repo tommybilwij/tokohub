@@ -1,0 +1,128 @@
+/* Stock Entry App - Custom Styles */
+
+body {
+  background-color: #f5f7fa;
+  font-size: 0.9rem;
+}
+
+.navbar-brand {
+  font-size: 1.1rem;
+}
+
+/* Cards */
+.card {
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  font-size: 0.95rem;
+}
+
+/* Tables */
+.table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* Item table status badges */
+.badge-auto {
+  background-color: #198754;
+}
+
+.badge-review {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.badge-unmatched {
+  background-color: #dc3545;
+}
+
+/* Search dropdown */
+.search-dropdown {
+  position: absolute;
+  z-index: 1050;
+  max-height: 300px;
+  overflow-y: auto;
+  width: calc(100% - 1.5rem);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.search-dropdown .list-group-item {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.search-dropdown .list-group-item:hover {
+  background-color: #e8f5e9;
+}
+
+.search-dropdown .match-score {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.score-high { color: #198754; }
+.score-mid  { color: #ffc107; }
+.score-low  { color: #dc3545; }
+
+/* Match candidate list in modal */
+#matchCandidates .list-group-item {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+#matchCandidates .list-group-item:hover {
+  background-color: #e8f5e9;
+}
+
+#matchCandidates .list-group-item.active {
+  background-color: #198754;
+  border-color: #198754;
+}
+
+/* Item row states */
+.item-row-auto {
+  border-left: 3px solid #198754;
+}
+
+.item-row-review {
+  border-left: 3px solid #ffc107;
+}
+
+.item-row-unmatched {
+  border-left: 3px solid #dc3545;
+}
+
+/* Loading spinner */
+.spinner-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .container-fluid {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .table th,
+  .table td {
+    font-size: 0.78rem;
+  }
+}

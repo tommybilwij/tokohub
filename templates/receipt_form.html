@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block title %}Entry Barang{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- Left: Input Panel -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-receipt"></i> Input Penerimaan Barang</h5>
+      </div>
+      <div class="card-body">
+        <!-- User Selection -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">User</label>
+          <select id="userSelect" class="form-select">
+            <option value="">-- Pilih User --</option>
+          </select>
+        </div>
+
+        <!-- Supplier Selection -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Supplier</label>
+          <select id="vendorSelect" class="form-select">
+            <option value="">-- Pilih Supplier --</option>
+          </select>
+        </div>
+
+        <!-- Order Date -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Tanggal</label>
+          <input type="date" id="orderDate" class="form-control" value="{{ today }}">
+        </div>
+
+        <hr>
+
+        <!-- Tabs: Manual / Photo / CSV -->
+        <ul class="nav nav-tabs" role="tablist">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab"
+                    data-bs-target="#tabManual" type="button">
+              <i class="bi bi-keyboard"></i> Manual
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#tabPhoto" type="button">
+              <i class="bi bi-camera"></i> Foto
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#tabCSV" type="button">
+              <i class="bi bi-file-earmark-spreadsheet"></i> CSV/Excel
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content pt-3">
+          <!-- Manual Entry -->
+          <div class="tab-pane fade show active" id="tabManual">
+            <div class="input-group mb-2">
+              <input type="text" id="itemNameInput" class="form-control"
+                     placeholder="Nama barang / barcode" autocomplete="off">
+              <input type="number" id="itemQtyInput" class="form-control"
+                     style="max-width:80px" placeholder="Qty" value="1" min="1">
+              <input type="number" id="itemPriceInput" class="form-control"
+                     style="max-width:160px" placeholder="Harga (opsional)">
+              <button class="btn btn-success" type="button" id="btnAddItem">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+            </div>
+
+            <!-- Live search dropdown -->
+            <div id="searchResults" class="list-group search-dropdown d-none"></div>
+          </div>
+
+          <!-- Photo Upload -->
+          <div class="tab-pane fade" id="tabPhoto">
+            <div class="mb-2">
+              <input type="file" id="photoInput" class="form-control"
+                     accept="image/png,image/jpeg">
+            </div>
+            <button class="btn btn-outline-success w-100" type="button" id="btnUploadPhoto">
+              <i class="bi bi-upload"></i> Upload & OCR
+            </button>
+            <div id="ocrStatus" class="mt-2 text-muted small"></div>
+          </div>
+
+          <!-- CSV Upload -->
+          <div class="tab-pane fade" id="tabCSV">
+            <div class="mb-2">
+              <input type="file" id="csvInput" class="form-control"
+                     accept=".csv,.xlsx">
+            </div>
+            <button class="btn btn-outline-success w-100" type="button" id="btnUploadCSV">
+              <i class="bi bi-upload"></i> Import File
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Item List & Actions -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
+        <span class="badge bg-secondary" id="itemCount">0 item</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" id="itemTable">
+            <thead class="table-light">
+              <tr>
+                <th style="width:30px">#</th>
+                <th>Nama (Receipt)</th>
+                <th style="width:60px">Qty</th>
+                <th>Match</th>
+                <th style="width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="itemTableBody">
+              <tr id="emptyRow">
+                <td colspan="5" class="text-center text-muted py-4">
+                  Belum ada barang. Tambahkan dari panel kiri.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" id="btnMatchAll" disabled>
+            <i class="bi bi-search"></i> Match Semua
+          </button>
+          <button class="btn btn-warning" id="btnPreviewPO" disabled>
+            <i class="bi bi-eye"></i> Preview PO
+          </button>
+          <button class="btn btn-outline-danger ms-auto" id="btnClearAll" disabled>
+            <i class="bi bi-trash"></i> Hapus Semua
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Match Review Modal -->
+<div class="modal fade" id="matchModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title">
+          <i class="bi bi-search"></i> Pilih Item yang Cocok
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-semibold">Nama di receipt: <span id="matchOrigName" class="text-primary"></span></p>
+        <div class="list-group" id="matchCandidates"></div>
+        <div class="form-check mt-3">
+          <input type="checkbox" class="form-check-input" id="chkSaveAlias" checked>
+          <label class="form-check-label" for="chkSaveAlias">
+            Simpan sebagai alias (otomatis cocok di lain waktu)
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PO Preview Modal -->
+<div class="modal fade" id="poPreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-eye"></i> Preview Purchase Order</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <strong>Supplier:</strong> <span id="poSupplierName"></span>
+          </div>
+          <div class="col-md-4">
+            <strong>Tanggal:</strong> <span id="poDate"></span>
+          </div>
+          <div class="col-md-4 text-end">
+            <strong>Total:</strong>
+            <span id="poGrandTotal" class="fs-5 fw-bold text-success"></span>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Artno</th>
+                <th>Nama</th>
+                <th class="text-end">Qty</th>
+                <th>Satuan</th>
+                <th class="text-end">Harga Beli</th>
+                <th class="text-end">Netto</th>
+                <th class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="poPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-success" id="btnCommitPO">
+          <i class="bi bi-check-circle"></i> Buat PO & Update Stok
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PO Success Modal -->
+<div class="modal fade" id="poSuccessModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="bi bi-check-circle"></i> PO Berhasil Dibuat!</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+        <h4>No. PO: <span id="successPONumber" class="text-primary"></span></h4>
+        <p>Total: <span id="successTotal" class="fw-bold"></span></p>
+        <p class="text-muted"><span id="successLineCount"></span> item, stok telah diperbarui.</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success" id="btnNewReceipt">
+          <i class="bi bi-plus-circle"></i> Entry Baru
+        </button>
+        <a href="/history" class="btn btn-outline-secondary">
+          <i class="bi bi-clock-history"></i> Lihat Riwayat
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Riwayat PO{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Riwayat Purchase Order</h5>
+    <span class="badge bg-secondary">{{ total }} total</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>No. Order</th>
+            <th>Tanggal</th>
+            <th>Supplier</th>
+            <th class="text-end">Total</th>
+            <th class="text-center">Items</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for o in orders %}
+          <tr>
+            <td><code>{{ o.noorder }}</code></td>
+            <td>{{ o.tglorder.strftime('%Y-%m-%d') if o.tglorder else '-' }}</td>
+            <td>{{ o.supplier_name or o.suppid }}</td>
+            <td class="text-end">{{ '{:,.0f}'.format(o.jlhfaktur or 0) }}</td>
+            <td class="text-center">{{ o.line_count }}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary btn-view-po"
+                      data-po="{{ o.noorder }}">
+                <i class="bi bi-eye"></i>
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">
+              Belum ada PO dari Receipt App.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if total > 20 %}
+  <div class="card-footer">
+    <nav>
+      <ul class="pagination pagination-sm mb-0 justify-content-center">
+        {% if page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page - 1 }}">&laquo;</a>
+        </li>
+        {% endif %}
+        <li class="page-item active">
+          <span class="page-link">{{ page }}</span>
+        </li>
+        {% if total > page * 20 %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page + 1 }}">&raquo;</a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<!-- PO Detail Modal -->
+<div class="modal fade" id="poDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detail PO: <span id="detailPONumber"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4"><strong>Supplier:</strong> <span id="detailSupplier"></span></div>
+          <div class="col-md-4"><strong>Tanggal:</strong> <span id="detailDate"></span></div>
+          <div class="col-md-4 text-end"><strong>Total:</strong> <span id="detailTotal" class="fw-bold"></span></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Artno</th>
+                <th>Nama</th>
+                <th class="text-end">Qty</th>
+                <th>Satuan</th>
+                <th class="text-end">Harga</th>
+                <th class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="detailLines"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.btn-view-po').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const po = btn.dataset.po;
+    const res = await fetch(`/api/po/${po}`);
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+
+    document.getElementById('detailPONumber').textContent = data.noorder;
+    document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
+    document.getElementById('detailDate').textContent = data.tglorder || '';
+    document.getElementById('detailTotal').textContent = formatNumber(data.jlhfaktur || 0);
+
+    const tbody = document.getElementById('detailLines');
+    tbody.innerHTML = '';
+    (data.lines || []).forEach((line, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td><code>${line.stockid || ''}</code></td>
+        <td>${line.artname || ''}</td>
+        <td class="text-end">${line.qty}</td>
+        <td>${line.satuanbsr || ''}</td>
+        <td class="text-end">${formatNumber(line.hbelibsr || 0)}</td>
+        <td class="text-end">${formatNumber(line.amount || 0)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    new bootstrap.Modal(document.getElementById('poDetailModal')).show();
+  });
+});
+
+function formatNumber(n) {
+  return new Intl.NumberFormat('id-ID').format(Math.round(n));
+}
+</script>
+{% endblock %}

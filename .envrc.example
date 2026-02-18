@@ -1,0 +1,13 @@
+# Database
+export DB_HOST=127.0.0.1
+export DB_PORT=3388
+export DB_USER=root
+export DB_PASSWORD=
+export DB_NAME=myposse
+export DB_POOL_SIZE=5
+
+
+# Fuzzy matching
+export FUZZY_CACHE_TTL=300
+export FUZZY_TOP_N=5
+export FUZZY_MIN_SCORE=40

@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS stock_alias (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  alias_name VARCHAR(200) NOT NULL DEFAULT '',
+  artno VARCHAR(30) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by VARCHAR(30) DEFAULT 'RECEIPT_APP',
+  PRIMARY KEY (id),
+  UNIQUE KEY alias_name_idx (alias_name),
+  KEY artno_idx (artno)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;

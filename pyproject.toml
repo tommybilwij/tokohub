@@ -1,0 +1,19 @@
+[project]
+name = "stock-entry-myposse"
+version = "0.1.0"
+description = "Stock receipt entry app with fuzzy matching for MyPosse POS"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "mysql-connector-python>=8.0",
+    "rapidfuzz>=3.0",
+    "openpyxl>=3.1",
+    "pytesseract>=0.3",
+    "Pillow>=10.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+serve = "app:main"

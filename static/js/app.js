@@ -85,6 +85,13 @@
     return data;
   }
 
+  function requireHeaderFields() {
+    if (!dom.userSelect.value) { alert('Pilih user terlebih dahulu.'); dom.userSelect.focus(); return false; }
+    if (!dom.vendorSelect.value) { alert('Pilih supplier terlebih dahulu.'); dom.vendorSelect.focus(); return false; }
+    if (!dom.orderDate.value) { alert('Isi tanggal terlebih dahulu.'); dom.orderDate.focus(); return false; }
+    return true;
+  }
+
   function showSpinner() {
     const el = document.createElement('div');
     el.className = 'spinner-overlay';
@@ -223,6 +230,7 @@
       `;
 
       el.addEventListener('click', () => {
+        if (!requireHeaderFields()) return;
         dom.itemNameInput.value = item.artname || '';
         dom.searchResults.classList.add('d-none');
         // Auto-add with the matched item
@@ -245,6 +253,8 @@
   // Item Management
   // -----------------------------------------------------------------------
   function addItemFromInput() {
+    if (!requireHeaderFields()) return;
+
     const name = dom.itemNameInput.value.trim();
     const qty = parseFloat(dom.itemQtyInput.value) || 1;
     const price = parseFloat(dom.itemPriceInput.value) || 0;
@@ -316,10 +326,15 @@
       tr.innerHTML = `
         <td>${idx + 1}</td>
         <td>
-          <span>${item.name}</span>
-          ${item.price ? `<br><small class="text-muted">@${formatNumber(item.price)}</small>` : ''}
+          <input type="text" class="form-control form-control-sm edit-name" data-idx="${idx}"
+                 value="${item.name.replace(/"/g, '&quot;')}">
+          <input type="number" class="form-control form-control-sm mt-1 edit-price" data-idx="${idx}"
+                 value="${item.price}" min="0" placeholder="Harga" style="max-width:140px">
         </td>
-        <td>${item.qty}</td>
+        <td>
+          <input type="number" class="form-control form-control-sm edit-qty" data-idx="${idx}"
+                 value="${item.qty}" min="0" step="any" style="width:60px">
+        </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove" data-idx="${idx}">
@@ -328,6 +343,23 @@
         </td>
       `;
       tbody.appendChild(tr);
+    });
+
+    // Bind inline edit fields
+    $$('.edit-name').forEach((el) => {
+      el.addEventListener('change', () => {
+        state.items[parseInt(el.dataset.idx)].name = el.value.trim();
+      });
+    });
+    $$('.edit-qty').forEach((el) => {
+      el.addEventListener('change', () => {
+        state.items[parseInt(el.dataset.idx)].qty = parseFloat(el.value) || 0;
+      });
+    });
+    $$('.edit-price').forEach((el) => {
+      el.addEventListener('change', () => {
+        state.items[parseInt(el.dataset.idx)].price = parseInt(el.value) || 0;
+      });
     });
 
     // Bind remove buttons
@@ -353,6 +385,7 @@
   // Match All
   // -----------------------------------------------------------------------
   async function matchAllItems() {
+    if (!requireHeaderFields()) return;
     const unmatched = state.items.filter((i) => i.status !== 'auto' || !i.selectedArtno);
     if (unmatched.length === 0) return;
 
@@ -453,6 +486,7 @@
   // Photo Upload (OCR)
   // -----------------------------------------------------------------------
   async function uploadPhoto() {
+    if (!requireHeaderFields()) return;
     const file = dom.photoInput.files[0];
     if (!file) { alert('Pilih foto terlebih dahulu.'); return; }
 
@@ -480,6 +514,7 @@
   // CSV Upload
   // -----------------------------------------------------------------------
   async function uploadCSV() {
+    if (!requireHeaderFields()) return;
     const file = dom.csvInput.files[0];
     if (!file) { alert('Pilih file CSV/Excel terlebih dahulu.'); return; }
 
@@ -504,10 +539,9 @@
   // PO Preview
   // -----------------------------------------------------------------------
   async function previewPO() {
+    if (!requireHeaderFields()) return;
     const userId = dom.userSelect.value;
-    if (!userId) { alert('Pilih user terlebih dahulu.'); return; }
     const supplierId = dom.vendorSelect.value;
-    if (!supplierId) { alert('Pilih supplier terlebih dahulu.'); return; }
 
     const items = state.items
       .filter((i) => i.selectedArtno)

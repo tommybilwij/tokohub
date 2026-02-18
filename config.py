@@ -45,6 +45,21 @@ class DatabaseSettings(BaseSettings):
         }
 
 
+class OpenAISettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix='OPENAI_')
+
+    api_base: str = ''
+    api_key: str = ''
+    deployment_id: str = 'gpt-4o-standard'
+    api_version: str = '2024-08-01-preview'
+
+    @classmethod
+    def settings_customise_sources(
+        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings,
+    ):
+        return (env_settings, dotenv_settings, init_settings)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file='.env',
@@ -66,6 +81,9 @@ class Settings(BaseSettings):
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
+
+    # Azure OpenAI
+    openai: OpenAISettings = Field(default_factory=OpenAISettings)
 
     @model_validator(mode='before')
     @classmethod

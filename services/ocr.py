@@ -1,79 +1,67 @@
-"""Receipt photo OCR using Tesseract."""
+"""Receipt photo OCR using Azure OpenAI GPT-4o vision."""
 
-import re
+import json
 import logging
 
-from PIL import Image, ImageEnhance, ImageFilter
-import pytesseract
+from services.llm import vision_completion
 
 logger = logging.getLogger(__name__)
 
-# Common receipt line patterns:
-#   "Item Name    2 x 15000"   or   "Item Name  2  15000"
-_LINE_PATTERN = re.compile(
-    r'^(.+?)\s+'           # item name (non-greedy)
-    r'(\d+(?:[.,]\d+)?)'  # qty
-    r'\s*[xX×]?\s*'       # optional "x" separator
-    r'(\d[\d.,]*)?'        # optional price
-    r'\s*$'
-)
+_EXTRACT_PROMPT = """\
+Extract all line items from this receipt image.
+Return ONLY a JSON array, no other text. Each element must have:
+- "name": item name (string)
+- "qty": quantity (number)
+- "price": unit price as integer without decimals (number)
 
+Example: [{"name": "Indomie Goreng", "qty": 2, "price": 3500}]
 
-def preprocess_image(image_path):
-    """Apply preprocessing to improve OCR accuracy."""
-    img = Image.open(image_path)
-
-    # Convert to grayscale
-    img = img.convert('L')
-
-    # Boost contrast
-    img = ImageEnhance.Contrast(img).enhance(2.0)
-
-    # Sharpen
-    img = img.filter(ImageFilter.SHARPEN)
-
-    # Binarize (threshold)
-    img = img.point(lambda x: 255 if x > 140 else 0, '1')
-
-    return img
+If you cannot determine qty, default to 1. If you cannot determine price, default to 0.
+"""
 
 
 def extract_lines(image_path):
-    """Run OCR on a receipt image and parse structured lines.
+    """Run GPT-4o vision on a receipt image and parse structured lines.
 
     Returns list of dicts: [{name, qty, price, raw_line}]
     """
-    img = preprocess_image(image_path)
-    raw_text = pytesseract.image_to_string(img, lang='ind+eng')
-    logger.debug("OCR raw output:\n%s", raw_text)
+    try:
+        raw = vision_completion(image_path, _EXTRACT_PROMPT, temperature=0)
+    except Exception:
+        logger.exception("LLM vision call failed for %s", image_path)
+        return []
+
+    logger.debug("LLM raw output:\n%s", raw)
+
+    # Strip markdown fences if present
+    text = raw.strip()
+    if text.startswith('```'):
+        text = text.split('\n', 1)[1] if '\n' in text else text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        text = text.strip()
+
+    try:
+        items = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Could not parse LLM response as JSON, returning raw lines")
+        return [
+            {'name': line.strip(), 'qty': 1, 'price': 0, 'raw_line': line.strip()}
+            for line in raw.splitlines()
+            if line.strip() and any(c.isalpha() for c in line)
+        ]
 
     results = []
-    for line in raw_text.splitlines():
-        line = line.strip()
-        if not line or len(line) < 3:
+    for item in items:
+        name = str(item.get('name', '')).strip()
+        if not name:
             continue
+        results.append({
+            'name': name,
+            'qty': float(item.get('qty', 1)),
+            'price': int(item.get('price', 0)),
+            'raw_line': f"{name} {item.get('qty', 1)} x {item.get('price', 0)}",
+        })
 
-        match = _LINE_PATTERN.match(line)
-        if match:
-            name = match.group(1).strip()
-            qty_str = match.group(2).replace(',', '.')
-            price_str = (match.group(3) or '0').replace(',', '').replace('.', '')
-
-            results.append({
-                'name': name,
-                'qty': float(qty_str),
-                'price': int(price_str) if price_str.isdigit() else 0,
-                'raw_line': line,
-            })
-        else:
-            # Include unmatched lines as name-only for user to edit
-            if any(c.isalpha() for c in line):
-                results.append({
-                    'name': line,
-                    'qty': 1,
-                    'price': 0,
-                    'raw_line': line,
-                })
-
-    logger.info("OCR extracted %d lines from %s", len(results), image_path)
+    logger.info("LLM extracted %d items from %s", len(results), image_path)
     return results

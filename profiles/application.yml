@@ -10,6 +10,13 @@ db:
   charset: latin1
   pool_size: 5
 
+# Azure OpenAI
+openai:
+  api_base: ""
+  api_key: ""
+  deployment_id: gpt-4o-standard
+  api_version: "2024-08-01-preview"
+
 # Fuzzy matching
 fuzzy_cache_ttl: 300   # seconds
 fuzzy_top_n: 5

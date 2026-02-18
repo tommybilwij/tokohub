@@ -7,6 +7,12 @@ export DB_NAME=myposse
 export DB_POOL_SIZE=5
 
 
+# Azure OpenAI
+export OPENAI_API_BASE=https://your-azure-endpoint.azure-api.net/openai-load-balancing
+export OPENAI_API_KEY=your-api-key-here
+export OPENAI_DEPLOYMENT_ID=gpt-4o-standard
+export OPENAI_API_VERSION=2024-08-01-preview
+
 # Fuzzy matching
 export FUZZY_CACHE_TTL=300
 export FUZZY_TOP_N=5

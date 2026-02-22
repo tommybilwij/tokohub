@@ -173,9 +173,23 @@ def match_items():
     results = []
     for item in data['items']:
         name = item.get('name', '').strip()
-        if not name:
+        barcode = item.get('barcode', '').strip()
+        if not name and not barcode:
             continue
-        matches = search_stock(name)
+
+        matches = []
+
+        # Priority 1: Try barcode match first
+        if barcode:
+            matches = search_stock(barcode)
+            # Only keep if barcode actually matched
+            if matches and matches[0].get('match_type') != 'barcode':
+                matches = []
+
+        # Priority 2: Fall back to name (fuzzy) match
+        if not matches and name:
+            matches = search_stock(name)
+
         status = 'unmatched'
         if matches:
             if matches[0]['match_type'] in ('alias', 'barcode'):
@@ -249,9 +263,11 @@ def preview_po():
 
     order_date = date.fromisoformat(order_date_str) if order_date_str else date.today()
 
+    shipping_cost = data.get('shipping_cost', 0)
+
     try:
         from services.po_service import preview_po as _preview
-        result = _preview(supplier_id, items, order_date)
+        result = _preview(supplier_id, items, order_date, shipping_cost=shipping_cost)
         return jsonify(result)
     except Exception as e:
         logger.exception("PO preview failed")
@@ -271,9 +287,11 @@ def commit_po():
 
     order_date = date.fromisoformat(order_date_str) if order_date_str else date.today()
 
+    shipping_cost = data.get('shipping_cost', 0)
+
     try:
         from services.po_service import commit_po as _commit
-        result = _commit(supplier_id, items, order_date, userid=userid)
+        result = _commit(supplier_id, items, order_date, userid=userid, shipping_cost=shipping_cost)
         return jsonify(result)
     except Exception as e:
         logger.exception("PO commit failed")

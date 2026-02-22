@@ -4,7 +4,7 @@
 {% block content %}
 <div class="row g-3">
   <!-- Left: Input Panel -->
-  <div class="col-lg-5">
+  <div class="col-lg-4">
     <div class="card">
       <div class="card-header bg-success text-white">
         <h5 class="mb-0"><i class="bi bi-receipt"></i> Input Penerimaan Barang</h5>
@@ -62,10 +62,6 @@
             <div class="input-group mb-2">
               <input type="text" id="itemNameInput" class="form-control"
                      placeholder="Nama barang / barcode" autocomplete="off">
-              <input type="number" id="itemQtyInput" class="form-control"
-                     style="max-width:80px" placeholder="Qty" value="1" min="1">
-              <input type="number" id="itemPriceInput" class="form-control"
-                     style="max-width:160px" placeholder="Harga (opsional)">
               <button class="btn btn-success" type="button" id="btnAddItem">
                 <i class="bi bi-plus-lg"></i>
               </button>
@@ -116,7 +112,7 @@
   </div>
 
   <!-- Right: Item List & Actions -->
-  <div class="col-lg-7">
+  <div class="col-lg-8">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
@@ -127,16 +123,25 @@
           <table class="table table-sm table-hover mb-0" id="itemTable">
             <thead class="table-light">
               <tr>
-                <th style="width:30px">#</th>
-                <th>Nama (Receipt)</th>
-                <th style="width:60px">Qty</th>
+                <th style="width:28px">#</th>
+                <th>Nama</th>
+                <th style="width:120px">Barcode</th>
+                <th style="width:130px">Qty Besar</th>
+                <th style="width:70px">Pcs</th>
+                <th style="width:95px">Total Harga</th>
+                <th style="width:95px">Harga Bsr</th>
+                <th style="width:80px">Harga Kcl</th>
+                <th style="width:58px">Disc1%</th>
+                <th style="width:58px">Disc2%</th>
+                <th style="width:58px">Disc3%</th>
+                <th style="width:58px">PPN%</th>
                 <th>Match</th>
-                <th style="width:30px"></th>
+                <th style="width:28px"></th>
               </tr>
             </thead>
             <tbody id="itemTableBody">
               <tr id="emptyRow">
-                <td colspan="5" class="text-center text-muted py-4">
+                <td colspan="14" class="text-center text-muted py-4">
                   Belum ada barang. Tambahkan dari panel kiri.
                 </td>
               </tr>
@@ -145,15 +150,25 @@
         </div>
       </div>
       <div class="card-footer">
-        <div class="d-flex gap-2">
-          <button class="btn btn-primary" id="btnMatchAll" disabled>
-            <i class="bi bi-search"></i> Match Semua
-          </button>
-          <button class="btn btn-warning" id="btnPreviewPO" disabled>
-            <i class="bi bi-eye"></i> Preview PO
-          </button>
-          <button class="btn btn-outline-danger ms-auto" id="btnClearAll" disabled>
-            <i class="bi bi-trash"></i> Hapus Semua
+        <div class="d-flex gap-3 align-items-center flex-wrap">
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" id="btnMatchAll" disabled>
+              <i class="bi bi-search"></i> Match Semua
+            </button>
+            <button class="btn btn-warning btn-sm" id="btnPreviewPO" disabled>
+              <i class="bi bi-eye"></i> Preview PO
+            </button>
+          </div>
+          <div class="d-flex align-items-center gap-2 ms-auto">
+            <label class="form-label mb-0 small fw-semibold text-nowrap text-muted" for="shippingCostInput">Biaya Kirim</label>
+            <div class="input-group input-group-sm" style="width:150px">
+              <span class="input-group-text">Rp</span>
+              <input type="text" id="shippingCostInput" class="form-control text-end"
+                     value="0" placeholder="0" inputmode="numeric">
+            </div>
+          </div>
+          <button class="btn btn-outline-danger btn-sm" id="btnClearAll" disabled>
+            <i class="bi bi-trash"></i> Hapus
           </button>
         </div>
       </div>
@@ -217,6 +232,11 @@
                 <th class="text-end">Qty</th>
                 <th>Satuan</th>
                 <th class="text-end">Harga Beli</th>
+                <th class="text-end">Harga Kcl</th>
+                <th class="text-end">Disc1%</th>
+                <th class="text-end">Disc2%</th>
+                <th class="text-end">Disc3%</th>
+                <th class="text-end">PPN%</th>
                 <th class="text-end">Netto</th>
                 <th class="text-end">Amount</th>
               </tr>

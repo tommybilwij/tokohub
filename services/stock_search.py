@@ -53,7 +53,7 @@ def _load_stock_cache():
 
     rows = execute_query(
         """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                  packing, hbelibsr, hbelikcl, pctdisc1, pctppn, hjual
+                  packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
            FROM stock
            WHERE isactive = 1
            ORDER BY artname"""
@@ -125,7 +125,7 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
     if alias_artno:
         stock = execute_single(
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctppn, hjual
+                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
                FROM stock WHERE artno = %s""",
             (alias_artno,)
         )
@@ -134,11 +134,11 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
             stock['match_type'] = 'alias'
             pinned.append(stock)
 
-    # Pass 2: Barcode match (8-13 digits)
-    if re.match(r'^\d{8,13}$', query):
+    # Pass 2: Barcode match (numeric strings, or any string that looks like a barcode/artpabrik)
+    if re.match(r'^\d{4,}$', query) or re.match(r'^[A-Z0-9-]{4,}$', query, re.IGNORECASE):
         stock = execute_single(
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctppn, hjual
+                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
                FROM stock WHERE artpabrik = %s AND isactive = 1""",
             (query,)
         )

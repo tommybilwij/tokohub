@@ -90,6 +90,69 @@ body {
   border-color: #198754;
 }
 
+/* Item table compact */
+#itemTable .form-control-sm,
+#itemTable .form-select-sm {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+#itemTable td {
+  padding: 0.3rem 0.35rem;
+  vertical-align: top;
+}
+
+#itemTable .btn-review {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Match info details below match button */
+.match-info {
+  background: #f0faf3;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 210px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+.match-info-header {
+  margin-bottom: 4px;
+}
+
+.match-info-header .badge {
+  font-size: 0.72rem;
+  padding: 3px 7px;
+  vertical-align: middle;
+}
+
+.match-artno {
+  color: #6c757d;
+  font-size: 0.78rem;
+  margin-left: 4px;
+}
+
+.match-info-row {
+  white-space: nowrap;
+}
+
+.match-label {
+  color: #6c757d;
+  font-size: 0.78rem;
+}
+
+.match-value {
+  font-weight: 700;
+  color: #212529;
+  margin-left: 3px;
+}
+
 /* Item row states */
 .item-row-auto {
   border-left: 3px solid #198754;
@@ -103,6 +166,12 @@ body {
   border-left: 3px solid #dc3545;
 }
 
+/* Card footer actions */
+.card-footer .input-group-text {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+}
+
 /* Loading spinner */
 .spinner-overlay {
   position: fixed;
@@ -112,6 +181,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Percentage input fields (Disc1/2/3, PPN) */
+.pct-input {
+  width: 54px;
+  padding: 0.15rem 0.25rem;
+  font-size: 0.78rem;
+}
+
+/* Hide spin buttons on pct inputs */
+.pct-input::-webkit-inner-spin-button,
+.pct-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pct-input[type=number] {
+  -moz-appearance: textfield;
 }
 
 /* Responsive tweaks */

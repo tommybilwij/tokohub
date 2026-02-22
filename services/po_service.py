@@ -92,13 +92,14 @@ def get_stock_details(artno_list):
     return {row['artno']: row for row in rows}
 
 
-def preview_po(supplier_id, items, order_date=None):
+def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
     """Build a PO preview without committing.
 
     Args:
         supplier_id: Vendor ID
         items: List of {artno, qty, price_override (optional)}
         order_date: Date for PO (defaults to today)
+        shipping_cost: Shipping cost to distribute proportionally into tax (jlhppn)
 
     Returns:
         dict with header info and line items with calculated pricing
@@ -106,6 +107,8 @@ def preview_po(supplier_id, items, order_date=None):
     order_date = order_date or date.today()
     artno_list = [item['artno'] for item in items]
     stock_map = get_stock_details(artno_list)
+
+    shipping = Decimal(str(shipping_cost or 0))
 
     lines = []
     grand_total = Decimal('0')
@@ -128,10 +131,10 @@ def preview_po(supplier_id, items, order_date=None):
         # Calculate small-unit price
         hbelikcl = hbelibsr / packing if packing else hbelibsr
 
-        # Discounts
-        pctdisc1 = stock['pctdisc1'] or Decimal('0')
-        pctdisc2 = stock['pctdisc2'] or Decimal('0')
-        pctdisc3 = stock['pctdisc3'] or Decimal('0')
+        # Discounts (use override if provided, else stock defaults)
+        pctdisc1 = Decimal(str(item['disc1_override'])) if item.get('disc1_override') is not None else (stock['pctdisc1'] or Decimal('0'))
+        pctdisc2 = Decimal(str(item['disc2_override'])) if item.get('disc2_override') is not None else (stock['pctdisc2'] or Decimal('0'))
+        pctdisc3 = Decimal(str(item['disc3_override'])) if item.get('disc3_override') is not None else (stock['pctdisc3'] or Decimal('0'))
 
         disc1 = hbelibsr * pctdisc1 / 100
         after_disc1 = hbelibsr - disc1
@@ -140,8 +143,8 @@ def preview_po(supplier_id, items, order_date=None):
         disc3 = after_disc2 * pctdisc3 / 100
         hbelinetto = after_disc2 - disc3
 
-        # Tax
-        pctppn = stock['pctppn'] or Decimal('0')
+        # Tax (use override if provided, else stock default)
+        pctppn = Decimal(str(item['ppn_override'])) if item.get('ppn_override') is not None else (stock['pctppn'] or Decimal('0'))
         ppn = hbelinetto * pctppn / 100
 
         amount = (hbelinetto + ppn) * qty
@@ -167,16 +170,26 @@ def preview_po(supplier_id, items, order_date=None):
         })
         grand_total += amount
 
+    # Distribute shipping cost proportionally into each line's jlhppn
+    if shipping > 0 and grand_total > 0:
+        for line in lines:
+            weight = Decimal(str(line['amount'])) / grand_total
+            line_shipping = float(shipping * weight)
+            line['jlhppn'] = line['jlhppn'] + line_shipping
+            line['amount'] = line['amount'] + line_shipping
+        grand_total += shipping
+
     return {
         'supplier_id': supplier_id,
         'order_date': order_date.isoformat(),
         'lines': lines,
         'grand_total': float(grand_total),
         'line_count': len(lines),
+        'shipping_cost': float(shipping),
     }
 
 
-def commit_po(supplier_id, items, order_date=None, userid=None):
+def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0):
     """Create PO in database without locking.
 
     Each write is an atomic single-row operation, so MyPosse POS
@@ -187,6 +200,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
         items: List of {artno, qty, price_override (optional)}
         order_date: Date for PO (defaults to today)
         userid: User creating the PO
+        shipping_cost: Shipping cost distributed into tax
 
     Returns:
         dict with PO number and summary
@@ -194,7 +208,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None):
     if not userid:
         raise POCreationError("userid is required")
     order_date = order_date or date.today()
-    preview = preview_po(supplier_id, items, order_date)
+    preview = preview_po(supplier_id, items, order_date, shipping_cost=shipping_cost)
 
     with get_connection() as conn:
         cursor = conn.cursor(dictionary=True)

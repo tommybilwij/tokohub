@@ -411,7 +411,7 @@
           ${item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—'}
         </td>
         <td class="text-end text-muted small harga-kcl" data-idx="${idx}">
-          ${item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—'}
+          ${item.qtyKecil > 0 && item.priceBsr ? formatNumber(Math.round(item.priceBsr / item.qtyKecil)) : '—'}
         </td>
         <td>
           <input type="number" class="form-control form-control-sm edit-disc1 text-end pct-input" data-idx="${idx}"
@@ -459,7 +459,9 @@
     });
     $$('.edit-qty-kecil').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].qtyKecil = parseFloat(el.value) || 0;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].qtyKecil = parseFloat(el.value) || 0;
+        _recalcFromTotal(idx);
       });
     });
     $$('.edit-satuan-bsr').forEach((el) => {
@@ -470,14 +472,13 @@
     function _recalcFromTotal(idx) {
       const item = state.items[idx];
       const qty = item.qtyBesar || 1;
-      const pack = item.packing || 1;
       item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
-      item.priceKcl = item.priceBsr / pack;
+      item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
 
       const bsrEl = document.querySelector(`.harga-bsr[data-idx="${idx}"]`);
       const kclEl = document.querySelector(`.harga-kcl[data-idx="${idx}"]`);
       if (bsrEl) bsrEl.textContent = item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—';
-      if (kclEl) kclEl.textContent = item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
+      if (kclEl) kclEl.textContent = item.qtyKecil > 0 && item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
     }
 
     $$('.edit-price-total').forEach((el) => {

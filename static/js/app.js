@@ -324,14 +324,28 @@
     renderItemTable();
   }
 
+  // Price recalculation helper (used by render and event handlers)
+  function _recalcFromTotal(idx) {
+    const item = state.items[idx];
+    const qty = item.qtyBesar || 1;
+    item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
+    item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
+
+    const bsrEl = document.querySelector(`.harga-bsr[data-idx="${idx}"]`);
+    const kclEl = document.querySelector(`.harga-kcl[data-idx="${idx}"]`);
+    if (bsrEl) bsrEl.textContent = item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—';
+    if (kclEl) kclEl.textContent = item.qtyKecil > 0 && item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
+  }
+
   function renderItemTable() {
     const tbody = dom.itemTableBody;
     tbody.innerHTML = '';
 
     if (state.items.length === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="19" class="text-center text-muted py-4">
-          Belum ada barang. Tambahkan dari panel kiri.
+        <tr><td colspan="10" class="text-center text-muted py-5">
+          <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3"></i><br>
+          <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
       dom.btnMatchAll.disabled = true;
@@ -341,8 +355,10 @@
     }
 
     state.items.forEach((item, idx) => {
+      // --- Main row ---
       const tr = document.createElement('tr');
-      tr.className = `item-row-${item.status}`;
+      tr.className = `item-main status-${item.status}`;
+      tr.dataset.idx = idx;
 
       let matchHTML = '';
       if (item.status === 'auto' && item.matches.length) {
@@ -357,12 +373,12 @@
           <button class="btn btn-sm btn-success btn-review" data-idx="${idx}" title="Klik untuk ganti">
             ${m.artname || m.artno}
           </button>
-          <div class="match-info mt-1">
+          <div class="match-info">
             <div class="match-info-header">${typeBadge} <span class="match-artno">${m.artno}</span></div>
             <div class="match-info-row">
               <span class="match-label">Beli</span>
               <span class="match-value">${formatNumber(m.hbelibsr || 0)}</span>
-              <span class="match-label ms-3">Jual</span>
+              <span class="match-label ms-2">Jual</span>
               <span class="match-value">${formatNumber(m.hjual || 0)}</span>
             </div>
             <div class="match-info-row">
@@ -380,101 +396,180 @@
         </button>`;
       }
 
-      // Build unit dropdown options
       const unitOpts = UNIT_OPTIONS.map(u =>
         `<option value="${u}"${u === item.satuanBsr ? ' selected' : ''}>${u}</option>`
       ).join('');
 
       tr.innerHTML = `
-        <td class="text-muted">${idx + 1}</td>
+        <td class="row-num">
+          <span class="expand-toggle"><i class="bi bi-chevron-right"></i></span>
+          ${idx + 1}
+        </td>
         <td>
-          <input type="text" class="form-control form-control-sm edit-name" data-idx="${idx}"
+          <input type="text" class="form-control edit-name" data-idx="${idx}"
                  value="${item.name.replace(/"/g, '&quot;')}">
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm edit-barcode" data-idx="${idx}"
-                 value="${(item.barcode || '').replace(/"/g, '&quot;')}" placeholder="—" style="width:110px;font-size:0.75rem" inputmode="numeric">
+          <input type="text" class="form-control edit-barcode" data-idx="${idx}"
+                 value="${(item.barcode || '').replace(/"/g, '&quot;')}" placeholder="—" inputmode="numeric">
         </td>
         <td>
           <div class="d-flex gap-1 align-items-center">
-            <input type="number" class="form-control form-control-sm edit-qty-besar" data-idx="${idx}"
-                   value="${item.qtyBesar}" min="0" step="any" style="width:55px">
-            <select class="form-select form-select-sm edit-satuan-bsr" data-idx="${idx}" style="width:68px;font-size:0.75rem">
+            <div class="qty-stepper">
+              <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+              <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
+                     value="${item.qtyBesar}" min="0" step="1">
+              <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+            </div>
+            <select class="form-select edit-satuan-bsr" data-idx="${idx}" style="width:72px">
               ${unitOpts}
             </select>
           </div>
         </td>
         <td>
-          <input type="number" class="form-control form-control-sm edit-qty-kecil" data-idx="${idx}"
-                 value="${item.qtyKecil}" min="0" step="any" style="width:60px">
+          <div class="qty-stepper">
+            <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+            <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
+                   value="${item.qtyKecil}" min="0" step="1">
+            <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+          </div>
         </td>
         <td>
-          <input type="text" class="form-control form-control-sm edit-price-total text-end" data-idx="${idx}"
-                 value="${item.priceTotal ? formatNumber(Math.round(item.priceTotal)) : ''}" placeholder="0" style="width:88px" inputmode="numeric">
+          <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
+                 value="${item.priceTotal ? formatNumber(Math.round(item.priceTotal)) : ''}" placeholder="0" inputmode="numeric">
         </td>
-        <td class="text-end text-muted small harga-bsr" data-idx="${idx}">
+        <td class="text-end price-readonly harga-bsr" data-idx="${idx}">
           ${item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—'}
         </td>
-        <td class="text-end text-muted small harga-kcl" data-idx="${idx}">
+        <td class="text-end price-readonly harga-kcl" data-idx="${idx}">
           ${item.qtyKecil > 0 && item.priceBsr ? formatNumber(Math.round(item.priceBsr / item.qtyKecil)) : '—'}
-        </td>
-        <td>
-          <input type="number" class="form-control form-control-sm edit-disc1 text-end pct-input" data-idx="${idx}"
-                 value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100">
-        </td>
-        <td>
-          <input type="number" class="form-control form-control-sm edit-disc2 text-end pct-input" data-idx="${idx}"
-                 value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100">
-        </td>
-        <td>
-          <input type="number" class="form-control form-control-sm edit-disc3 text-end pct-input" data-idx="${idx}"
-                 value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100">
-        </td>
-        <td>
-          <input type="number" class="form-control form-control-sm edit-ppn text-end pct-input" data-idx="${idx}"
-                 value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm edit-hjual1 text-end" data-idx="${idx}"
-                 value="${item.hjual1 != null ? formatNumber(item.hjual1) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm edit-hjual3 text-end" data-idx="${idx}"
-                 value="${item.hjual3 != null ? formatNumber(item.hjual3) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm edit-hjual4 text-end" data-idx="${idx}"
-                 value="${item.hjual4 != null ? formatNumber(item.hjual4) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm edit-hjual5 text-end" data-idx="${idx}"
-                 value="${item.hjual5 != null ? formatNumber(item.hjual5) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
-        </td>
-        <td>
-          <input type="text" class="form-control form-control-sm edit-hjual2 text-end" data-idx="${idx}"
-                 value="${item.hjual2 != null ? formatNumber(item.hjual2) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
         </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="${idx}" title="Hapus">
-            <i class="bi bi-x"></i>
+            <i class="bi bi-x-lg"></i>
           </button>
         </td>
       `;
       tbody.appendChild(tr);
+
+      // --- Detail row (expandable) ---
+      const detailTr = document.createElement('tr');
+      detailTr.className = 'item-detail';
+      detailTr.dataset.idx = idx;
+      detailTr.innerHTML = `
+        <td colspan="10">
+          <div class="detail-panel">
+            <div class="detail-group">
+              <div class="detail-group-title">Diskon & PPN</div>
+              <div class="detail-fields">
+                <div class="detail-field">
+                  <label>Disc 1%</label>
+                  <input type="number" class="pct-input edit-disc1" data-idx="${idx}"
+                         value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100">
+                </div>
+                <div class="detail-field">
+                  <label>Disc 2%</label>
+                  <input type="number" class="pct-input edit-disc2" data-idx="${idx}"
+                         value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100">
+                </div>
+                <div class="detail-field">
+                  <label>Disc 3%</label>
+                  <input type="number" class="pct-input edit-disc3" data-idx="${idx}"
+                         value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100">
+                </div>
+                <div class="detail-field">
+                  <label>PPN%</label>
+                  <input type="number" class="pct-input edit-ppn" data-idx="${idx}"
+                         value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
+                </div>
+              </div>
+            </div>
+            <div class="detail-group">
+              <div class="detail-group-title">Harga Jual</div>
+              <div class="detail-fields">
+                <div class="detail-field">
+                  <label>Jual 1</label>
+                  <input type="text" class="edit-hjual1" data-idx="${idx}"
+                         value="${item.hjual1 != null ? formatNumber(item.hjual1) : ''}" placeholder="—" inputmode="numeric">
+                </div>
+                <div class="detail-field">
+                  <label>Jual 3</label>
+                  <input type="text" class="edit-hjual3" data-idx="${idx}"
+                         value="${item.hjual3 != null ? formatNumber(item.hjual3) : ''}" placeholder="—" inputmode="numeric">
+                </div>
+                <div class="detail-field">
+                  <label>Jual 4</label>
+                  <input type="text" class="edit-hjual4" data-idx="${idx}"
+                         value="${item.hjual4 != null ? formatNumber(item.hjual4) : ''}" placeholder="—" inputmode="numeric">
+                </div>
+                <div class="detail-field">
+                  <label>Jual 5</label>
+                  <input type="text" class="edit-hjual5" data-idx="${idx}"
+                         value="${item.hjual5 != null ? formatNumber(item.hjual5) : ''}" placeholder="—" inputmode="numeric">
+                </div>
+                <div class="detail-field">
+                  <label>Jual Mbr</label>
+                  <input type="text" class="edit-hjual2" data-idx="${idx}"
+                         value="${item.hjual2 != null ? formatNumber(item.hjual2) : ''}" placeholder="—" inputmode="numeric">
+                </div>
+              </div>
+            </div>
+          </div>
+        </td>
+      `;
+      // Auto-expand detail row if it has disc/hjual data
+      const hasDetail = item.disc1 || item.disc2 || item.disc3 || item.ppn ||
+                        item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5;
+      if (hasDetail) {
+        detailTr.classList.add('open');
+        tr.classList.add('has-detail-open');
+      }
+
+      tbody.appendChild(detailTr);
     });
 
-    // Bind inline edit fields
+    // --- Bind events ---
+    _bindItemEvents();
+
+    dom.itemCount.textContent = `${state.items.length} item`;
+    dom.btnMatchAll.disabled = false;
+    dom.btnClearAll.disabled = false;
+
+    const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
+    dom.btnPreviewPO.disabled = !allMatched;
+  }
+
+  function _bindItemEvents() {
+    // Toggle detail row on main row click
+    $$('.item-main').forEach((mainRow) => {
+      mainRow.addEventListener('click', (e) => {
+        // Don't toggle if clicking on inputs, buttons, or selects
+        if (e.target.closest('input, button, select, .btn-review, .match-info')) return;
+        const idx = mainRow.dataset.idx;
+        const detailRow = document.querySelector(`.item-detail[data-idx="${idx}"]`);
+        if (detailRow) {
+          detailRow.classList.toggle('open');
+          mainRow.classList.toggle('has-detail-open');
+        }
+      });
+    });
+
+    // Name
     $$('.edit-name').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].name = el.value.trim();
       });
     });
+
+    // Barcode
     $$('.edit-barcode').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].barcode = el.value.trim();
       });
     });
+
+    // Qty Besar
     $$('.edit-qty-besar').forEach((el) => {
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
@@ -482,6 +577,30 @@
         _recalcFromTotal(idx);
       });
     });
+
+    // Qty Besar stepper buttons
+    $$('.qtybsr-up').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        state.items[idx].qtyBesar = (state.items[idx].qtyBesar || 0) + 1;
+        const input = btn.parentElement.querySelector('.edit-qty-besar');
+        input.value = state.items[idx].qtyBesar;
+        _recalcFromTotal(idx);
+      });
+    });
+    $$('.qtybsr-down').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const current = state.items[idx].qtyBesar || 0;
+        if (current <= 0) return;
+        state.items[idx].qtyBesar = current - 1;
+        const input = btn.parentElement.querySelector('.edit-qty-besar');
+        input.value = state.items[idx].qtyBesar;
+        _recalcFromTotal(idx);
+      });
+    });
+
+    // Qty Kecil
     $$('.edit-qty-kecil').forEach((el) => {
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
@@ -489,23 +608,37 @@
         _recalcFromTotal(idx);
       });
     });
+
+    // Qty Kecil stepper buttons
+    $$('.qty-up').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        state.items[idx].qtyKecil = (state.items[idx].qtyKecil || 0) + 1;
+        const input = btn.parentElement.querySelector('.edit-qty-kecil');
+        input.value = state.items[idx].qtyKecil;
+        _recalcFromTotal(idx);
+      });
+    });
+    $$('.qty-down').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const current = state.items[idx].qtyKecil || 0;
+        if (current <= 0) return;
+        state.items[idx].qtyKecil = current - 1;
+        const input = btn.parentElement.querySelector('.edit-qty-kecil');
+        input.value = state.items[idx].qtyKecil;
+        _recalcFromTotal(idx);
+      });
+    });
+
+    // Satuan Besar
     $$('.edit-satuan-bsr').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].satuanBsr = el.value;
       });
     });
-    function _recalcFromTotal(idx) {
-      const item = state.items[idx];
-      const qty = item.qtyBesar || 1;
-      item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
-      item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
 
-      const bsrEl = document.querySelector(`.harga-bsr[data-idx="${idx}"]`);
-      const kclEl = document.querySelector(`.harga-kcl[data-idx="${idx}"]`);
-      if (bsrEl) bsrEl.textContent = item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—';
-      if (kclEl) kclEl.textContent = item.qtyKecil > 0 && item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
-    }
-
+    // Total Harga
     $$('.edit-price-total').forEach((el) => {
       el.addEventListener('input', () => {
         const idx = parseInt(el.dataset.idx);
@@ -519,6 +652,8 @@
         _recalcFromTotal(idx);
       });
     });
+
+    // Disc & PPN (in detail row)
     $$('.edit-disc1').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].disc1 = el.value !== '' ? parseFloat(el.value) : null;
@@ -539,64 +674,28 @@
         state.items[parseInt(el.dataset.idx)].ppn = el.value !== '' ? parseFloat(el.value) : null;
       });
     });
-    $$('.edit-hjual1').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        const val = parsePrice(el.value);
-        state.items[idx].hjual1 = val || null;
-        el.value = val ? formatNumber(val) : '';
-      });
-    });
-    $$('.edit-hjual2').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        const val = parsePrice(el.value);
-        state.items[idx].hjual2 = val || null;
-        el.value = val ? formatNumber(val) : '';
-      });
-    });
-    $$('.edit-hjual3').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        const val = parsePrice(el.value);
-        state.items[idx].hjual3 = val || null;
-        el.value = val ? formatNumber(val) : '';
-      });
-    });
-    $$('.edit-hjual4').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        const val = parsePrice(el.value);
-        state.items[idx].hjual4 = val || null;
-        el.value = val ? formatNumber(val) : '';
-      });
-    });
-    $$('.edit-hjual5').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        const val = parsePrice(el.value);
-        state.items[idx].hjual5 = val || null;
-        el.value = val ? formatNumber(val) : '';
+
+    // Harga Jual (in detail row)
+    ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach((field) => {
+      $$(`.edit-${field}`).forEach((el) => {
+        el.addEventListener('change', () => {
+          const idx = parseInt(el.dataset.idx);
+          const val = parsePrice(el.value);
+          state.items[idx][field] = val || null;
+          el.value = val ? formatNumber(val) : '';
+        });
       });
     });
 
-    // Bind remove buttons
+    // Remove buttons
     $$('.btn-remove').forEach((btn) => {
       btn.addEventListener('click', () => removeItem(parseInt(btn.dataset.idx)));
     });
 
-    // Bind review buttons
+    // Review/match buttons
     $$('.btn-review').forEach((btn) => {
       btn.addEventListener('click', () => openMatchModal(parseInt(btn.dataset.idx)));
     });
-
-    dom.itemCount.textContent = `${state.items.length} item`;
-    dom.btnMatchAll.disabled = false;
-    dom.btnClearAll.disabled = false;
-
-    // Enable preview only if all items are matched
-    const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
-    dom.btnPreviewPO.disabled = !allMatched;
   }
 
   // -----------------------------------------------------------------------

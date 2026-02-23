@@ -19,34 +19,318 @@ body {
   font-size: 0.95rem;
 }
 
-/* Tables */
-.table th {
-  font-size: 0.8rem;
+/* -----------------------------------------------------------------------
+   Item Table - Main Layout
+   ----------------------------------------------------------------------- */
+#itemTable {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#itemTable thead th {
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   color: #6c757d;
+  font-weight: 700;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 2px solid #dee2e6;
+  background: #f8f9fa;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Column widths */
+#itemTable .col-num      { width: 32px; text-align: center; }
+#itemTable .col-name     { min-width: 180px; }
+#itemTable .col-barcode  { width: 110px; }
+#itemTable .col-satbsr   { width: 185px; }
+#itemTable .col-qtykcl   { width: 110px; }
+#itemTable .col-price    { width: 110px; }
+#itemTable .col-hbsr     { width: 90px; }
+#itemTable .col-hkcl     { width: 85px; }
+#itemTable .col-match    { min-width: 160px; }
+#itemTable .col-actions  { width: 36px; }
+
+/* Main row */
+#itemTable .item-main td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: none;
+}
+
+#itemTable .item-main {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+#itemTable .item-main:hover {
+  background-color: #f0faf3;
+}
+
+/* Row number */
+#itemTable .item-main .row-num {
+  font-weight: 600;
+  color: #adb5bd;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Status indicator - left border */
+#itemTable .item-main.status-auto     { border-left: 3px solid #198754; }
+#itemTable .item-main.status-review   { border-left: 3px solid #ffc107; }
+#itemTable .item-main.status-unmatched { border-left: 3px solid #dc3545; }
+
+/* Inputs in main row */
+#itemTable .item-main .form-control,
+#itemTable .item-main .form-select {
+  font-size: 0.82rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#itemTable .item-main .form-control:focus,
+#itemTable .item-main .form-select:focus {
+  border-color: #198754;
+  box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
+}
+
+/* Read-only price cells */
+#itemTable .price-readonly {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+/* -----------------------------------------------------------------------
+   Detail Row (expandable)
+   ----------------------------------------------------------------------- */
+#itemTable .item-detail {
+  display: none;
+}
+
+#itemTable .item-detail.open {
+  display: table-row;
+}
+
+#itemTable .item-detail td {
+  padding: 0;
+  border-bottom: 2px solid #e9ecef;
+  background: #fafbfc;
+}
+
+.detail-panel {
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-group-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8c959d;
+  margin-bottom: 0.15rem;
+}
+
+.detail-fields {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-field label {
+  font-size: 0.68rem;
+  color: #8c959d;
+  font-weight: 600;
+  margin: 0;
+}
+
+.detail-field input {
+  width: 80px;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  text-align: right;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.detail-field input:focus {
+  outline: none;
+  border-color: #198754;
+  box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
+}
+
+.detail-field input.pct-input {
+  width: 58px;
+}
+
+/* -----------------------------------------------------------------------
+   Qty Kecil stepper
+   ----------------------------------------------------------------------- */
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.qty-stepper input {
+  width: 42px;
+  text-align: center;
+  border: none;
+  border-left: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+  border-radius: 0;
+  padding: 0.25rem 0.15rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
-.table td {
+.qty-stepper input:focus {
+  outline: none;
+  box-shadow: none;
+  background: #f0faf3;
+}
+
+.qty-stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 30px;
+  border: none;
+  background: #f8f9fa;
+  color: #495057;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.qty-stepper-btn:hover {
+  background: #198754;
+  color: #fff;
+}
+
+.qty-stepper-btn:active {
+  background: #146c43;
+  color: #fff;
+}
+
+/* Row separator between main+detail pairs */
+#itemTable .item-main td {
+  border-top: 1px solid #e9ecef;
+}
+
+#itemTable .item-main.has-detail-open td {
+  border-bottom: none;
+}
+
+/* Expand toggle icon */
+.expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+  color: #adb5bd;
+  transition: transform 0.2s, color 0.15s;
+}
+
+.item-main.has-detail-open .expand-toggle {
+  transform: rotate(90deg);
+  color: #198754;
+}
+
+/* -----------------------------------------------------------------------
+   Match display
+   ----------------------------------------------------------------------- */
+#itemTable .btn-review {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 6px;
+}
+
+.match-info {
+  background: #f0faf3;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-width: 180px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #333;
+  margin-top: 4px;
+}
+
+.match-info-header {
+  margin-bottom: 3px;
+}
+
+.match-info-header .badge {
+  font-size: 0.68rem;
+  padding: 2px 6px;
   vertical-align: middle;
 }
 
-/* Item table status badges */
-.badge-auto {
-  background-color: #198754;
+.match-artno {
+  color: #6c757d;
+  font-size: 0.72rem;
+  margin-left: 4px;
 }
 
-.badge-review {
-  background-color: #ffc107;
+.match-info-row {
+  white-space: nowrap;
+}
+
+.match-label {
+  color: #6c757d;
+  font-size: 0.72rem;
+}
+
+.match-value {
+  font-weight: 700;
   color: #212529;
+  margin-left: 3px;
 }
 
-.badge-unmatched {
-  background-color: #dc3545;
-}
+/* -----------------------------------------------------------------------
+   Score badges
+   ----------------------------------------------------------------------- */
+.score-high { color: #198754; }
+.score-mid  { color: #ffc107; }
+.score-low  { color: #dc3545; }
 
-/* Search dropdown */
+/* -----------------------------------------------------------------------
+   Search dropdown
+   ----------------------------------------------------------------------- */
 .search-dropdown {
   position: absolute;
   z-index: 1050;
@@ -71,11 +355,9 @@ body {
   font-weight: 600;
 }
 
-.score-high { color: #198754; }
-.score-mid  { color: #ffc107; }
-.score-low  { color: #dc3545; }
-
-/* Match candidate list in modal */
+/* -----------------------------------------------------------------------
+   Match candidate list in modal
+   ----------------------------------------------------------------------- */
 #matchCandidates .list-group-item {
   cursor: pointer;
   transition: background-color 0.15s;
@@ -90,89 +372,17 @@ body {
   border-color: #198754;
 }
 
-/* Item table compact */
-#itemTable .form-control-sm,
-#itemTable .form-select-sm {
-  padding: 0.2rem 0.4rem;
-  font-size: 0.8rem;
-}
-
-#itemTable td {
-  padding: 0.3rem 0.35rem;
-  vertical-align: top;
-}
-
-#itemTable .btn-review {
-  font-size: 0.8rem;
-  white-space: nowrap;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Match info details below match button */
-.match-info {
-  background: #f0faf3;
-  border: 1px solid #c3e6cb;
-  border-radius: 6px;
-  padding: 8px 10px;
-  min-width: 210px;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  color: #333;
-}
-
-.match-info-header {
-  margin-bottom: 4px;
-}
-
-.match-info-header .badge {
-  font-size: 0.72rem;
-  padding: 3px 7px;
-  vertical-align: middle;
-}
-
-.match-artno {
-  color: #6c757d;
-  font-size: 0.78rem;
-  margin-left: 4px;
-}
-
-.match-info-row {
-  white-space: nowrap;
-}
-
-.match-label {
-  color: #6c757d;
-  font-size: 0.78rem;
-}
-
-.match-value {
-  font-weight: 700;
-  color: #212529;
-  margin-left: 3px;
-}
-
-/* Item row states */
-.item-row-auto {
-  border-left: 3px solid #198754;
-}
-
-.item-row-review {
-  border-left: 3px solid #ffc107;
-}
-
-.item-row-unmatched {
-  border-left: 3px solid #dc3545;
-}
-
-/* Card footer actions */
+/* -----------------------------------------------------------------------
+   Card footer actions
+   ----------------------------------------------------------------------- */
 .card-footer .input-group-text {
   font-size: 0.78rem;
   padding: 0.2rem 0.5rem;
 }
 
-/* Loading spinner */
+/* -----------------------------------------------------------------------
+   Loading spinner
+   ----------------------------------------------------------------------- */
 .spinner-overlay {
   position: fixed;
   inset: 0;
@@ -183,14 +393,9 @@ body {
   justify-content: center;
 }
 
-/* Percentage input fields (Disc1/2/3, PPN) */
-.pct-input {
-  width: 54px;
-  padding: 0.15rem 0.25rem;
-  font-size: 0.78rem;
-}
-
-/* Hide spin buttons on pct inputs */
+/* -----------------------------------------------------------------------
+   Percentage input spin-button hide
+   ----------------------------------------------------------------------- */
 .pct-input::-webkit-inner-spin-button,
 .pct-input::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -200,15 +405,27 @@ body {
   -moz-appearance: textfield;
 }
 
-/* Responsive tweaks */
+/* Number input spin-button hide */
+#itemTable input[type=number]::-webkit-inner-spin-button,
+#itemTable input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#itemTable input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* -----------------------------------------------------------------------
+   Responsive
+   ----------------------------------------------------------------------- */
 @media (max-width: 768px) {
   .container-fluid {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
 
-  .table th,
-  .table td {
-    font-size: 0.78rem;
+  .detail-panel {
+    padding: 0.5rem 0.75rem;
+    gap: 1rem;
   }
 }

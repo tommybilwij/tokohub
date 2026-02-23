@@ -99,6 +99,31 @@ def _compute_score(query_normalized, query_sizes, candidate):
     return round(composite, 1)
 
 
+def _fetch_bundlings(artno_list):
+    """Fetch bundling (itempaket) data for a list of artnos."""
+    if not artno_list:
+        return {}
+    placeholders = ','.join(['%s'] * len(artno_list))
+    rows = execute_query(
+        f"""SELECT artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5
+            FROM itempaket
+            WHERE artno IN ({placeholders})
+            ORDER BY artno, qty""",
+        tuple(artno_list)
+    )
+    result = {}
+    for row in rows:
+        result.setdefault(row['artno'], []).append({
+            'qty': float(row['qty'] or 0),
+            'hjual1': float(row['hjual1'] or 0),
+            'hjual2': float(row['hjual2'] or 0),
+            'hjual3': float(row['hjual3'] or 0),
+            'hjual4': float(row['hjual4'] or 0),
+            'hjual5': float(row['hjual5'] or 0),
+        })
+    return result
+
+
 def search_stock(query, top_n=None, min_score=None, score_against=None):
     """
     Multi-pass search for stock items.
@@ -174,4 +199,12 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
             scored.append(result)
 
     scored.sort(key=lambda x: x['score'], reverse=True)
-    return pinned + scored[:top_n]
+    results = pinned + scored[:top_n]
+
+    # Attach bundling data from itempaket
+    artno_list = [r['artno'] for r in results]
+    bundling_map = _fetch_bundlings(artno_list)
+    for r in results:
+        r['_bundlings'] = bundling_map.get(r['artno'], [])
+
+    return results

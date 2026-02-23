@@ -419,21 +419,85 @@
         else typeBadge = `<span class="badge bg-success">${m.score}%</span>`;
 
         const packNum = m.packing ? parseInt(m.packing) : '';
+        const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? Math.round(m.hbelibsr / packNum) : 0);
+
+        // Build jual grid rows (only non-zero)
+        const jualItems = [
+          { label: 'Jual 1', val: m.hjual },
+          { label: 'Jual 3', val: m.hjual3 },
+          { label: 'Jual 4', val: m.hjual4 },
+          { label: 'Jual 5', val: m.hjual5 },
+          { label: 'Member', val: m.hjual2 },
+        ].filter(j => j.val);
+
+        const jualHTML = jualItems.length
+          ? `<div class="si-section">
+              <div class="si-label">Harga Jual (Saat Ini)</div>
+              <div class="si-grid">${jualItems.map(j =>
+                `<div class="si-cell"><span class="si-cell-label">${j.label}</span><span class="si-cell-value">${formatNumber(j.val)}</span></div>`
+              ).join('')}</div>
+            </div>`
+          : '';
+
+        // Bundling data from DB (if any)
+        const bundlings = m._bundlings || [];
+        const bundlingHTML = bundlings.length
+          ? bundlings.map((b, bi) => {
+              const bJual = [
+                { label: 'J1', val: b.hjual1 },
+                { label: 'J3', val: b.hjual3 },
+                { label: 'J4', val: b.hjual4 },
+                { label: 'J5', val: b.hjual5 },
+                { label: 'Mbr', val: b.hjual2 },
+              ].filter(j => j.val);
+              return `<div class="si-section">
+                <div class="si-label si-label-bundling">Bundling ${bi + 1} — Qty &ge; ${b.qty}</div>
+                <div class="si-grid">${bJual.map(j =>
+                  `<div class="si-cell si-cell-bundling"><span class="si-cell-label">${j.label}</span><span class="si-cell-value">${formatNumber(j.val)}</span></div>`
+                ).join('')}</div>
+              </div>`;
+            }).join('')
+          : '';
+
+        // Disc/PPN pills (only non-zero)
+        const discItems = [];
+        if (m.pctdisc1) discItems.push({ label: 'D1', val: m.pctdisc1 });
+        if (m.pctdisc2) discItems.push({ label: 'D2', val: m.pctdisc2 });
+        if (m.pctdisc3) discItems.push({ label: 'D3', val: m.pctdisc3 });
+        if (m.pctppn) discItems.push({ label: 'PPN', val: m.pctppn });
+        const discHTML = discItems.length
+          ? `<div class="si-pills">${discItems.map(d =>
+              `<span class="si-pill">${d.label} <b>${d.val}%</b></span>`
+            ).join('')}</div>`
+          : '';
+
         matchHTML = `
           <button class="btn btn-sm btn-success btn-review" data-idx="${idx}" title="Klik untuk ganti">
             ${m.artname || m.artno}
           </button>
-          <div class="match-info">
-            <div class="match-info-header">${typeBadge} <span class="match-artno">${m.artno}</span></div>
-            <div class="match-info-row">
-              <span class="match-label">Beli</span>
-              <span class="match-value">${formatNumber(m.hbelibsr || 0)}</span>
-              <span class="match-label ms-2">Jual</span>
-              <span class="match-value">${formatNumber(m.hjual || 0)}</span>
+          <div class="stock-info-card">
+            <div class="si-header">
+              ${typeBadge}
+              <span class="si-artno">${m.artno}</span>
+              <span class="si-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
             </div>
-            <div class="match-info-row">
-              <span class="match-label">Isi</span>
-              <span class="match-value">1 ${m.satbesar || '-'} / ${packNum || '-'} ${m.satkecil || 'Pcs'}</span>
+            <div class="si-body">
+              <div class="si-section">
+                <div class="si-label">Harga Beli (Saat Ini)</div>
+                <div class="si-prices">
+                  <div class="si-price-item">
+                    <span class="si-price-caption">/ ${m.satbesar || 'Bsr'}</span>
+                    <span class="si-price-amount">${formatNumber(m.hbelibsr || 0)}</span>
+                  </div>
+                  <div class="si-price-item">
+                    <span class="si-price-caption">/ ${m.satkecil || 'Pcs'}</span>
+                    <span class="si-price-amount si-price-small">${formatNumber(hbelikcl)}</span>
+                  </div>
+                </div>
+                ${discHTML}
+              </div>
+              ${jualHTML}
+              ${bundlingHTML}
             </div>
           </div>`;
       } else if (item.status === 'review') {

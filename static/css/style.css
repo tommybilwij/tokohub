@@ -51,7 +51,7 @@ body {
 #itemTable .col-price    { width: 110px; }
 #itemTable .col-hbsr     { width: 90px; }
 #itemTable .col-hkcl     { width: 85px; }
-#itemTable .col-match    { min-width: 160px; }
+#itemTable .col-match    { min-width: 240px; }
 #itemTable .col-actions  { width: 36px; }
 
 /* Main row */
@@ -315,47 +315,165 @@ body {
   border-radius: 6px;
 }
 
-.match-info {
+/* -----------------------------------------------------------------------
+   Stock Info Card (after match)
+   ----------------------------------------------------------------------- */
+.stock-info-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-top: 6px;
+  overflow: hidden;
+  min-width: 220px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.si-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.si-header .badge {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+}
+
+.si-artno {
+  font-size: 0.72rem;
+  color: #6c757d;
+  font-family: monospace;
+}
+
+.si-packing {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #495057;
+  background: #fff;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid #dee2e6;
+}
+
+.si-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.si-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.si-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8c959d;
+}
+
+.si-prices {
+  display: flex;
+  gap: 8px;
+}
+
+.si-price-item {
+  display: flex;
+  flex-direction: column;
   background: #f0faf3;
   border: 1px solid #c3e6cb;
   border-radius: 6px;
-  padding: 6px 8px;
-  min-width: 180px;
+  padding: 4px 10px;
+  min-width: 75px;
+}
+
+.si-price-caption {
+  font-size: 0.62rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.si-price-amount {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #198754;
+}
+
+.si-price-amount.si-price-small {
   font-size: 0.78rem;
-  line-height: 1.5;
-  color: #333;
-  margin-top: 4px;
+  font-weight: 600;
+  color: #495057;
 }
 
-.match-info-header {
-  margin-bottom: 3px;
+.si-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
 }
 
-.match-info-header .badge {
+.si-pill {
+  display: inline-block;
+  background: #eef1f5;
+  border-radius: 4px;
+  padding: 1px 7px;
   font-size: 0.68rem;
-  padding: 2px 6px;
-  vertical-align: middle;
-}
-
-.match-artno {
   color: #6c757d;
-  font-size: 0.72rem;
-  margin-left: 4px;
 }
 
-.match-info-row {
-  white-space: nowrap;
+.si-pill b {
+  color: #495057;
 }
 
-.match-label {
+.si-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.si-cell {
+  display: flex;
+  flex-direction: column;
+  background: #eef4ff;
+  border: 1px solid #c5d5f0;
+  border-radius: 5px;
+  padding: 3px 8px;
+  min-width: 55px;
+}
+
+.si-cell-label {
+  font-size: 0.6rem;
   color: #6c757d;
-  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
-.match-value {
+.si-cell-value {
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #212529;
-  margin-left: 3px;
+  color: #0d6efd;
+}
+
+.si-label-bundling {
+  color: #6f42c1;
+}
+
+.si-cell-bundling {
+  background: #f3f0ff;
+  border-color: #d4c5f9;
+}
+
+.si-cell-bundling .si-cell-value {
+  color: #6f42c1;
 }
 
 /* -----------------------------------------------------------------------

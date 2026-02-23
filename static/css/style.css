@@ -240,6 +240,43 @@ body {
   color: #fff;
 }
 
+/* -----------------------------------------------------------------------
+   Bundling groups
+   ----------------------------------------------------------------------- */
+.bundling-group {
+  border-left: 3px solid #0d6efd;
+  padding-left: 0.75rem;
+}
+
+.bundling-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0d6efd;
+  margin: 0;
+}
+
+.bundling-toggle .form-check-input {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  cursor: pointer;
+}
+
+.bundling-toggle .form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.bundling-fields {
+  transition: opacity 0.2s;
+}
+
 /* Row separator between main+detail pairs */
 #itemTable .item-main td {
   border-top: 1px solid #e9ecef;

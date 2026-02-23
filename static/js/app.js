@@ -310,6 +310,8 @@
       hjual3: null,
       hjual4: null,
       hjual5: null,
+      bundling1: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
+      bundling2: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
     });
     renderItemTable();
   }
@@ -322,6 +324,54 @@
   function clearAllItems() {
     state.items = [];
     renderItemTable();
+  }
+
+  // Render a bundling group (1 or 2) for the detail panel
+  function _renderBundlingGroup(idx, tier, b) {
+    const t = tier; // 1 or 2
+    const checked = b.enabled ? 'checked' : '';
+    const disabled = b.enabled ? '' : 'disabled';
+    return `
+      <div class="detail-group bundling-group">
+        <div class="detail-group-title">
+          <label class="bundling-toggle">
+            <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${t}" ${checked}>
+            Bundling ${t} <span class="text-muted fw-normal">(Qty &ge;)</span>
+          </label>
+        </div>
+        <div class="detail-fields bundling-fields" data-idx="${idx}" data-tier="${t}" ${b.enabled ? '' : 'style="opacity:0.4;pointer-events:none"'}>
+          <div class="detail-field">
+            <label>Min Qty</label>
+            <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${t}"
+                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" style="width:60px" ${disabled}>
+          </div>
+          <div class="detail-field">
+            <label>Jual 1</label>
+            <input type="text" class="bundling-hjual1" data-idx="${idx}" data-tier="${t}"
+                   value="${b.hjual1 != null ? formatNumber(b.hjual1) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
+          </div>
+          <div class="detail-field">
+            <label>Jual 3</label>
+            <input type="text" class="bundling-hjual3" data-idx="${idx}" data-tier="${t}"
+                   value="${b.hjual3 != null ? formatNumber(b.hjual3) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
+          </div>
+          <div class="detail-field">
+            <label>Jual 4</label>
+            <input type="text" class="bundling-hjual4" data-idx="${idx}" data-tier="${t}"
+                   value="${b.hjual4 != null ? formatNumber(b.hjual4) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
+          </div>
+          <div class="detail-field">
+            <label>Jual 5</label>
+            <input type="text" class="bundling-hjual5" data-idx="${idx}" data-tier="${t}"
+                   value="${b.hjual5 != null ? formatNumber(b.hjual5) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
+          </div>
+          <div class="detail-field">
+            <label>Jual Mbr</label>
+            <input type="text" class="bundling-hjual2" data-idx="${idx}" data-tier="${t}"
+                   value="${b.hjual2 != null ? formatNumber(b.hjual2) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
+          </div>
+        </div>
+      </div>`;
   }
 
   // Price recalculation helper (used by render and event handlers)
@@ -515,12 +565,15 @@
                 </div>
               </div>
             </div>
+            ${_renderBundlingGroup(idx, 1, item.bundling1)}
+            ${_renderBundlingGroup(idx, 2, item.bundling2)}
           </div>
         </td>
       `;
-      // Auto-expand detail row if it has disc/hjual data
+      // Auto-expand detail row if it has disc/hjual/bundling data
       const hasDetail = item.disc1 || item.disc2 || item.disc3 || item.ppn ||
-                        item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5;
+                        item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5 ||
+                        item.bundling1.enabled || item.bundling2.enabled;
       if (hasDetail) {
         detailTr.classList.add('open');
         tr.classList.add('has-detail-open');
@@ -704,6 +757,48 @@
           const idx = parseInt(el.dataset.idx);
           const val = parsePrice(el.value);
           state.items[idx][field] = val || null;
+          el.value = val ? formatNumber(val) : '';
+        });
+      });
+    });
+
+    // Bundling enable toggles
+    $$('.bundling-enable').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const tier = el.dataset.tier; // "1" or "2"
+        const b = state.items[idx][`bundling${tier}`];
+        b.enabled = el.checked;
+        // Toggle fields visibility
+        const fields = document.querySelector(`.bundling-fields[data-idx="${idx}"][data-tier="${tier}"]`);
+        if (fields) {
+          fields.style.opacity = el.checked ? '1' : '0.4';
+          fields.style.pointerEvents = el.checked ? '' : 'none';
+          fields.querySelectorAll('input').forEach(inp => {
+            if (el.checked) inp.removeAttribute('disabled');
+            else inp.setAttribute('disabled', '');
+          });
+        }
+      });
+    });
+
+    // Bundling min qty
+    $$('.bundling-minqty').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const tier = el.dataset.tier;
+        state.items[idx][`bundling${tier}`].minQty = parseInt(el.value) || 0;
+      });
+    });
+
+    // Bundling hjual fields
+    ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach((field) => {
+      $$(`.bundling-${field}`).forEach((el) => {
+        el.addEventListener('change', () => {
+          const idx = parseInt(el.dataset.idx);
+          const tier = el.dataset.tier;
+          const val = parsePrice(el.value);
+          state.items[idx][`bundling${tier}`][field] = val || null;
           el.value = val ? formatNumber(val) : '';
         });
       });
@@ -973,6 +1068,40 @@
   // -----------------------------------------------------------------------
   // PO Preview
   // -----------------------------------------------------------------------
+  function _buildBundlingPayload(b) {
+    if (!b || !b.enabled || !b.minQty) return null;
+    return {
+      min_qty: b.minQty,
+      hjual1: b.hjual1,
+      hjual2: b.hjual2,
+      hjual3: b.hjual3,
+      hjual4: b.hjual4,
+      hjual5: b.hjual5,
+    };
+  }
+
+  function _buildItemPayload(i) {
+    const payload = {
+      artno: i.selectedArtno,
+      qty: computeQty(i),
+      price_override: i.priceBsr || 0,
+      disc1_override: i.disc1,
+      disc2_override: i.disc2,
+      disc3_override: i.disc3,
+      ppn_override: i.ppn,
+      hjual1_override: i.hjual1,
+      hjual2_override: i.hjual2,
+      hjual3_override: i.hjual3,
+      hjual4_override: i.hjual4,
+      hjual5_override: i.hjual5,
+    };
+    const b1 = _buildBundlingPayload(i.bundling1);
+    const b2 = _buildBundlingPayload(i.bundling2);
+    if (b1) payload.bundling1 = b1;
+    if (b2) payload.bundling2 = b2;
+    return payload;
+  }
+
   async function previewPO() {
     if (!requireHeaderFields()) return;
     const userId = dom.userSelect.value;
@@ -981,20 +1110,7 @@
     const shippingCost = parsePrice(dom.shippingCostInput.value);
     const items = state.items
       .filter((i) => i.selectedArtno)
-      .map((i) => ({
-        artno: i.selectedArtno,
-        qty: computeQty(i),
-        price_override: i.priceBsr || 0,
-        disc1_override: i.disc1,
-        disc2_override: i.disc2,
-        disc3_override: i.disc3,
-        ppn_override: i.ppn,
-        hjual1_override: i.hjual1,
-        hjual2_override: i.hjual2,
-        hjual3_override: i.hjual3,
-        hjual4_override: i.hjual4,
-        hjual5_override: i.hjual5,
-      }));
+      .map(_buildItemPayload);
 
     if (!items.length) { alert('Tidak ada item yang sudah di-match.'); return; }
 
@@ -1069,20 +1185,7 @@
     const shippingCost = parsePrice(dom.shippingCostInput.value);
     const items = state.items
       .filter((i) => i.selectedArtno)
-      .map((i) => ({
-        artno: i.selectedArtno,
-        qty: computeQty(i),
-        price_override: i.priceBsr || 0,
-        disc1_override: i.disc1,
-        disc2_override: i.disc2,
-        disc3_override: i.disc3,
-        ppn_override: i.ppn,
-        hjual1_override: i.hjual1,
-        hjual2_override: i.hjual2,
-        hjual3_override: i.hjual3,
-        hjual4_override: i.hjual4,
-        hjual5_override: i.hjual5,
-      }));
+      .map(_buildItemPayload);
 
     showSpinner();
     try {

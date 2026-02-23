@@ -562,10 +562,32 @@
       });
     });
 
-    // Barcode
+    // Barcode — auto-lookup on change
     $$('.edit-barcode').forEach((el) => {
-      el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].barcode = el.value.trim();
+      el.addEventListener('change', async () => {
+        const idx = parseInt(el.dataset.idx);
+        const barcode = el.value.trim();
+        state.items[idx].barcode = barcode;
+        if (!barcode) return;
+
+        try {
+          const results = await api(`/api/stock/search?q=${encodeURIComponent(barcode)}&limit=10`);
+          if (!results.length) return;
+
+          // If top result is a barcode or alias exact match, auto-apply
+          const top = results[0];
+          if (top.match_type === 'barcode' || top.match_type === 'alias' || top.score >= 95) {
+            _applyMatch(idx, top);
+            renderItemTable();
+          } else {
+            // Open match modal for user to pick
+            state.currentReviewIdx = idx;
+            state.items[idx].matches = results;
+            openMatchModal(idx);
+          }
+        } catch (e) {
+          console.warn('Barcode lookup failed:', e.message);
+        }
       });
     });
 
@@ -842,10 +864,8 @@
     });
   }
 
-  async function selectCandidate(match) {
-    const idx = state.currentReviewIdx;
+  function _applyMatch(idx, match) {
     const item = state.items[idx];
-
     item.selectedArtno = match.artno;
     item.status = 'auto';
     item.matches = [match];
@@ -856,27 +876,29 @@
     item.disc2 = match.pctdisc2 ?? null;
     item.disc3 = match.pctdisc3 ?? null;
     item.ppn = match.pctppn ?? null;
-    // Auto-populate harga jual from match
     item.hjual1 = match.hjual || null;
     item.hjual2 = match.hjual2 || null;
     item.hjual3 = match.hjual3 || null;
     item.hjual4 = match.hjual4 || null;
     item.hjual5 = match.hjual5 || null;
-    // Auto-populate price from match if not yet set
     if (match.hbelibsr && !item.priceTotal) {
       item.priceTotal = match.hbelibsr * (item.qtyBesar || 1);
     }
-    // Recalculate derived prices (packing may have changed)
     const qty = item.qtyBesar || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.priceBsr / (item.packing || 1);
+  }
+
+  async function selectCandidate(match) {
+    const idx = state.currentReviewIdx;
+    _applyMatch(idx, match);
 
     // Save alias if checkbox checked
     if (dom.chkSaveAlias.checked) {
       try {
         await api('/receipt/save-alias', {
           method: 'POST',
-          body: { alias_name: item.name, artno: match.artno, userid: dom.userSelect.value },
+          body: { alias_name: state.items[idx].name, artno: match.artno, userid: dom.userSelect.value },
         });
       } catch (e) {
         console.warn('Alias save failed:', e.message);

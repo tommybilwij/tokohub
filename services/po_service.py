@@ -84,7 +84,7 @@ def get_stock_details(artno_list):
         f"""SELECT artno, artpabrik, artname, suppid, deptid,
                    satbesar, satkecil, packing,
                    hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3,
-                   pctppn, hjual, hjual2, hjual3
+                   pctppn, hjual, hjual2, hjual3, hjual4, hjual5
             FROM stock
             WHERE artno IN ({placeholders})""",
         tuple(artno_list)
@@ -165,7 +165,11 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'pctdisc3': float(pctdisc3),
             'pctppn': float(pctppn),
             'jlhppn': float(ppn * qty),
-            'hjual': float(stock['hjual'] or 0),
+            'hjual': float(item['hjual1_override']) if item.get('hjual1_override') is not None else float(stock['hjual'] or 0),
+            'hjual2': float(item['hjual2_override']) if item.get('hjual2_override') is not None else float(stock['hjual2'] or 0),
+            'hjual3': float(item['hjual3_override']) if item.get('hjual3_override') is not None else float(stock['hjual3'] or 0),
+            'hjual4': float(item['hjual4_override']) if item.get('hjual4_override') is not None else float(stock['hjual4'] or 0),
+            'hjual5': float(item['hjual5_override']) if item.get('hjual5_override') is not None else float(stock['hjual5'] or 0),
             'amount': float(amount),
         })
         grand_total += amount
@@ -258,21 +262,25 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                         jlhdisc1, jlhdisc2, jlhdisc3,
                         pctppn, jlhppn,
                         packing, satuanbsr, satuankcl,
-                        hjual, amount)
+                        hjual, hjual2, hjual3, hjual4, hjual5,
+                        amount)
                        VALUES (%s, %s, %s, %s, %s,
                                %s, %s, %s,
                                %s, %s, %s,
                                0, 0, 0,
                                %s, %s,
                                %s, %s, %s,
-                               %s, %s)""",
+                               %s, %s, %s, %s, %s,
+                               %s)""",
                     (becreff, line['artno'], line['artpabrik'], line['artname'],
                      line['qty'],
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
                      line['pctppn'], line['jlhppn'],
                      line['packing'], line['satuanbsr'], line['satuankcl'],
-                     line['hjual'], line['amount'])
+                     line['hjual'], line['hjual2'], line['hjual3'],
+                     line['hjual4'], line['hjual5'],
+                     line['amount'])
                 )
 
                 # Atomic balance update: curqty += qty * packing
@@ -301,7 +309,8 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                         pctdisc1, pctdisc2, pctdisc3,
                         jlhdisc1, jlhdisc2, jlhdisc3,
                         pctppn, jlhppn,
-                        hjual, amount,
+                        hjual, hjual2, hjual3, hjual4, hjual5,
+                        amount,
                         suppid, whid, nofaktur, becreff, tipetrans,
                         isupdateprice, isupdatepurchprice)
                        VALUES (%s, %s, %s, %s,
@@ -310,7 +319,8 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                                %s, %s, %s,
                                0, 0, 0,
                                %s, %s,
-                               %s, %s,
+                               %s, %s, %s, %s, %s,
+                               %s,
                                %s, 'LAPANGAN', %s, %s, 1,
                                1, 1)""",
                     (line['artno'], line['artpabrik'], line['artname'], order_date,
@@ -319,7 +329,9 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
                      line['pctppn'], line['jlhppn'],
-                     line['hjual'], line['amount'],
+                     line['hjual'], line['hjual2'], line['hjual3'],
+                     line['hjual4'], line['hjual5'],
+                     line['amount'],
                      supplier_id, fp_number, fp_becreff)
                 )
 

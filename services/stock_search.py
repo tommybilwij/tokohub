@@ -53,7 +53,8 @@ def _load_stock_cache():
 
     rows = execute_query(
         """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                  packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
+                  packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  hjual, hjual2, hjual3, hjual4, hjual5
            FROM stock
            WHERE isactive = 1
            ORDER BY artname"""
@@ -125,7 +126,8 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
     if alias_artno:
         stock = execute_single(
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
+                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  hjual, hjual2, hjual3, hjual4, hjual5
                FROM stock WHERE artno = %s""",
             (alias_artno,)
         )
@@ -138,7 +140,8 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
     if re.match(r'^\d{4,}$', query) or re.match(r'^[A-Z0-9-]{4,}$', query, re.IGNORECASE):
         stock = execute_single(
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn, hjual
+                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  hjual, hjual2, hjual3, hjual4, hjual5
                FROM stock WHERE artpabrik = %s AND isactive = 1""",
             (query,)
         )

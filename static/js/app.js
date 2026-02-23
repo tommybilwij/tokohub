@@ -305,6 +305,11 @@
       disc2: disc2 ?? null,
       disc3: disc3 ?? null,
       ppn: ppn ?? null,
+      hjual1: null,
+      hjual2: null,
+      hjual3: null,
+      hjual4: null,
+      hjual5: null,
     });
     renderItemTable();
   }
@@ -325,7 +330,7 @@
 
     if (state.items.length === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="14" class="text-center text-muted py-4">
+        <tr><td colspan="19" class="text-center text-muted py-4">
           Belum ada barang. Tambahkan dari panel kiri.
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
@@ -429,6 +434,26 @@
           <input type="number" class="form-control form-control-sm edit-ppn text-end pct-input" data-idx="${idx}"
                  value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
         </td>
+        <td>
+          <input type="text" class="form-control form-control-sm edit-hjual1 text-end" data-idx="${idx}"
+                 value="${item.hjual1 != null ? formatNumber(item.hjual1) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm edit-hjual3 text-end" data-idx="${idx}"
+                 value="${item.hjual3 != null ? formatNumber(item.hjual3) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm edit-hjual4 text-end" data-idx="${idx}"
+                 value="${item.hjual4 != null ? formatNumber(item.hjual4) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm edit-hjual5 text-end" data-idx="${idx}"
+                 value="${item.hjual5 != null ? formatNumber(item.hjual5) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
+        </td>
+        <td>
+          <input type="text" class="form-control form-control-sm edit-hjual2 text-end" data-idx="${idx}"
+                 value="${item.hjual2 != null ? formatNumber(item.hjual2) : ''}" placeholder="—" style="width:65px" inputmode="numeric">
+        </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="${idx}" title="Hapus">
@@ -514,6 +539,46 @@
         state.items[parseInt(el.dataset.idx)].ppn = el.value !== '' ? parseFloat(el.value) : null;
       });
     });
+    $$('.edit-hjual1').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const val = parsePrice(el.value);
+        state.items[idx].hjual1 = val || null;
+        el.value = val ? formatNumber(val) : '';
+      });
+    });
+    $$('.edit-hjual2').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const val = parsePrice(el.value);
+        state.items[idx].hjual2 = val || null;
+        el.value = val ? formatNumber(val) : '';
+      });
+    });
+    $$('.edit-hjual3').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const val = parsePrice(el.value);
+        state.items[idx].hjual3 = val || null;
+        el.value = val ? formatNumber(val) : '';
+      });
+    });
+    $$('.edit-hjual4').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const val = parsePrice(el.value);
+        state.items[idx].hjual4 = val || null;
+        el.value = val ? formatNumber(val) : '';
+      });
+    });
+    $$('.edit-hjual5').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const val = parsePrice(el.value);
+        state.items[idx].hjual5 = val || null;
+        el.value = val ? formatNumber(val) : '';
+      });
+    });
 
     // Bind remove buttons
     $$('.btn-remove').forEach((btn) => {
@@ -568,6 +633,12 @@
         item.disc2 = m.pctdisc2 ?? null;
         item.disc3 = m.pctdisc3 ?? null;
         item.ppn = m.pctppn ?? null;
+        // Auto-populate harga jual from match
+        if (item.hjual1 == null) item.hjual1 = m.hjual || null;
+        if (item.hjual2 == null) item.hjual2 = m.hjual2 || null;
+        if (item.hjual3 == null) item.hjual3 = m.hjual3 || null;
+        if (item.hjual4 == null) item.hjual4 = m.hjual4 || null;
+        if (item.hjual5 == null) item.hjual5 = m.hjual5 || null;
         // Auto-populate price from match if not yet set
         if (m.hbelibsr && !item.priceTotal) {
           item.priceTotal = m.hbelibsr * (item.qtyBesar || 1);
@@ -686,6 +757,12 @@
     item.disc2 = match.pctdisc2 ?? null;
     item.disc3 = match.pctdisc3 ?? null;
     item.ppn = match.pctppn ?? null;
+    // Auto-populate harga jual from match
+    item.hjual1 = match.hjual || null;
+    item.hjual2 = match.hjual2 || null;
+    item.hjual3 = match.hjual3 || null;
+    item.hjual4 = match.hjual4 || null;
+    item.hjual5 = match.hjual5 || null;
     // Auto-populate price from match if not yet set
     if (match.hbelibsr && !item.priceTotal) {
       item.priceTotal = match.hbelibsr * (item.qtyBesar || 1);
@@ -791,6 +868,11 @@
         disc2_override: i.disc2,
         disc3_override: i.disc3,
         ppn_override: i.ppn,
+        hjual1_override: i.hjual1,
+        hjual2_override: i.hjual2,
+        hjual3_override: i.hjual3,
+        hjual4_override: i.hjual4,
+        hjual5_override: i.hjual5,
       }));
 
     if (!items.length) { alert('Tidak ada item yang sudah di-match.'); return; }
@@ -874,6 +956,11 @@
         disc2_override: i.disc2,
         disc3_override: i.disc3,
         ppn_override: i.ppn,
+        hjual1_override: i.hjual1,
+        hjual2_override: i.hjual2,
+        hjual3_override: i.hjual3,
+        hjual4_override: i.hjual4,
+        hjual5_override: i.hjual5,
       }));
 
     showSpinner();

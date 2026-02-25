@@ -185,6 +185,30 @@ body {
   width: 58px;
 }
 
+/* Computed price displays (read-only) */
+.detail-computed .computed-val {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  text-align: right;
+  min-width: 80px;
+  background: #fef9f0;
+  color: #e67e22;
+  border: 1px solid #f0d9b5;
+}
+
+.computed-row {
+  margin-top: 0.3rem;
+}
+
+.computed-row .computed-val {
+  background: #eef4ff;
+  color: #0d6efd;
+  border: 1px solid #c5d5f0;
+}
+
 /* -----------------------------------------------------------------------
    Qty Kecil stepper
    ----------------------------------------------------------------------- */
@@ -432,6 +456,22 @@ body {
 
 .si-pill b {
   color: #495057;
+}
+
+/* Netto price after disc/ppn */
+.si-prices-netto {
+  margin-top: 4px;
+}
+
+.si-price-netto {
+  background: #fef9f0;
+  border-color: #f0d9b5;
+}
+
+.si-netto-amount {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e67e22;
 }
 
 .si-grid {

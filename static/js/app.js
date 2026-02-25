@@ -81,6 +81,21 @@
     return big;
   }
 
+  /**
+   * Calculate net purchase price after cascading discounts and tax.
+   * Mirrors the backend calculation in po_service.preview_po().
+   */
+  function calcNetPrice(hbelibsr, pctdisc1, pctdisc2, pctdisc3, pctppn) {
+    const d1 = hbelibsr * (pctdisc1 || 0) / 100;
+    const afterD1 = hbelibsr - d1;
+    const d2 = afterD1 * (pctdisc2 || 0) / 100;
+    const afterD2 = afterD1 - d2;
+    const d3 = afterD2 * (pctdisc3 || 0) / 100;
+    const netto = afterD2 - d3;
+    const ppn = netto * (pctppn || 0) / 100;
+    return { netto: Math.round(netto), final: Math.round(netto + ppn) };
+  }
+
   function debounce(fn, ms) {
     let timer;
     return function (...args) {
@@ -385,6 +400,36 @@
     const kclEl = document.querySelector(`.harga-kcl[data-idx="${idx}"]`);
     if (bsrEl) bsrEl.textContent = item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—';
     if (kclEl) kclEl.textContent = item.qtyKecil > 0 && item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
+    _updateComputedPrices(idx);
+  }
+
+  function _updateComputedPrices(idx) {
+    const item = state.items[idx];
+    const hbelibsr = item.priceBsr || 0;
+    const packing = item.packing || 1;
+
+    // Harga beli netto after disc/ppn
+    const hasDiscOrPpn = item.disc1 || item.disc2 || item.disc3 || item.ppn;
+    const nettoBsrEl = document.querySelector(`.netto-bsr[data-idx="${idx}"]`);
+    const finalBsrEl = document.querySelector(`.final-bsr[data-idx="${idx}"]`);
+
+    if (hasDiscOrPpn && hbelibsr) {
+      const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+      if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(net.netto);
+      if (finalBsrEl) finalBsrEl.textContent = formatNumber(net.final);
+    } else {
+      if (nettoBsrEl) nettoBsrEl.textContent = '—';
+      if (finalBsrEl) finalBsrEl.textContent = '—';
+    }
+
+    // Harga jual per bsr (hjual * packing)
+    ['hjual1', 'hjual3', 'hjual4', 'hjual5', 'hjual2'].forEach((field) => {
+      const el = document.querySelector(`.${field}-bsr[data-idx="${idx}"]`);
+      if (el) {
+        const val = item[field];
+        el.textContent = val && packing ? formatNumber(val * packing) : '—';
+      }
+    });
   }
 
   function renderItemTable() {
@@ -471,6 +516,22 @@
             ).join('')}</div>`
           : '';
 
+        // Net price after cascading discounts & PPN
+        const hasDiscOrPpn = m.pctdisc1 || m.pctdisc2 || m.pctdisc3 || m.pctppn;
+        const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
+        const nettoHTML = netPrices
+          ? `<div class="si-prices si-prices-netto">
+              <div class="si-price-item si-price-netto">
+                <span class="si-price-caption">Netto / ${m.satbesar || 'Bsr'}</span>
+                <span class="si-price-amount si-netto-amount">${formatNumber(netPrices.netto)}</span>
+              </div>
+              <div class="si-price-item si-price-netto">
+                <span class="si-price-caption">+PPN / ${m.satbesar || 'Bsr'}</span>
+                <span class="si-price-amount si-netto-amount">${formatNumber(netPrices.final)}</span>
+              </div>
+            </div>`
+          : '';
+
         matchHTML = `
           <button class="btn btn-sm btn-success btn-review" data-idx="${idx}" title="Klik untuk ganti">
             ${m.artname || m.artno}
@@ -495,6 +556,7 @@
                   </div>
                 </div>
                 ${discHTML}
+                ${nettoHTML}
               </div>
               ${jualHTML}
               ${bundlingHTML}
@@ -597,6 +659,14 @@
                   <input type="number" class="pct-input edit-ppn" data-idx="${idx}"
                          value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
                 </div>
+                <div class="detail-field detail-computed">
+                  <label>Netto/Bsr</label>
+                  <span class="computed-val netto-bsr" data-idx="${idx}">—</span>
+                </div>
+                <div class="detail-field detail-computed">
+                  <label>+PPN/Bsr</label>
+                  <span class="computed-val final-bsr" data-idx="${idx}">—</span>
+                </div>
               </div>
             </div>
             <div class="detail-group">
@@ -628,6 +698,28 @@
                          value="${item.hjual2 != null ? formatNumber(item.hjual2) : ''}" placeholder="—" inputmode="numeric">
                 </div>
               </div>
+              <div class="detail-fields computed-row">
+                <div class="detail-field detail-computed">
+                  <label>J1/Bsr</label>
+                  <span class="computed-val hjual1-bsr" data-idx="${idx}">—</span>
+                </div>
+                <div class="detail-field detail-computed">
+                  <label>J3/Bsr</label>
+                  <span class="computed-val hjual3-bsr" data-idx="${idx}">—</span>
+                </div>
+                <div class="detail-field detail-computed">
+                  <label>J4/Bsr</label>
+                  <span class="computed-val hjual4-bsr" data-idx="${idx}">—</span>
+                </div>
+                <div class="detail-field detail-computed">
+                  <label>J5/Bsr</label>
+                  <span class="computed-val hjual5-bsr" data-idx="${idx}">—</span>
+                </div>
+                <div class="detail-field detail-computed">
+                  <label>Mbr/Bsr</label>
+                  <span class="computed-val hjual2-bsr" data-idx="${idx}">—</span>
+                </div>
+              </div>
             </div>
             ${_renderBundlingGroup(idx, 1, item.bundling1)}
             ${_renderBundlingGroup(idx, 2, item.bundling2)}
@@ -648,6 +740,9 @@
 
     // --- Bind events ---
     _bindItemEvents();
+
+    // Update computed price displays
+    state.items.forEach((_, idx) => _updateComputedPrices(idx));
 
     dom.itemCount.textContent = `${state.items.length} item`;
     dom.btnMatchAll.disabled = false;
@@ -795,22 +890,30 @@
     // Disc & PPN (in detail row)
     $$('.edit-disc1').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].disc1 = el.value !== '' ? parseFloat(el.value) : null;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].disc1 = el.value !== '' ? parseFloat(el.value) : null;
+        _updateComputedPrices(idx);
       });
     });
     $$('.edit-disc2').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].disc2 = el.value !== '' ? parseFloat(el.value) : null;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].disc2 = el.value !== '' ? parseFloat(el.value) : null;
+        _updateComputedPrices(idx);
       });
     });
     $$('.edit-disc3').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].disc3 = el.value !== '' ? parseFloat(el.value) : null;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].disc3 = el.value !== '' ? parseFloat(el.value) : null;
+        _updateComputedPrices(idx);
       });
     });
     $$('.edit-ppn').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].ppn = el.value !== '' ? parseFloat(el.value) : null;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].ppn = el.value !== '' ? parseFloat(el.value) : null;
+        _updateComputedPrices(idx);
       });
     });
 
@@ -822,6 +925,7 @@
           const val = parsePrice(el.value);
           state.items[idx][field] = val || null;
           el.value = val ? formatNumber(val) : '';
+          _updateComputedPrices(idx);
         });
       });
     });

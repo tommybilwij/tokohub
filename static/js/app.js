@@ -92,8 +92,8 @@
     const afterD2 = afterD1 - d2;
     const d3 = afterD2 * (pctdisc3 || 0) / 100;
     const netto = afterD2 - d3;
-    const ppn = netto * (pctppn || 0) / 100;
-    return { netto: Math.round(netto), final: Math.round(netto + ppn) };
+    const ppnAmt = netto * (pctppn || 0) / 100;
+    return { d1: Math.round(d1), d2: Math.round(d2), d3: Math.round(d3), ppnAmt: Math.round(ppnAmt), netto: Math.round(netto), final: Math.round(netto + ppnAmt) };
   }
 
   function debounce(fn, ms) {
@@ -341,50 +341,50 @@
     renderItemTable();
   }
 
+  // Render a jual price table (reusable for main + bundling tiers)
+  // tier: null = main, 1 = bundling1, 2 = bundling2
+  function _renderJualTable(idx, tier, values) {
+    const t = tier == null ? 'main' : tier;
+    const dis = tier != null && !values._enabled ? 'disabled' : '';
+    const rows = [
+      { label: 'Jual 1', field: 'hjual1' },
+      { label: 'Member', field: 'hjual2' },
+      { label: 'Jual 3', field: 'hjual3' },
+      { label: 'Jual 4', field: 'hjual4' },
+      { label: 'Jual 5', field: 'hjual5' },
+    ];
+    const rowsHTML = rows.map(r => {
+      const val = values[r.field];
+      return `<tr>
+        <td class="jt-label">${r.label}</td>
+        <td><input type="text" class="jual-input" data-idx="${idx}" data-tier="${t}" data-field="${r.field}"
+                   value="${val != null ? formatNumber(val) : ''}" placeholder="—" inputmode="numeric" ${dis}></td>
+        <td class="jt-pct"><span class="jual-pct" data-idx="${idx}" data-tier="${t}" data-field="${r.field}">—</span></td>
+        <td class="jt-margin"><span class="jual-margin" data-idx="${idx}" data-tier="${t}" data-field="${r.field}">—</span></td>
+      </tr>`;
+    }).join('');
+    return `<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>${rowsHTML}</tbody></table>`;
+  }
+
   // Render a bundling group (1 or 2) for the detail panel
   function _renderBundlingGroup(idx, tier, b) {
-    const t = tier; // 1 or 2
     const checked = b.enabled ? 'checked' : '';
     const disabled = b.enabled ? '' : 'disabled';
+    const vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
     return `
-      <div class="detail-group bundling-group">
-        <div class="detail-group-title">
+      <div class="dp-bundling-section">
+        <div class="dp-section-header">
           <label class="bundling-toggle">
-            <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${t}" ${checked}>
-            Bundling ${t} <span class="text-muted fw-normal">(Qty &ge;)</span>
+            <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${tier}" ${checked}>
+            Bundling ${tier}
           </label>
+          <span class="bundling-qty-wrap">Qty &ge;
+            <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
+                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" ${disabled}>
+          </span>
         </div>
-        <div class="detail-fields bundling-fields" data-idx="${idx}" data-tier="${t}" ${b.enabled ? '' : 'style="opacity:0.4;pointer-events:none"'}>
-          <div class="detail-field">
-            <label>Min Qty</label>
-            <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${t}"
-                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" style="width:60px" ${disabled}>
-          </div>
-          <div class="detail-field">
-            <label>Jual 1</label>
-            <input type="text" class="bundling-hjual1" data-idx="${idx}" data-tier="${t}"
-                   value="${b.hjual1 != null ? formatNumber(b.hjual1) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
-          </div>
-          <div class="detail-field">
-            <label>Jual 3</label>
-            <input type="text" class="bundling-hjual3" data-idx="${idx}" data-tier="${t}"
-                   value="${b.hjual3 != null ? formatNumber(b.hjual3) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
-          </div>
-          <div class="detail-field">
-            <label>Jual 4</label>
-            <input type="text" class="bundling-hjual4" data-idx="${idx}" data-tier="${t}"
-                   value="${b.hjual4 != null ? formatNumber(b.hjual4) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
-          </div>
-          <div class="detail-field">
-            <label>Jual 5</label>
-            <input type="text" class="bundling-hjual5" data-idx="${idx}" data-tier="${t}"
-                   value="${b.hjual5 != null ? formatNumber(b.hjual5) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
-          </div>
-          <div class="detail-field">
-            <label>Jual Mbr</label>
-            <input type="text" class="bundling-hjual2" data-idx="${idx}" data-tier="${t}"
-                   value="${b.hjual2 != null ? formatNumber(b.hjual2) : ''}" placeholder="—" inputmode="numeric" ${disabled}>
-          </div>
+        <div class="bundling-fields" data-idx="${idx}" data-tier="${tier}" ${b.enabled ? '' : 'style="opacity:0.4;pointer-events:none"'}>
+          ${_renderJualTable(idx, tier, vals)}
         </div>
       </div>`;
   }
@@ -406,29 +406,69 @@
   function _updateComputedPrices(idx) {
     const item = state.items[idx];
     const hbelibsr = item.priceBsr || 0;
-    const packing = item.packing || 1;
+    // Use qtyKecil (user-entered pcs/pak) for /Pcs display, consistent with main row H/Kcl
+    const qtyKcl = item.qtyKecil || 0;
+    const showPcs = qtyKcl > 0;
 
-    // Harga beli netto after disc/ppn
-    const hasDiscOrPpn = item.disc1 || item.disc2 || item.disc3 || item.ppn;
+    // H.Beli /Bsr and /Pcs
+    const hbeliBsrEl = document.querySelector(`.hbeli-bsr[data-idx="${idx}"]`);
+    const hbeliPcsEl = document.querySelector(`.hbeli-pcs[data-idx="${idx}"]`);
+    if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(Math.round(hbelibsr)) : '—';
+    if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(Math.round(hbelibsr / qtyKcl)) : '—';
+
+    // Disc amounts
+    const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+    const d1El = document.querySelector(`.disc-amt-1[data-idx="${idx}"]`);
+    const d2El = document.querySelector(`.disc-amt-2[data-idx="${idx}"]`);
+    const d3El = document.querySelector(`.disc-amt-3[data-idx="${idx}"]`);
+    const ppnEl = document.querySelector(`.ppn-amt[data-idx="${idx}"]`);
+    if (d1El) d1El.textContent = formatNumber(net.d1);
+    if (d2El) d2El.textContent = formatNumber(net.d2);
+    if (d3El) d3El.textContent = formatNumber(net.d3);
+    if (ppnEl) ppnEl.textContent = formatNumber(net.ppnAmt);
+
+    // Netto /Bsr and /Pcs (final = netto + ppn)
     const nettoBsrEl = document.querySelector(`.netto-bsr[data-idx="${idx}"]`);
-    const finalBsrEl = document.querySelector(`.final-bsr[data-idx="${idx}"]`);
-
-    if (hasDiscOrPpn && hbelibsr) {
-      const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
-      if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(net.netto);
-      if (finalBsrEl) finalBsrEl.textContent = formatNumber(net.final);
+    const nettoPcsEl = document.querySelector(`.netto-pcs[data-idx="${idx}"]`);
+    if (hbelibsr) {
+      if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(net.final);
+      if (nettoPcsEl) nettoPcsEl.textContent = showPcs ? formatNumber(Math.round(net.final / qtyKcl)) : '—';
     } else {
       if (nettoBsrEl) nettoBsrEl.textContent = '—';
-      if (finalBsrEl) finalBsrEl.textContent = '—';
+      if (nettoPcsEl) nettoPcsEl.textContent = '—';
     }
 
-    // Harga jual per bsr (hjual * packing)
-    ['hjual1', 'hjual3', 'hjual4', 'hjual5', 'hjual2'].forEach((field) => {
-      const el = document.querySelector(`.${field}-bsr[data-idx="${idx}"]`);
-      if (el) {
-        const val = item[field];
-        el.textContent = val && packing ? formatNumber(val * packing) : '—';
+    // Reference cost per pcs for markup calculations (uses qtyKecil to match display)
+    const nettoPcs = (hbelibsr && showPcs) ? net.final / qtyKcl : 0;
+
+    // Update jual markup% and margin for a given tier
+    function updateJualRow(tier, field, hjualVal) {
+      const pctEl = document.querySelector(`.jual-pct[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
+      const mrgEl = document.querySelector(`.jual-margin[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
+      if (!pctEl || !mrgEl) return;
+      if (hjualVal == null || hjualVal <= 0 || !nettoPcs) {
+        pctEl.textContent = '—';
+        mrgEl.textContent = '—';
+        pctEl.classList.remove('negative');
+        mrgEl.classList.remove('negative');
+        return;
       }
+      const margin = hjualVal - nettoPcs;
+      const pct = (margin / nettoPcs) * 100;
+      const isNeg = margin < 0;
+      pctEl.textContent = isNeg ? `(${Math.abs(pct).toFixed(1)}%)` : `${pct.toFixed(1)}%`;
+      mrgEl.textContent = isNeg ? `(${formatNumber(Math.abs(Math.round(margin)))})` : formatNumber(Math.round(margin));
+      pctEl.classList.toggle('negative', isNeg);
+      mrgEl.classList.toggle('negative', isNeg);
+    }
+
+    // Main jual prices
+    ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach(f => updateJualRow('main', f, item[f]));
+
+    // Bundling tiers
+    [1, 2].forEach(t => {
+      const b = item[`bundling${t}`];
+      ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach(f => updateJualRow(String(t), f, b[f]));
     });
   }
 
@@ -633,94 +673,65 @@
       const detailTr = document.createElement('tr');
       detailTr.className = 'item-detail';
       detailTr.dataset.idx = idx;
+
+      const satuanBsr = item.satuanBsr || 'Bsr';
+      const mainJualVals = { hjual1: item.hjual1, hjual2: item.hjual2, hjual3: item.hjual3, hjual4: item.hjual4, hjual5: item.hjual5, _enabled: true };
+
       detailTr.innerHTML = `
         <td colspan="10">
-          <div class="detail-panel">
-            <div class="detail-group">
-              <div class="detail-group-title">Diskon & PPN</div>
-              <div class="detail-fields">
-                <div class="detail-field">
-                  <label>Disc 1%</label>
+          <div class="dp-grid">
+            <!-- Left: Harga Beli -->
+            <div class="dp-section dp-beli">
+              <div class="dp-section-header">Harga Beli</div>
+              <div class="dp-beli-row">
+                <span class="dp-label">H.Beli</span>
+                <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit">/${satuanBsr}</span>
+                <span class="dp-val hbeli-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
+              </div>
+              <div class="dp-disc-row">
+                <div class="dp-disc-field">
+                  <span class="dp-disc-lbl">D1</span>
                   <input type="number" class="pct-input edit-disc1" data-idx="${idx}"
                          value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100">
+                  <span class="dp-disc-eq">% =</span>
+                  <span class="dp-disc-amt disc-amt-1" data-idx="${idx}">0</span>
                 </div>
-                <div class="detail-field">
-                  <label>Disc 2%</label>
+                <div class="dp-disc-field">
+                  <span class="dp-disc-lbl">D2</span>
                   <input type="number" class="pct-input edit-disc2" data-idx="${idx}"
                          value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100">
+                  <span class="dp-disc-eq">% =</span>
+                  <span class="dp-disc-amt disc-amt-2" data-idx="${idx}">0</span>
                 </div>
-                <div class="detail-field">
-                  <label>Disc 3%</label>
+              </div>
+              <div class="dp-disc-row">
+                <div class="dp-disc-field">
+                  <span class="dp-disc-lbl">D3</span>
                   <input type="number" class="pct-input edit-disc3" data-idx="${idx}"
                          value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100">
+                  <span class="dp-disc-eq">% =</span>
+                  <span class="dp-disc-amt disc-amt-3" data-idx="${idx}">0</span>
                 </div>
-                <div class="detail-field">
-                  <label>PPN%</label>
+                <div class="dp-disc-field">
+                  <span class="dp-disc-lbl">PPN</span>
                   <input type="number" class="pct-input edit-ppn" data-idx="${idx}"
                          value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
+                  <span class="dp-disc-eq">% =</span>
+                  <span class="dp-disc-amt ppn-amt" data-idx="${idx}">0</span>
                 </div>
-                <div class="detail-field detail-computed">
-                  <label>Netto/Bsr</label>
-                  <span class="computed-val netto-bsr" data-idx="${idx}">—</span>
-                </div>
-                <div class="detail-field detail-computed">
-                  <label>+PPN/Bsr</label>
-                  <span class="computed-val final-bsr" data-idx="${idx}">—</span>
-                </div>
+              </div>
+              <div class="dp-netto-row">
+                <span class="dp-label">Netto</span>
+                <span class="dp-netto-val netto-bsr" data-idx="${idx}">—</span><span class="dp-unit">/${satuanBsr}</span>
+                <span class="dp-netto-val netto-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
             </div>
-            <div class="detail-group">
-              <div class="detail-group-title">Harga Jual</div>
-              <div class="detail-fields">
-                <div class="detail-field">
-                  <label>Jual 1</label>
-                  <input type="text" class="edit-hjual1" data-idx="${idx}"
-                         value="${item.hjual1 != null ? formatNumber(item.hjual1) : ''}" placeholder="—" inputmode="numeric">
-                </div>
-                <div class="detail-field">
-                  <label>Jual 3</label>
-                  <input type="text" class="edit-hjual3" data-idx="${idx}"
-                         value="${item.hjual3 != null ? formatNumber(item.hjual3) : ''}" placeholder="—" inputmode="numeric">
-                </div>
-                <div class="detail-field">
-                  <label>Jual 4</label>
-                  <input type="text" class="edit-hjual4" data-idx="${idx}"
-                         value="${item.hjual4 != null ? formatNumber(item.hjual4) : ''}" placeholder="—" inputmode="numeric">
-                </div>
-                <div class="detail-field">
-                  <label>Jual 5</label>
-                  <input type="text" class="edit-hjual5" data-idx="${idx}"
-                         value="${item.hjual5 != null ? formatNumber(item.hjual5) : ''}" placeholder="—" inputmode="numeric">
-                </div>
-                <div class="detail-field">
-                  <label>Jual Mbr</label>
-                  <input type="text" class="edit-hjual2" data-idx="${idx}"
-                         value="${item.hjual2 != null ? formatNumber(item.hjual2) : ''}" placeholder="—" inputmode="numeric">
-                </div>
-              </div>
-              <div class="detail-fields computed-row">
-                <div class="detail-field detail-computed">
-                  <label>J1/Bsr</label>
-                  <span class="computed-val hjual1-bsr" data-idx="${idx}">—</span>
-                </div>
-                <div class="detail-field detail-computed">
-                  <label>J3/Bsr</label>
-                  <span class="computed-val hjual3-bsr" data-idx="${idx}">—</span>
-                </div>
-                <div class="detail-field detail-computed">
-                  <label>J4/Bsr</label>
-                  <span class="computed-val hjual4-bsr" data-idx="${idx}">—</span>
-                </div>
-                <div class="detail-field detail-computed">
-                  <label>J5/Bsr</label>
-                  <span class="computed-val hjual5-bsr" data-idx="${idx}">—</span>
-                </div>
-                <div class="detail-field detail-computed">
-                  <label>Mbr/Bsr</label>
-                  <span class="computed-val hjual2-bsr" data-idx="${idx}">—</span>
-                </div>
-              </div>
+            <!-- Right: Harga Jual -->
+            <div class="dp-section dp-jual">
+              <div class="dp-section-header">Harga Jual</div>
+              ${_renderJualTable(idx, null, mainJualVals)}
             </div>
+            <!-- Full-width: Bundling -->
             ${_renderBundlingGroup(idx, 1, item.bundling1)}
             ${_renderBundlingGroup(idx, 2, item.bundling2)}
           </div>
@@ -917,16 +928,20 @@
       });
     });
 
-    // Harga Jual (in detail row)
-    ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach((field) => {
-      $$(`.edit-${field}`).forEach((el) => {
-        el.addEventListener('change', () => {
-          const idx = parseInt(el.dataset.idx);
-          const val = parsePrice(el.value);
+    // Unified jual input handler (main + bundling)
+    $$('.jual-input').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const tier = el.dataset.tier; // "main", "1", or "2"
+        const field = el.dataset.field; // "hjual1"..."hjual5"
+        const val = parsePrice(el.value);
+        if (tier === 'main') {
           state.items[idx][field] = val || null;
-          el.value = val ? formatNumber(val) : '';
-          _updateComputedPrices(idx);
-        });
+        } else {
+          state.items[idx][`bundling${tier}`][field] = val || null;
+        }
+        el.value = val ? formatNumber(val) : '';
+        _updateComputedPrices(idx);
       });
     });
 
@@ -956,19 +971,6 @@
         const idx = parseInt(el.dataset.idx);
         const tier = el.dataset.tier;
         state.items[idx][`bundling${tier}`].minQty = parseInt(el.value) || 0;
-      });
-    });
-
-    // Bundling hjual fields
-    ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'].forEach((field) => {
-      $$(`.bundling-${field}`).forEach((el) => {
-        el.addEventListener('change', () => {
-          const idx = parseInt(el.dataset.idx);
-          const tier = el.dataset.tier;
-          const val = parsePrice(el.value);
-          state.items[idx][`bundling${tier}`][field] = val || null;
-          el.value = val ? formatNumber(val) : '';
-        });
       });
     });
 

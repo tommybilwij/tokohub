@@ -123,90 +123,241 @@ body {
   background: #fafbfc;
 }
 
-.detail-panel {
+/* -----------------------------------------------------------------------
+   Detail Panel — Grid Layout (MyPosse-style)
+   ----------------------------------------------------------------------- */
+.dp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
-  display: flex;
-  gap: 2rem;
-  flex-wrap: wrap;
 }
 
-.detail-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.dp-section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
 }
 
-.detail-group-title {
-  font-size: 0.68rem;
+.dp-section-header {
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #8c959d;
-  margin-bottom: 0.15rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #eee;
 }
 
-.detail-fields {
+/* Harga Beli section */
+.dp-beli-row,
+.dp-netto-row {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
-.detail-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.dp-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #495057;
+  min-width: 42px;
 }
 
-.detail-field label {
+.dp-val {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #495057;
+}
+
+.dp-unit {
   font-size: 0.68rem;
   color: #8c959d;
-  font-weight: 600;
-  margin: 0;
+  margin-right: 0.5rem;
 }
 
-.detail-field input {
-  width: 80px;
-  font-size: 0.8rem;
-  padding: 0.25rem 0.4rem;
+.dp-disc-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.dp-disc-field {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+}
+
+.dp-disc-lbl {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6c757d;
+  min-width: 24px;
+}
+
+.dp-disc-field .pct-input {
+  width: 48px;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.3rem;
   border: 1px solid #dee2e6;
   border-radius: 4px;
   text-align: right;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.detail-field input:focus {
+.dp-disc-field .pct-input:focus {
   outline: none;
   border-color: #198754;
   box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
 }
 
-.detail-field input.pct-input {
-  width: 58px;
+.dp-disc-eq {
+  font-size: 0.72rem;
+  color: #adb5bd;
 }
 
-/* Computed price displays (read-only) */
-.detail-computed .computed-val {
-  display: block;
-  font-size: 0.8rem;
+.dp-disc-amt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #495057;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* Netto row — highlighted */
+.dp-netto-row {
+  background: #fef9f0;
+  border: 1px solid #f0d9b5;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+}
+
+.dp-netto-val {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #e67e22;
+}
+
+/* -----------------------------------------------------------------------
+   Jual Price Table
+   ----------------------------------------------------------------------- */
+.jual-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.jual-table thead th {
+  font-size: 0.65rem;
   font-weight: 700;
-  padding: 0.25rem 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8c959d;
+  padding: 0.2rem 0.3rem;
+  border-bottom: 1px solid #eee;
+  text-align: right;
+}
+
+.jual-table thead th:first-child {
+  text-align: left;
+}
+
+.jual-table td {
+  padding: 0.2rem 0.3rem;
+  vertical-align: middle;
+}
+
+.jual-table .jt-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.jual-table .jual-input {
+  width: 72px;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #dee2e6;
   border-radius: 4px;
   text-align: right;
-  min-width: 80px;
-  background: #fef9f0;
-  color: #e67e22;
-  border: 1px solid #f0d9b5;
 }
 
-.computed-row {
-  margin-top: 0.3rem;
+.jual-table .jual-input:focus {
+  outline: none;
+  border-color: #198754;
+  box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.15);
 }
 
-.computed-row .computed-val {
-  background: #eef4ff;
-  color: #0d6efd;
-  border: 1px solid #c5d5f0;
+.jual-table .jt-pct,
+.jual-table .jt-margin {
+  text-align: right;
+  font-size: 0.72rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+.jual-table .jual-pct,
+.jual-table .jual-margin {
+  font-weight: 600;
+}
+
+.jual-table .jual-pct.negative,
+.jual-table .jual-margin.negative {
+  color: #dc3545;
+}
+
+/* -----------------------------------------------------------------------
+   Bundling sections (full-width in grid)
+   ----------------------------------------------------------------------- */
+.dp-bundling-section {
+  grid-column: 1 / -1;
+  background: #fff;
+  border: 1px solid #d4c5f9;
+  border-left: 3px solid #6f42c1;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.dp-bundling-section .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid #f0ecff;
+  color: #6f42c1;
+}
+
+.bundling-qty-wrap {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6c757d;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.bundling-qty-wrap input {
+  width: 52px;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.bundling-qty-wrap input:focus {
+  outline: none;
+  border-color: #6f42c1;
+  box-shadow: 0 0 0 2px rgba(111, 66, 193, 0.15);
+}
+
+.bundling-fields {
+  transition: opacity 0.2s;
 }
 
 /* -----------------------------------------------------------------------
@@ -265,13 +416,8 @@ body {
 }
 
 /* -----------------------------------------------------------------------
-   Bundling groups
+   Bundling toggle checkbox
    ----------------------------------------------------------------------- */
-.bundling-group {
-  border-left: 3px solid #0d6efd;
-  padding-left: 0.75rem;
-}
-
 .bundling-toggle {
   display: inline-flex;
   align-items: center;
@@ -281,7 +427,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #0d6efd;
+  color: #6f42c1;
   margin: 0;
 }
 
@@ -293,12 +439,8 @@ body {
 }
 
 .bundling-toggle .form-check-input:checked {
-  background-color: #0d6efd;
-  border-color: #0d6efd;
-}
-
-.bundling-fields {
-  transition: opacity 0.2s;
+  background-color: #6f42c1;
+  border-color: #6f42c1;
 }
 
 /* Row separator between main+detail pairs */
@@ -619,8 +761,9 @@ body {
     padding-right: 0.5rem;
   }
 
-  .detail-panel {
+  .dp-grid {
+    grid-template-columns: 1fr;
     padding: 0.5rem 0.75rem;
-    gap: 1rem;
+    gap: 0.5rem;
   }
 }

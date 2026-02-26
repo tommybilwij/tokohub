@@ -1,11 +1,11 @@
 /* Stock Entry App - Custom Styles
-   Palette: Green #2e7d32/#43a047  Blue #1565c0/#1976d2
-            Purple #7b1fa2        Orange #e65100
-            Neutral #37474f/#546e7a/#78909c
+   Palette: Blue #1565c0/#1976d2 (page shell, navbar, table headers)
+            Green #2e7d32/#43a047/#c8e6c9 (editable panels)
+            Grey #546e7a/#78909c/#cfd8dc (stock info - STOK SAAT INI)
 */
 
 body {
-  background-color: #f0f4f0;
+  background-color: #eef2f7;
   font-size: 0.9rem;
   color: #37474f;
 }
@@ -27,27 +27,27 @@ body {
 }
 
 .card-footer {
-  background: #f8faf8;
+  background: #f5f7fa;
   border-top: 1px solid #e0e0e0;
 }
 
 /* Form controls — consistent styling */
 .form-control, .form-select {
   border-radius: 6px;
-  border-color: #c8e6c9;
+  border-color: #bbdefb;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form-control:focus, .form-select:focus {
-  border-color: #43a047;
-  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.18);
 }
 
 .form-label {
   color: #37474f;
 }
 
-/* Nav tabs — green accent */
+/* Nav tabs — blue accent */
 .nav-tabs .nav-link {
   color: #546e7a;
   font-weight: 600;
@@ -55,8 +55,8 @@ body {
 }
 
 .nav-tabs .nav-link.active {
-  color: #2e7d32;
-  border-bottom-color: #2e7d32;
+  color: #1565c0;
+  border-bottom-color: #1565c0;
   font-weight: 700;
 }
 
@@ -68,15 +68,15 @@ body {
   border-spacing: 0;
 }
 
-#itemTable thead th {
+#itemTable > thead > tr > th {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #2e7d32;
+  color: #1565c0;
   font-weight: 700;
   padding: 0.6rem 0.5rem;
-  border-bottom: 2px solid #c8e6c9;
-  background: #f1f8e9;
+  border-bottom: 2px solid #bbdefb;
+  background: #e3f2fd;
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -106,7 +106,7 @@ body {
 }
 
 #itemTable .item-main:hover {
-  background-color: #f0faf3;
+  background-color: #eaf0fb;
 }
 
 /* Row number */
@@ -118,7 +118,7 @@ body {
 }
 
 /* Status indicator - left border */
-#itemTable .item-main.status-auto     { border-left: 3px solid #2e7d32; }
+#itemTable .item-main.status-auto     { border-left: 3px solid #1976d2; }
 #itemTable .item-main.status-review   { border-left: 3px solid #f9a825; }
 #itemTable .item-main.status-unmatched { border-left: 3px solid #e53935; }
 
@@ -134,8 +134,8 @@ body {
 
 #itemTable .item-main .form-control:focus,
 #itemTable .item-main .form-select:focus {
-  border-color: #43a047;
-  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.18);
 }
 
 /* Row separator between main+detail pairs */
@@ -160,8 +160,8 @@ body {
 
 #itemTable .item-detail td {
   padding: 0;
-  border-bottom: 2px solid #c8e6c9;
-  background: #f5f8f3;
+  border-bottom: 2px solid #e0e0e0;
+  background: #f8f9fa;
 }
 
 /* -----------------------------------------------------------------------
@@ -179,7 +179,7 @@ body {
    ----------------------------------------------------------------------- */
 .dp-section {
   background: #fff;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #c8e6c9;
   border-radius: 10px;
   padding: 0.75rem 0.85rem;
 }
@@ -191,10 +191,10 @@ body {
   letter-spacing: 0.06em;
   margin-bottom: 0.6rem;
   padding-bottom: 0.4rem;
-  border-bottom: 2px solid #eee;
+  border-bottom: 2px solid #c8e6c9;
 }
 
-/* --- Harga Beli section (green accent) --- */
+/* --- Editable sections (unified green accent) --- */
 .dp-beli {
   border-color: #c8e6c9;
   border-left: 4px solid #43a047;
@@ -206,16 +206,15 @@ body {
   border-bottom-color: #c8e6c9;
 }
 
-/* --- Harga Jual section (blue accent) --- */
 .dp-jual {
-  border-color: #bbdefb;
-  border-left: 4px solid #1976d2;
-  background: linear-gradient(135deg, #fff 60%, #e3f2fd 100%);
+  border-color: #c8e6c9;
+  border-left: 4px solid #43a047;
+  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
 }
 
 .dp-jual .dp-section-header {
-  color: #1565c0;
-  border-bottom-color: #bbdefb;
+  color: #2e7d32;
+  border-bottom-color: #c8e6c9;
 }
 
 /* -----------------------------------------------------------------------
@@ -290,18 +289,28 @@ body {
   color: #90a4ae;
 }
 
-.dp-disc-amt {
+.dp-disc-field .amt-input {
+  width: 72px;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #37474f;
-  min-width: 48px;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid #c8e6c9;
+  border-radius: 6px;
   text-align: right;
+  color: #37474f;
+  background: #fafffe;
 }
 
-/* Netto row — warm highlight */
+.dp-disc-field .amt-input:focus {
+  outline: none;
+  border-color: #43a047;
+  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
+}
+
+/* Netto row — green highlight (matches editable panel) */
 .dp-netto-row {
-  background: linear-gradient(90deg, #fff8e1, #fff3e0);
-  border: 1px solid #ffcc80;
+  background: linear-gradient(90deg, #e8f5e9, #f1f8e9);
+  border: 1px solid #a5d6a7;
   border-radius: 8px;
   padding: 0.35rem 0.6rem;
   margin-top: 0.35rem;
@@ -311,7 +320,7 @@ body {
 .dp-netto-val {
   font-size: 0.92rem;
   font-weight: 800;
-  color: #e65100;
+  color: #2e7d32;
 }
 
 /* -----------------------------------------------------------------------
@@ -328,9 +337,10 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #78909c;
+  color: #558b2f;
   padding: 0.25rem 0.35rem;
-  border-bottom: 2px solid #e3f2fd;
+  border-bottom: 2px solid #c8e6c9;
+  background: #f1f8e9;
   text-align: right;
 }
 
@@ -338,12 +348,16 @@ body {
   text-align: left;
 }
 
+.jual-table thead th:nth-child(2) {
+  text-align: center;
+}
+
 .jual-table tbody tr {
-  border-bottom: 1px solid #e3f2fd;
+  border-bottom: 1px solid #c8e6c9;
 }
 
 .jual-table tbody tr:nth-child(odd) {
-  background: #fafcff;
+  background: #fafffe;
 }
 
 .jual-table td {
@@ -354,15 +368,19 @@ body {
 .jual-table .jt-label {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #1565c0;
+  color: #2e7d32;
   white-space: nowrap;
+}
+
+.jual-table td:nth-child(2) {
+  text-align: center;
 }
 
 .jual-table .jual-input {
   width: 82px;
   font-size: 0.85rem;
   padding: 0.28rem 0.4rem;
-  border: 1px solid #bbdefb;
+  border: 1px solid #c8e6c9;
   border-radius: 6px;
   text-align: right;
   background: #fff;
@@ -370,8 +388,8 @@ body {
 
 .jual-table .jual-input:focus {
   outline: none;
-  border-color: #1976d2;
-  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.18);
+  border-color: #43a047;
+  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
 }
 
 .jual-table .jt-pct,
@@ -393,13 +411,13 @@ body {
 }
 
 /* -----------------------------------------------------------------------
-   Bundling sections (full-width in grid, purple accent)
+   Bundling sections (full-width in grid, unified green accent)
    ----------------------------------------------------------------------- */
 .dp-bundling-section {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, #fff 60%, #f3e5f5 100%);
-  border: 1px solid #d1c4e9;
-  border-left: 4px solid #7b1fa2;
+  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
+  border: 1px solid #c8e6c9;
+  border-left: 4px solid #43a047;
   border-radius: 10px;
   padding: 0.65rem 0.85rem;
 }
@@ -408,8 +426,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-bottom: 2px solid #ede7f6;
-  color: #6a1b9a;
+  border-bottom: 2px solid #c8e6c9;
+  color: #2e7d32;
 }
 
 .bundling-qty-wrap {
@@ -425,48 +443,20 @@ body {
   width: 56px;
   font-size: 0.85rem;
   padding: 0.2rem 0.35rem;
-  border: 1px solid #d1c4e9;
+  border: 1px solid #c8e6c9;
   border-radius: 6px;
   text-align: center;
-  background: #faf8ff;
+  background: #fafffe;
 }
 
 .bundling-qty-wrap input:focus {
   outline: none;
-  border-color: #7b1fa2;
-  box-shadow: 0 0 0 2px rgba(123, 31, 162, 0.15);
+  border-color: #43a047;
+  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
 }
 
 .bundling-fields {
   transition: opacity 0.2s;
-}
-
-/* Bundling jual inputs match purple theme */
-.dp-bundling-section .jual-table thead th {
-  border-bottom-color: #ede7f6;
-  color: #7b1fa2;
-}
-
-.dp-bundling-section .jual-table .jt-label {
-  color: #7b1fa2;
-}
-
-.dp-bundling-section .jual-table tbody tr {
-  border-bottom-color: #ede7f6;
-}
-
-.dp-bundling-section .jual-table tbody tr:nth-child(odd) {
-  background: #faf8ff;
-}
-
-.dp-bundling-section .jual-input {
-  border-color: #d1c4e9;
-  background: #fff;
-}
-
-.dp-bundling-section .jual-input:focus {
-  border-color: #7b1fa2;
-  box-shadow: 0 0 0 2px rgba(123, 31, 162, 0.15);
 }
 
 /* -----------------------------------------------------------------------
@@ -496,7 +486,7 @@ body {
 .qty-stepper input:focus {
   outline: none;
   box-shadow: none;
-  background: #e8f5e9;
+  background: #e3f2fd;
 }
 
 .qty-stepper-btn {
@@ -515,12 +505,12 @@ body {
 }
 
 .qty-stepper-btn:hover {
-  background: #43a047;
+  background: #1976d2;
   color: #fff;
 }
 
 .qty-stepper-btn:active {
-  background: #2e7d32;
+  background: #1565c0;
   color: #fff;
 }
 
@@ -536,7 +526,7 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #7b1fa2;
+  color: inherit;
   margin: 0;
 }
 
@@ -548,8 +538,40 @@ body {
 }
 
 .bundling-toggle .form-check-input:checked {
-  background-color: #7b1fa2;
-  border-color: #7b1fa2;
+  background-color: #43a047;
+  border-color: #43a047;
+}
+
+/* Auto-adjust jual toggle (in Harga Jual header) */
+.auto-adjust-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #2e7d32;
+  margin: 0;
+  margin-left: auto;
+  float: right;
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+}
+
+.auto-adjust-toggle .form-check-input {
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0;
+  cursor: pointer;
+}
+
+.auto-adjust-toggle .form-check-input:checked {
+  background-color: #43a047;
+  border-color: #43a047;
 }
 
 /* Expand toggle icon */
@@ -566,7 +588,7 @@ body {
 
 .item-main.has-detail-open .expand-toggle {
   transform: rotate(90deg);
-  color: #2e7d32;
+  color: #1565c0;
 }
 
 /* -----------------------------------------------------------------------
@@ -583,8 +605,8 @@ body {
 }
 
 #itemTable .btn-review.btn-success {
-  background: #2e7d32;
-  border-color: #2e7d32;
+  background: #1976d2;
+  border-color: #1976d2;
 }
 
 #itemTable .btn-review.btn-warning {
@@ -618,9 +640,9 @@ body {
    ----------------------------------------------------------------------- */
 .dp-stock-info {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 50%, #e8f5e9 100%);
-  border: 1px solid #a5d6a7;
-  border-left: 4px solid #43a047;
+  background: linear-gradient(135deg, #f5f5f5 0%, #eceff1 50%, #f5f5f5 100%);
+  border: 1px solid #cfd8dc;
+  border-left: 4px solid #78909c;
   border-radius: 10px;
   padding: 0.65rem 1rem;
 }
@@ -631,7 +653,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   padding-bottom: 0.45rem;
-  border-bottom: 1px solid #c8e6c9;
+  border-bottom: 1px solid #cfd8dc;
   margin-bottom: 0.5rem;
 }
 
@@ -640,11 +662,11 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #2e7d32;
+  color: #546e7a;
   background: #fff;
   padding: 3px 10px;
   border-radius: 5px;
-  border: 1px solid #a5d6a7;
+  border: 1px solid #b0bec5;
   flex-shrink: 0;
 }
 
@@ -672,7 +694,7 @@ body {
 .dsi-artname {
   font-size: 0.92rem;
   font-weight: 800;
-  color: #1b5e20;
+  color: #37474f;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -681,11 +703,11 @@ body {
 .dsi-packing {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #33691e;
+  color: #546e7a;
   background: #fff;
   padding: 2px 10px;
   border-radius: 12px;
-  border: 1px solid #a5d6a7;
+  border: 1px solid #b0bec5;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -719,20 +741,20 @@ body {
 .dsi-lbl {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #558b2f;
+  color: #546e7a;
   min-width: 38px;
 }
 
 .dsi-val {
   font-size: 0.92rem;
   font-weight: 800;
-  color: #2e7d32;
+  color: #37474f;
 }
 
 .dsi-val-sm {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #4e6e50;
+  color: #78909c;
 }
 
 .dsi-unit {
@@ -743,36 +765,36 @@ body {
 
 .dsi-disc {
   font-size: 0.82rem;
-  color: #6d4c41;
+  color: #546e7a;
   font-weight: 600;
-  background: #fff3e0;
-  border: 1px solid #ffe0b2;
+  background: #fff;
+  border: 1px solid #b0bec5;
   border-radius: 5px;
   padding: 0.1rem 0.5rem;
 }
 
-/* Netto row — warm highlight */
+/* Netto row — grey highlight */
 .dsi-netto-row {
-  background: linear-gradient(90deg, #fff8e1, #fff3e0);
-  border: 1px solid #ffcc80;
+  background: linear-gradient(90deg, #eceff1, #e0e0e0);
+  border: 1px solid #b0bec5;
   border-radius: 6px;
   padding: 0.2rem 0.45rem;
   margin-top: 0.15rem;
 }
 
 .dsi-netto-val {
-  color: #e65100 !important;
+  color: #37474f !important;
   font-weight: 800 !important;
   font-size: 0.92rem !important;
 }
 
-/* --- Jual price chips --- */
+/* --- Jual price chips (inside STOK SAAT INI, grey theme) --- */
 .dsi-jual-item {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-  border: 1px solid #90caf9;
+  background: #fff;
+  border: 1px solid #b0bec5;
   border-radius: 6px;
   padding: 0.25rem 0.6rem;
 }
@@ -780,7 +802,7 @@ body {
 .dsi-jual-lbl {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #1565c0;
+  color: #546e7a;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -788,10 +810,10 @@ body {
 .dsi-jual-val {
   font-size: 0.88rem;
   font-weight: 800;
-  color: #0d47a1;
+  color: #37474f;
 }
 
-/* --- Bundling rows --- */
+/* --- Bundling rows (inside STOK SAAT INI) --- */
 .dsi-bundling {
   display: flex;
   align-items: center;
@@ -799,15 +821,15 @@ body {
   flex-wrap: wrap;
   margin-top: 0.4rem;
   padding-top: 0.4rem;
-  border-top: 1px dashed #ce93d8;
+  border-top: 1px dashed #b0bec5;
 }
 
 .dsi-bundling-tag {
   font-size: 0.78rem;
   font-weight: 800;
-  color: #7b1fa2;
-  background: #f3e5f5;
-  border: 1px solid #ce93d8;
+  color: #546e7a;
+  background: #fff;
+  border: 1px solid #b0bec5;
   border-radius: 5px;
   padding: 0.1rem 0.5rem;
   white-space: nowrap;
@@ -815,25 +837,25 @@ body {
 
 .dsi-bund-pair {
   font-size: 0.82rem;
-  color: #6a1b9a;
+  color: #546e7a;
   font-weight: 600;
 }
 
 .dsi-bund-pair b {
-  color: #4a148c;
+  color: #37474f;
   font-weight: 800;
 }
 
 /* -----------------------------------------------------------------------
    Badge & score color overrides (match palette)
    ----------------------------------------------------------------------- */
-.badge.bg-success { background: #2e7d32 !important; }
+.badge.bg-success { background: rgba(255,255,255,0.9) !important; color: #1565c0 !important; font-weight: 800 !important; }
 .badge.bg-primary { background: #1565c0 !important; }
 .badge.bg-info    { background: #00838f !important; }
 .badge.bg-warning { background: #f9a825 !important; color: #37474f !important; }
 .badge.bg-danger  { background: #e53935 !important; }
 
-.score-high { color: #2e7d32; }
+.score-high { color: #1565c0; }
 .score-mid  { color: #f9a825; }
 .score-low  { color: #e53935; }
 
@@ -856,7 +878,7 @@ body {
 }
 
 .search-dropdown .list-group-item:hover {
-  background-color: #e8f5e9;
+  background-color: #e3f2fd;
 }
 
 .search-dropdown .match-score {
@@ -873,12 +895,12 @@ body {
 }
 
 #matchCandidates .list-group-item:hover {
-  background-color: #e8f5e9;
+  background-color: #e3f2fd;
 }
 
 #matchCandidates .list-group-item.active {
-  background-color: #2e7d32;
-  border-color: #2e7d32;
+  background-color: #1976d2;
+  border-color: #1976d2;
 }
 
 /* -----------------------------------------------------------------------

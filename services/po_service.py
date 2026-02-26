@@ -131,10 +131,10 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
         # Calculate small-unit price
         hbelikcl = hbelibsr / packing if packing else hbelibsr
 
-        # Discounts (use override if provided, else stock defaults)
-        pctdisc1 = Decimal(str(item['disc1_override'])) if item.get('disc1_override') is not None else (stock['pctdisc1'] or Decimal('0'))
-        pctdisc2 = Decimal(str(item['disc2_override'])) if item.get('disc2_override') is not None else (stock['pctdisc2'] or Decimal('0'))
-        pctdisc3 = Decimal(str(item['disc3_override'])) if item.get('disc3_override') is not None else (stock['pctdisc3'] or Decimal('0'))
+        # Discounts (use override if provided, else 0 — empty means no discount)
+        pctdisc1 = Decimal(str(item['disc1_override'])) if item.get('disc1_override') is not None else Decimal('0')
+        pctdisc2 = Decimal(str(item['disc2_override'])) if item.get('disc2_override') is not None else Decimal('0')
+        pctdisc3 = Decimal(str(item['disc3_override'])) if item.get('disc3_override') is not None else Decimal('0')
 
         disc1 = hbelibsr * pctdisc1 / 100
         after_disc1 = hbelibsr - disc1
@@ -143,8 +143,8 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
         disc3 = after_disc2 * pctdisc3 / 100
         hbelinetto = after_disc2 - disc3
 
-        # Tax (use override if provided, else stock default)
-        pctppn = Decimal(str(item['ppn_override'])) if item.get('ppn_override') is not None else (stock['pctppn'] or Decimal('0'))
+        # Tax (use override if provided, else 0 — empty means no tax)
+        pctppn = Decimal(str(item['ppn_override'])) if item.get('ppn_override') is not None else Decimal('0')
         ppn = hbelinetto * pctppn / 100
 
         amount = (hbelinetto + ppn) * qty

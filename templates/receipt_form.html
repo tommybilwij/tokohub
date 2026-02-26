@@ -6,7 +6,7 @@
   <!-- Left: Input Panel -->
   <div class="col-lg-4">
     <div class="card">
-      <div class="card-header text-white" style="background:#2e7d32">
+      <div class="card-header text-white" style="background:#1565c0">
         <h5 class="mb-0"><i class="bi bi-receipt"></i> Input Penerimaan Barang</h5>
       </div>
       <div class="card-body">
@@ -62,7 +62,7 @@
             <div class="input-group mb-2">
               <input type="text" id="itemNameInput" class="form-control"
                      placeholder="Nama barang / barcode" autocomplete="off">
-              <button class="btn text-white" type="button" id="btnAddItem" style="background:#43a047">
+              <button class="btn text-white" type="button" id="btnAddItem" style="background:#1976d2">
                 <i class="bi bi-plus-lg"></i>
               </button>
             </div>
@@ -114,9 +114,9 @@
   <!-- Right: Item List & Actions -->
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center" style="background:#f1f8e9; border-bottom: 2px solid #c8e6c9;">
-        <h5 class="mb-0" style="color:#2e7d32"><i class="bi bi-list-check"></i> Daftar Barang</h5>
-        <span class="badge text-white" id="itemCount" style="background:#43a047">0 item</span>
+      <div class="card-header d-flex justify-content-between align-items-center" style="background:#e3f2fd; border-bottom: 2px solid #bbdefb;">
+        <h5 class="mb-0" style="color:#1565c0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
+        <span class="badge text-white" id="itemCount" style="background:#1976d2">0 item</span>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -147,11 +147,8 @@
       <div class="card-footer">
         <div class="d-flex gap-3 align-items-center flex-wrap">
           <div class="d-flex gap-2">
-            <button class="btn btn-sm text-white" id="btnMatchAll" disabled style="background:#1976d2">
-              <i class="bi bi-search"></i> Match Semua
-            </button>
             <button class="btn btn-sm text-white" id="btnPreviewPO" disabled style="background:#e65100">
-              <i class="bi bi-eye"></i> Preview PO
+              <i class="bi bi-send"></i> Kirim PO
             </button>
           </div>
           <div class="d-flex align-items-center gap-2 ms-auto">
@@ -242,7 +239,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn text-white" id="btnCommitPO" style="background:#2e7d32">
+        <button type="button" class="btn text-white" id="btnCommitPO" style="background:#1565c0">
           <i class="bi bi-check-circle"></i> Buat PO & Update Stok
         </button>
       </div>
@@ -254,7 +251,7 @@
 <div class="modal fade" id="poSuccessModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header text-white" style="background:#2e7d32">
+      <div class="modal-header text-white" style="background:#1565c0">
         <h5 class="modal-title"><i class="bi bi-check-circle"></i> PO Berhasil Dibuat!</h5>
       </div>
       <div class="modal-body text-center">
@@ -264,7 +261,7 @@
         <p class="text-muted"><span id="successLineCount"></span> item, stok telah diperbarui.</p>
       </div>
       <div class="modal-footer justify-content-center">
-        <button type="button" class="btn text-white" id="btnNewReceipt" style="background:#2e7d32">
+        <button type="button" class="btn text-white" id="btnNewReceipt" style="background:#1565c0">
           <i class="bi bi-plus-circle"></i> Entry Baru
         </button>
         <a href="/history" class="btn btn-outline-secondary">

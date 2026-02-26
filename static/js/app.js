@@ -34,7 +34,6 @@
     itemTableBody:   $('#itemTableBody'),
     itemCount:       $('#itemCount'),
     emptyRow:        $('#emptyRow'),
-    btnMatchAll:     $('#btnMatchAll'),
     btnPreviewPO:    $('#btnPreviewPO'),
     btnClearAll:     $('#btnClearAll'),
     btnUploadPhoto:  $('#btnUploadPhoto'),
@@ -135,12 +134,28 @@
       const draft = JSON.parse(raw);
       if (!draft || !Array.isArray(draft.items) || draft.items.length === 0) return false;
 
-      // Clean up disc/ppn values (old data may have "0.0000" strings)
+      // Clean up values (old data may have NaN or "0.0000" strings)
       draft.items.forEach(item => {
         item.disc1 = parseFloat(item.disc1) || null;
         item.disc2 = parseFloat(item.disc2) || null;
         item.disc3 = parseFloat(item.disc3) || null;
         item.ppn = parseFloat(item.ppn) || null;
+        // Sanitize hjual — NaN from old buggy auto-adjust
+        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+          if (item[f] != null && isNaN(item[f])) item[f] = null;
+        });
+        // Backfill auto-adjust refs for legacy matched items
+        if (item.status === 'auto' && item.matches && item.matches.length && item._refNettoPcs == null) {
+          const m = item.matches[0];
+          const dbBeli = m.hbelibsr || 0;
+          const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+          const dbPacking = parseInt(m.packing) || 1;
+          item._refNettoPcs = dbNet.final / dbPacking;
+          item._refHjual = {
+            hjual1: m.hjual || null, hjual2: m.hjual2 || null,
+            hjual3: m.hjual3 || null, hjual4: m.hjual4 || null, hjual5: m.hjual5 || null
+          };
+        }
       });
 
       state.items = draft.items;
@@ -266,7 +281,6 @@
     });
 
     // Action buttons
-    dom.btnMatchAll.addEventListener('click', matchAllItems);
     dom.btnPreviewPO.addEventListener('click', previewPO);
     dom.btnClearAll.addEventListener('click', clearAllItems);
 
@@ -397,6 +411,10 @@
       hjual5: null,
       bundling1: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
       bundling2: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
+      autoAdjustJual: false,
+      _refNettoPcs: null,
+      _refHjual: null,
+      _saveAlias: false,
     });
     renderItemTable();
   }
@@ -459,6 +477,48 @@
       </div>`;
   }
 
+  // Auto-adjust harga jual based on harga beli delta
+  function _autoAdjustJual(idx) {
+    const item = state.items[idx];
+    if (!item.autoAdjustJual) return;
+
+    // Compute refs from match data if missing (legacy items or fresh state)
+    if ((item._refNettoPcs == null || !item._refHjual) && item.matches && item.matches.length) {
+      const m = item.matches[0];
+      const dbBeli = parseFloat(m.hbelibsr) || 0;
+      const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+      const dbPacking = parseInt(m.packing) || 1;
+      item._refNettoPcs = dbNet.final / dbPacking;
+      item._refHjual = {
+        hjual1: parseFloat(m.hjual) || null, hjual2: parseFloat(m.hjual2) || null,
+        hjual3: parseFloat(m.hjual3) || null, hjual4: parseFloat(m.hjual4) || null,
+        hjual5: parseFloat(m.hjual5) || null
+      };
+    }
+
+    if (item._refNettoPcs == null || !item._refHjual) return;
+
+    const hbelibsr = item.priceBsr || 0;
+    const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+    const qtyKcl = item.qtyKecil || item.packing || 1;
+    const currentNettoPcs = qtyKcl > 0 ? net.final / qtyKcl : 0;
+    const delta = currentNettoPcs - item._refNettoPcs;
+
+    if (isNaN(delta)) return;
+
+    ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+      const ref = parseFloat(item._refHjual[f]);
+      if (ref && ref > 0) {
+        item[f] = Math.round(ref + delta);
+      }
+    });
+    // Update jual input values in DOM
+    ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+      const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="main"][data-field="${f}"]`);
+      if (input) input.value = (item[f] != null && !isNaN(item[f])) ? formatNumber(item[f]) : '';
+    });
+  }
+
   // Price recalculation helper (used by render and event handlers)
   function _recalcFromTotal(idx) {
     const item = state.items[idx];
@@ -482,16 +542,13 @@
     if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(Math.round(hbelibsr)) : '—';
     if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(Math.round(hbelibsr / qtyKcl)) : '—';
 
-    // Disc amounts
+    // Disc amounts — update amt inputs
     const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
-    const d1El = document.querySelector(`.disc-amt-1[data-idx="${idx}"]`);
-    const d2El = document.querySelector(`.disc-amt-2[data-idx="${idx}"]`);
-    const d3El = document.querySelector(`.disc-amt-3[data-idx="${idx}"]`);
-    const ppnEl = document.querySelector(`.ppn-amt[data-idx="${idx}"]`);
-    if (d1El) d1El.textContent = formatNumber(net.d1);
-    if (d2El) d2El.textContent = formatNumber(net.d2);
-    if (d3El) d3El.textContent = formatNumber(net.d3);
-    if (ppnEl) ppnEl.textContent = formatNumber(net.ppnAmt);
+    const amtMap = { disc1: net.d1, disc2: net.d2, disc3: net.d3, ppn: net.ppnAmt };
+    ['disc1','disc2','disc3','ppn'].forEach(f => {
+      const amtEl = document.querySelector(`.edit-disc-amt[data-idx="${idx}"][data-field="${f}"]`);
+      if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
+    });
 
     // Netto /Bsr and /Pcs (final = netto + ppn)
     const nettoBsrEl = document.querySelector(`.netto-bsr[data-idx="${idx}"]`);
@@ -504,6 +561,9 @@
       if (nettoPcsEl) nettoPcsEl.textContent = '—';
     }
 
+    // Auto-adjust jual prices if enabled (before margin calcs)
+    _autoAdjustJual(idx);
+
     // Reference cost per pcs for markup calculations (uses qtyKecil to match display)
     const nettoPcs = (hbelibsr && showPcs) ? net.final / qtyKcl : 0;
 
@@ -512,7 +572,7 @@
       const pctEl = document.querySelector(`.jual-pct[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
       const mrgEl = document.querySelector(`.jual-margin[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
       if (!pctEl || !mrgEl) return;
-      if (hjualVal == null || hjualVal <= 0 || !nettoPcs) {
+      if (hjualVal == null || isNaN(hjualVal) || hjualVal <= 0 || !nettoPcs) {
         pctEl.textContent = '—';
         mrgEl.textContent = '—';
         pctEl.classList.remove('negative');
@@ -639,7 +699,6 @@
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
-      dom.btnMatchAll.disabled = true;
       dom.btnPreviewPO.disabled = true;
       dom.btnClearAll.disabled = true;
       return;
@@ -747,33 +806,37 @@
               <div class="dp-disc-row">
                 <div class="dp-disc-field">
                   <span class="dp-disc-lbl">D1</span>
-                  <input type="number" class="pct-input edit-disc1" data-idx="${idx}"
+                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
                          value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100">
                   <span class="dp-disc-eq">% =</span>
-                  <span class="dp-disc-amt disc-amt-1" data-idx="${idx}">0</span>
+                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
+                         value="" placeholder="0" inputmode="numeric">
                 </div>
                 <div class="dp-disc-field">
                   <span class="dp-disc-lbl">D2</span>
-                  <input type="number" class="pct-input edit-disc2" data-idx="${idx}"
+                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                          value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100">
                   <span class="dp-disc-eq">% =</span>
-                  <span class="dp-disc-amt disc-amt-2" data-idx="${idx}">0</span>
+                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
+                         value="" placeholder="0" inputmode="numeric">
                 </div>
               </div>
               <div class="dp-disc-row">
                 <div class="dp-disc-field">
                   <span class="dp-disc-lbl">D3</span>
-                  <input type="number" class="pct-input edit-disc3" data-idx="${idx}"
+                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
                          value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100">
                   <span class="dp-disc-eq">% =</span>
-                  <span class="dp-disc-amt disc-amt-3" data-idx="${idx}">0</span>
+                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
+                         value="" placeholder="0" inputmode="numeric">
                 </div>
                 <div class="dp-disc-field">
                   <span class="dp-disc-lbl">PPN</span>
-                  <input type="number" class="pct-input edit-ppn" data-idx="${idx}"
+                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                          value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
                   <span class="dp-disc-eq">% =</span>
-                  <span class="dp-disc-amt ppn-amt" data-idx="${idx}">0</span>
+                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
+                         value="" placeholder="0" inputmode="numeric">
                 </div>
               </div>
               <div class="dp-netto-row">
@@ -784,7 +847,12 @@
             </div>
             <!-- Right: Harga Jual -->
             <div class="dp-section dp-jual">
-              <div class="dp-section-header">Harga Jual</div>
+              <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
+                ? ` <label class="auto-adjust-toggle">
+                       <input type="checkbox" class="form-check-input auto-adjust-jual" data-idx="${idx}" ${item.autoAdjustJual ? 'checked' : ''}>
+                       <span>Ikuti H.Beli</span>
+                     </label>`
+                : ''}</div>
               ${_renderJualTable(idx, null, mainJualVals)}
             </div>
             <!-- Full-width: Bundling -->
@@ -813,7 +881,6 @@
     state.items.forEach((_, idx) => _updateComputedPrices(idx));
 
     dom.itemCount.textContent = `${state.items.length} item`;
-    dom.btnMatchAll.disabled = false;
     dom.btnClearAll.disabled = false;
 
     const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
@@ -959,38 +1026,52 @@
       });
     });
 
-    // Disc & PPN (in detail row)
-    $$('.edit-disc1').forEach((el) => {
-      el.addEventListener('change', () => {
+    // Disc & PPN — dual input: percentage ↔ price amount
+    // Helper: get the base amount for a disc field (what the % is applied to)
+    function _discBase(item, field) {
+      const hbelibsr = item.priceBsr || 0;
+      if (!hbelibsr) return 0;
+      const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+      if (field === 'disc1') return hbelibsr;
+      if (field === 'disc2') return hbelibsr - net.d1;
+      if (field === 'disc3') return hbelibsr - net.d1 - net.d2;
+      if (field === 'ppn') return net.netto;
+      return hbelibsr;
+    }
+    // Percentage input → update state + recalc amt (live on input + change)
+    $$('.edit-disc-pct').forEach(el => {
+      function handler() {
         const idx = parseInt(el.dataset.idx);
-        state.items[idx].disc1 = el.value !== '' ? parseFloat(el.value) : null;
+        const field = el.dataset.field;
+        const item = state.items[idx];
+        item[field] = el.value !== '' ? parseFloat(el.value) : null;
         _updateComputedPrices(idx);
         _saveStateDebounced();
-      });
+      }
+      el.addEventListener('input', handler);
+      el.addEventListener('change', handler);
     });
-    $$('.edit-disc2').forEach((el) => {
-      el.addEventListener('change', () => {
+    // Amount input → convert to percentage, update state + recalc (live on input + change)
+    $$('.edit-disc-amt').forEach(el => {
+      function handler() {
         const idx = parseInt(el.dataset.idx);
-        state.items[idx].disc2 = el.value !== '' ? parseFloat(el.value) : null;
+        const field = el.dataset.field;
+        const item = state.items[idx];
+        const amt = parsePrice(el.value);
+        if (!amt) {
+          item[field] = null;
+        } else {
+          const base = _discBase(item, field);
+          item[field] = base > 0 ? Math.round((amt / base) * 10000) / 100 : 0;
+        }
+        // Update the percentage input to reflect calculated %
+        const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
+        if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
         _updateComputedPrices(idx);
         _saveStateDebounced();
-      });
-    });
-    $$('.edit-disc3').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        state.items[idx].disc3 = el.value !== '' ? parseFloat(el.value) : null;
-        _updateComputedPrices(idx);
-        _saveStateDebounced();
-      });
-    });
-    $$('.edit-ppn').forEach((el) => {
-      el.addEventListener('change', () => {
-        const idx = parseInt(el.dataset.idx);
-        state.items[idx].ppn = el.value !== '' ? parseFloat(el.value) : null;
-        _updateComputedPrices(idx);
-        _saveStateDebounced();
-      });
+      }
+      el.addEventListener('input', handler);
+      el.addEventListener('change', handler);
     });
 
     // Unified jual input handler (main + bundling)
@@ -1042,6 +1123,32 @@
       });
     });
 
+    // Auto-adjust jual toggle
+    $$('.auto-adjust-jual').forEach(cb => {
+      cb.addEventListener('change', e => {
+        const idx = +e.target.dataset.idx;
+        state.items[idx].autoAdjustJual = e.target.checked;
+        // Toggle readonly on main jual inputs
+        document.querySelectorAll(`.jual-input[data-idx="${idx}"][data-tier="main"]`).forEach(inp => {
+          if (e.target.checked) { inp.setAttribute('readonly', ''); inp.style.opacity = '0.6'; }
+          else { inp.removeAttribute('readonly'); inp.style.opacity = ''; }
+        });
+        if (e.target.checked) {
+          _autoAdjustJual(idx);
+          _updateComputedPrices(idx);
+        }
+        _saveStateDebounced();
+      });
+      // Apply readonly state on initial bind if already checked
+      const idx = +cb.dataset.idx;
+      if (state.items[idx].autoAdjustJual) {
+        document.querySelectorAll(`.jual-input[data-idx="${idx}"][data-tier="main"]`).forEach(inp => {
+          inp.setAttribute('readonly', '');
+          inp.style.opacity = '0.6';
+        });
+      }
+    });
+
     // Remove buttons
     $$('.btn-remove').forEach((btn) => {
       btn.addEventListener('click', () => removeItem(parseInt(btn.dataset.idx)));
@@ -1083,10 +1190,7 @@
         if (m.artpabrik && !item.barcode) item.barcode = m.artpabrik;
         if (m.satbesar) item.satuanBsr = m.satbesar;
         if (m.packing) item.packing = m.packing;
-        item.disc1 = parseFloat(m.pctdisc1) || null;
-        item.disc2 = parseFloat(m.pctdisc2) || null;
-        item.disc3 = parseFloat(m.pctdisc3) || null;
-        item.ppn = parseFloat(m.pctppn) || null;
+        // disc/ppn NOT auto-populated — user enters manually
         // Auto-populate harga jual from match
         if (item.hjual1 == null) item.hjual1 = m.hjual || null;
         if (item.hjual2 == null) item.hjual2 = m.hjual2 || null;
@@ -1101,23 +1205,18 @@
         const qty = item.qtyBesar || 1;
         item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
         item.priceKcl = item.priceBsr / (item.packing || 1);
+
+        // Store reference values for auto-adjust jual
+        const dbBeli = m.hbelibsr || 0;
+        const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+        const dbPacking = parseInt(m.packing) || 1;
+        item._refNettoPcs = dbNet.final / dbPacking;
+        item._refHjual = { hjual1: parseFloat(item.hjual1)||null, hjual2: parseFloat(item.hjual2)||null, hjual3: parseFloat(item.hjual3)||null, hjual4: parseFloat(item.hjual4)||null, hjual5: parseFloat(item.hjual5)||null };
+        item.autoAdjustJual = false;
       }
     });
 
     renderItemTable();
-  }
-
-  async function matchAllItems() {
-    if (!requireHeaderFields()) return;
-
-    showSpinner();
-    try {
-      await _doMatch();
-    } catch (e) {
-      alert('Match gagal: ' + e.message);
-    } finally {
-      hideSpinner();
-    }
   }
 
   // -----------------------------------------------------------------------
@@ -1205,10 +1304,7 @@
     if (match.artpabrik) item.barcode = match.artpabrik;
     if (match.satbesar) item.satuanBsr = match.satbesar;
     if (match.packing) item.packing = match.packing;
-    item.disc1 = parseFloat(match.pctdisc1) || null;
-    item.disc2 = parseFloat(match.pctdisc2) || null;
-    item.disc3 = parseFloat(match.pctdisc3) || null;
-    item.ppn = parseFloat(match.pctppn) || null;
+    // disc/ppn NOT auto-populated — user enters manually
     item.hjual1 = match.hjual || null;
     item.hjual2 = match.hjual2 || null;
     item.hjual3 = match.hjual3 || null;
@@ -1220,23 +1316,22 @@
     const qty = item.qtyBesar || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.priceBsr / (item.packing || 1);
+
+    // Store reference values for auto-adjust jual
+    const dbBeli = match.hbelibsr || 0;
+    const dbNet = calcNetPrice(dbBeli, parseFloat(match.pctdisc1)||0, parseFloat(match.pctdisc2)||0, parseFloat(match.pctdisc3)||0, parseFloat(match.pctppn)||0);
+    const dbPacking = parseInt(match.packing) || 1;
+    item._refNettoPcs = dbNet.final / dbPacking;
+    item._refHjual = { hjual1: parseFloat(item.hjual1)||null, hjual2: parseFloat(item.hjual2)||null, hjual3: parseFloat(item.hjual3)||null, hjual4: parseFloat(item.hjual4)||null, hjual5: parseFloat(item.hjual5)||null };
+    item.autoAdjustJual = false;
   }
 
   async function selectCandidate(match) {
     const idx = state.currentReviewIdx;
     _applyMatch(idx, match);
 
-    // Save alias if checkbox checked
-    if (dom.chkSaveAlias.checked) {
-      try {
-        await api('/receipt/save-alias', {
-          method: 'POST',
-          body: { alias_name: state.items[idx].name, artno: match.artno, userid: dom.userSelect.value },
-        });
-      } catch (e) {
-        console.warn('Alias save failed:', e.message);
-      }
-    }
+    // Defer alias save — flag intent, actual save happens on PO commit
+    state.items[idx]._saveAlias = dom.chkSaveAlias.checked;
 
     bootstrap.Modal.getInstance(dom.matchModal).hide();
     renderItemTable();
@@ -1441,6 +1536,20 @@
       // Close preview, show success — clear draft
       bootstrap.Modal.getInstance(dom.poPreviewModal).hide();
       _clearSavedState();
+
+      // Save aliases for items that were flagged during match selection
+      for (const item of state.items) {
+        if (item._saveAlias && item.selectedArtno) {
+          try {
+            await api('/receipt/save-alias', {
+              method: 'POST',
+              body: { alias_name: item.name, artno: item.selectedArtno, userid: userId },
+            });
+          } catch (e) {
+            console.warn('Alias save failed for', item.name, e.message);
+          }
+        }
+      }
 
       dom.successPONumber.textContent = data.po_number;
       dom.successTotal.textContent = formatNumber(data.grand_total);

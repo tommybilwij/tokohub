@@ -472,6 +472,95 @@
     });
   }
 
+  // Render stock reference banner for the detail panel (read-only DB data)
+  function _renderStockInfo(idx, item) {
+    if (item.status !== 'auto' || !item.matches.length) return '';
+    const m = item.matches[0];
+
+    // Badge
+    let typeBadge = '';
+    if (m.match_type === 'alias') typeBadge = '<span class="badge bg-info">alias</span>';
+    else if (m.match_type === 'barcode') typeBadge = '<span class="badge bg-primary">barcode</span>';
+    else typeBadge = `<span class="badge bg-success">${m.score}%</span>`;
+
+    const packNum = m.packing ? parseInt(m.packing) : '';
+    const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? Math.round(m.hbelibsr / packNum) : 0);
+
+    // Disc pills (only non-zero)
+    const discItems = [];
+    if (m.pctdisc1) discItems.push({ label: 'D1', val: m.pctdisc1 });
+    if (m.pctdisc2) discItems.push({ label: 'D2', val: m.pctdisc2 });
+    if (m.pctdisc3) discItems.push({ label: 'D3', val: m.pctdisc3 });
+    if (m.pctppn) discItems.push({ label: 'PPN', val: m.pctppn });
+    const discHTML = discItems.length
+      ? `<span class="dsi-disc">${discItems.map(d => `${d.label} ${d.val}%`).join('  ')}</span>`
+      : '';
+
+    // Netto
+    const hasDiscOrPpn = m.pctdisc1 || m.pctdisc2 || m.pctdisc3 || m.pctppn;
+    const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
+
+    // Jual prices
+    const jualItems = [
+      { label: 'Jual 1', val: m.hjual },
+      { label: 'Jual 3', val: m.hjual3 },
+      { label: 'Jual 4', val: m.hjual4 },
+      { label: 'Jual 5', val: m.hjual5 },
+      { label: 'Member', val: m.hjual2 },
+    ];
+
+    const jualHTML = jualItems.map(j =>
+      `<div class="dsi-jual-item"><span class="dsi-jual-lbl">${j.label}</span><span class="dsi-jual-val">${j.val ? formatNumber(j.val) : '—'}</span></div>`
+    ).join('');
+
+    // Bundling
+    const bundlings = m._bundlings || [];
+    const bundlingHTML = bundlings.map((b, bi) => {
+      const bJual = [
+        { label: 'J1', val: b.hjual1 },
+        { label: 'J3', val: b.hjual3 },
+        { label: 'J4', val: b.hjual4 },
+        { label: 'J5', val: b.hjual5 },
+        { label: 'Mbr', val: b.hjual2 },
+      ];
+      return `<div class="dsi-bundling">
+        <span class="dsi-bundling-tag">Bundling ${bi + 1} (Qty&ge;${b.qty})</span>
+        ${bJual.map(j => `<span class="dsi-bund-pair">${j.label} <b>${j.val ? formatNumber(j.val) : '—'}</b></span>`).join('')}
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="dp-stock-info">
+        <div class="dsi-header">
+          <div class="dsi-header-left">
+            ${typeBadge}
+            <span class="dsi-artno">${m.artno}</span>
+            <span class="dsi-artname">${m.artname || ''}</span>
+          </div>
+          <span class="dsi-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
+        </div>
+        <div class="dsi-body">
+          <div class="dsi-col-beli">
+            <div class="dsi-row">
+              <span class="dsi-lbl">Beli</span>
+              <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+              <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+            </div>
+            ${discHTML ? `<div class="dsi-row">${discHTML}</div>` : ''}
+            ${netPrices ? `<div class="dsi-row dsi-netto-row">
+              <span class="dsi-lbl">Netto</span>
+              <span class="dsi-val dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+              <span class="dsi-val dsi-netto-val dsi-val-sm">${packNum ? formatNumber(Math.round(netPrices.final / packNum)) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+            </div>` : ''}
+          </div>
+          <div class="dsi-col-jual">
+            ${jualHTML}
+          </div>
+        </div>
+        ${bundlingHTML}
+      </div>`;
+  }
+
   function renderItemTable() {
     const tbody = dom.itemTableBody;
     tbody.innerHTML = '';
@@ -499,109 +588,14 @@
       if (item.status === 'auto' && item.matches.length) {
         const m = item.matches[0];
         let typeBadge = '';
-        if (m.match_type === 'alias') typeBadge = '<span class="badge bg-info">alias</span>';
-        else if (m.match_type === 'barcode') typeBadge = '<span class="badge bg-primary">barcode</span>';
-        else typeBadge = `<span class="badge bg-success">${m.score}%</span>`;
-
-        const packNum = m.packing ? parseInt(m.packing) : '';
-        const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? Math.round(m.hbelibsr / packNum) : 0);
-
-        // Build jual grid rows (only non-zero)
-        const jualItems = [
-          { label: 'Jual 1', val: m.hjual },
-          { label: 'Jual 3', val: m.hjual3 },
-          { label: 'Jual 4', val: m.hjual4 },
-          { label: 'Jual 5', val: m.hjual5 },
-          { label: 'Member', val: m.hjual2 },
-        ].filter(j => j.val);
-
-        const jualHTML = jualItems.length
-          ? `<div class="si-section">
-              <div class="si-label">Harga Jual (Saat Ini)</div>
-              <div class="si-grid">${jualItems.map(j =>
-                `<div class="si-cell"><span class="si-cell-label">${j.label}</span><span class="si-cell-value">${formatNumber(j.val)}</span></div>`
-              ).join('')}</div>
-            </div>`
-          : '';
-
-        // Bundling data from DB (if any)
-        const bundlings = m._bundlings || [];
-        const bundlingHTML = bundlings.length
-          ? bundlings.map((b, bi) => {
-              const bJual = [
-                { label: 'J1', val: b.hjual1 },
-                { label: 'J3', val: b.hjual3 },
-                { label: 'J4', val: b.hjual4 },
-                { label: 'J5', val: b.hjual5 },
-                { label: 'Mbr', val: b.hjual2 },
-              ].filter(j => j.val);
-              return `<div class="si-section">
-                <div class="si-label si-label-bundling">Bundling ${bi + 1} — Qty &ge; ${b.qty}</div>
-                <div class="si-grid">${bJual.map(j =>
-                  `<div class="si-cell si-cell-bundling"><span class="si-cell-label">${j.label}</span><span class="si-cell-value">${formatNumber(j.val)}</span></div>`
-                ).join('')}</div>
-              </div>`;
-            }).join('')
-          : '';
-
-        // Disc/PPN pills (only non-zero)
-        const discItems = [];
-        if (m.pctdisc1) discItems.push({ label: 'D1', val: m.pctdisc1 });
-        if (m.pctdisc2) discItems.push({ label: 'D2', val: m.pctdisc2 });
-        if (m.pctdisc3) discItems.push({ label: 'D3', val: m.pctdisc3 });
-        if (m.pctppn) discItems.push({ label: 'PPN', val: m.pctppn });
-        const discHTML = discItems.length
-          ? `<div class="si-pills">${discItems.map(d =>
-              `<span class="si-pill">${d.label} <b>${d.val}%</b></span>`
-            ).join('')}</div>`
-          : '';
-
-        // Net price after cascading discounts & PPN
-        const hasDiscOrPpn = m.pctdisc1 || m.pctdisc2 || m.pctdisc3 || m.pctppn;
-        const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
-        const nettoHTML = netPrices
-          ? `<div class="si-prices si-prices-netto">
-              <div class="si-price-item si-price-netto">
-                <span class="si-price-caption">Netto / ${m.satbesar || 'Bsr'}</span>
-                <span class="si-price-amount si-netto-amount">${formatNumber(netPrices.netto)}</span>
-              </div>
-              <div class="si-price-item si-price-netto">
-                <span class="si-price-caption">+PPN / ${m.satbesar || 'Bsr'}</span>
-                <span class="si-price-amount si-netto-amount">${formatNumber(netPrices.final)}</span>
-              </div>
-            </div>`
-          : '';
+        if (m.match_type === 'alias') typeBadge = '<span class="badge bg-info me-1">alias</span>';
+        else if (m.match_type === 'barcode') typeBadge = '<span class="badge bg-primary me-1">barcode</span>';
+        else typeBadge = `<span class="badge bg-success me-1">${m.score}%</span>`;
 
         matchHTML = `
           <button class="btn btn-sm btn-success btn-review" data-idx="${idx}" title="Klik untuk ganti">
-            ${m.artname || m.artno}
-          </button>
-          <div class="stock-info-card">
-            <div class="si-header">
-              ${typeBadge}
-              <span class="si-artno">${m.artno}</span>
-              <span class="si-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
-            </div>
-            <div class="si-body">
-              <div class="si-section">
-                <div class="si-label">Harga Beli (Saat Ini)</div>
-                <div class="si-prices">
-                  <div class="si-price-item">
-                    <span class="si-price-caption">/ ${m.satbesar || 'Bsr'}</span>
-                    <span class="si-price-amount">${formatNumber(m.hbelibsr || 0)}</span>
-                  </div>
-                  <div class="si-price-item">
-                    <span class="si-price-caption">/ ${m.satkecil || 'Pcs'}</span>
-                    <span class="si-price-amount si-price-small">${formatNumber(hbelikcl)}</span>
-                  </div>
-                </div>
-                ${discHTML}
-                ${nettoHTML}
-              </div>
-              ${jualHTML}
-              ${bundlingHTML}
-            </div>
-          </div>`;
+            ${typeBadge}${m.artname || m.artno}
+          </button>`;
       } else if (item.status === 'review') {
         matchHTML = `<button class="btn btn-sm btn-warning btn-review" data-idx="${idx}">
           <i class="bi bi-search"></i> Pilih
@@ -680,6 +674,7 @@
       detailTr.innerHTML = `
         <td colspan="10">
           <div class="dp-grid">
+            ${_renderStockInfo(idx, item)}
             <!-- Left: Harga Beli -->
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
@@ -737,8 +732,9 @@
           </div>
         </td>
       `;
-      // Auto-expand detail row if it has disc/hjual/bundling data
-      const hasDetail = item.disc1 || item.disc2 || item.disc3 || item.ppn ||
+      // Auto-expand detail row if matched or has disc/hjual/bundling data
+      const isMatched = item.status === 'auto' && item.matches.length;
+      const hasDetail = isMatched || item.disc1 || item.disc2 || item.disc3 || item.ppn ||
                         item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5 ||
                         item.bundling1.enabled || item.bundling2.enabled;
       if (hasDetail) {

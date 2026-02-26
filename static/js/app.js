@@ -104,6 +104,57 @@
     };
   }
 
+  // -----------------------------------------------------------------------
+  // State Persistence (localStorage)
+  // -----------------------------------------------------------------------
+  const STORAGE_KEY = 'stockEntry_draft';
+
+  function _saveState() {
+    try {
+      const draft = {
+        items: state.items,
+        header: {
+          user: dom.userSelect ? dom.userSelect.value : '',
+          vendor: dom.vendorSelect ? dom.vendorSelect.value : '',
+          orderDate: dom.orderDate ? dom.orderDate.value : '',
+          shippingCost: dom.shippingCostInput ? dom.shippingCostInput.value : '',
+        },
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    } catch (e) {
+      // Silently ignore quota errors
+    }
+  }
+
+  const _saveStateDebounced = debounce(_saveState, 300);
+
+  function _restoreState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const draft = JSON.parse(raw);
+      if (!draft || !Array.isArray(draft.items) || draft.items.length === 0) return false;
+
+      state.items = draft.items;
+
+      // Restore header fields after dropdowns are populated
+      if (draft.header) {
+        if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
+        if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
+        if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
+        if (draft.header.shippingCost && dom.shippingCostInput) dom.shippingCostInput.value = draft.header.shippingCost;
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function _clearSavedState() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
   async function api(url, opts = {}) {
     if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
       opts.headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -138,18 +189,23 @@
   // -----------------------------------------------------------------------
   // Init
   // -----------------------------------------------------------------------
-  function init() {
+  async function init() {
     // Guard: only run on receipt form page
     if (!dom.vendorSelect) return;
 
-    // Set today's date
+    // Set today's date as default
     if (dom.orderDate) {
       dom.orderDate.value = new Date().toISOString().slice(0, 10);
     }
 
-    loadUsers();
-    loadVendors();
+    // Load dropdowns first, then restore saved state
+    await Promise.all([loadUsers(), loadVendors()]);
     bindEvents();
+
+    // Restore draft from localStorage (if any)
+    if (_restoreState()) {
+      renderItemTable();
+    }
   }
 
   async function loadUsers() {
@@ -206,10 +262,16 @@
     dom.btnPreviewPO.addEventListener('click', previewPO);
     dom.btnClearAll.addEventListener('click', clearAllItems);
 
+    // Header fields — persist on change
+    dom.userSelect.addEventListener('change', _saveStateDebounced);
+    dom.vendorSelect.addEventListener('change', _saveStateDebounced);
+    dom.orderDate.addEventListener('change', _saveStateDebounced);
+
     // Shipping cost: format on blur
     dom.shippingCostInput.addEventListener('change', () => {
       const val = parsePrice(dom.shippingCostInput.value);
       dom.shippingCostInput.value = val ? formatNumber(val) : '0';
+      _saveStateDebounced();
     });
 
     // File uploads
@@ -395,12 +457,8 @@
     const qty = item.qtyBesar || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
-
-    const bsrEl = document.querySelector(`.harga-bsr[data-idx="${idx}"]`);
-    const kclEl = document.querySelector(`.harga-kcl[data-idx="${idx}"]`);
-    if (bsrEl) bsrEl.textContent = item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—';
-    if (kclEl) kclEl.textContent = item.qtyKecil > 0 && item.priceKcl ? formatNumber(Math.round(item.priceKcl)) : '—';
     _updateComputedPrices(idx);
+    _saveStateDebounced();
   }
 
   function _updateComputedPrices(idx) {
@@ -486,18 +544,18 @@
     const packNum = m.packing ? parseInt(m.packing) : '';
     const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? Math.round(m.hbelibsr / packNum) : 0);
 
-    // Disc pills (only non-zero)
+    // Disc pills (only non-zero — parseFloat to handle string "0.0000")
     const discItems = [];
-    if (m.pctdisc1) discItems.push({ label: 'D1', val: m.pctdisc1 });
-    if (m.pctdisc2) discItems.push({ label: 'D2', val: m.pctdisc2 });
-    if (m.pctdisc3) discItems.push({ label: 'D3', val: m.pctdisc3 });
-    if (m.pctppn) discItems.push({ label: 'PPN', val: m.pctppn });
+    if (parseFloat(m.pctdisc1)) discItems.push({ label: 'D1', val: parseFloat(m.pctdisc1) });
+    if (parseFloat(m.pctdisc2)) discItems.push({ label: 'D2', val: parseFloat(m.pctdisc2) });
+    if (parseFloat(m.pctdisc3)) discItems.push({ label: 'D3', val: parseFloat(m.pctdisc3) });
+    if (parseFloat(m.pctppn)) discItems.push({ label: 'PPN', val: parseFloat(m.pctppn) });
     const discHTML = discItems.length
-      ? `<span class="dsi-disc">${discItems.map(d => `${d.label} ${d.val}%`).join('  ')}</span>`
+      ? `<span class="dsi-disc">${discItems.map(d => `${d.label} ${d.val}%`).join(' &middot; ')}</span>`
       : '';
 
     // Netto
-    const hasDiscOrPpn = m.pctdisc1 || m.pctdisc2 || m.pctdisc3 || m.pctppn;
+    const hasDiscOrPpn = parseFloat(m.pctdisc1) || parseFloat(m.pctdisc2) || parseFloat(m.pctdisc3) || parseFloat(m.pctppn);
     const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
 
     // Jual prices
@@ -532,6 +590,7 @@
     return `
       <div class="dp-stock-info">
         <div class="dsi-header">
+          <span class="dsi-title">STOK SAAT INI</span>
           <div class="dsi-header-left">
             ${typeBadge}
             <span class="dsi-artno">${m.artno}</span>
@@ -567,7 +626,7 @@
 
     if (state.items.length === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="10" class="text-center text-muted py-5">
+        <tr><td colspan="8" class="text-center text-muted py-5">
           <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3"></i><br>
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
@@ -648,12 +707,6 @@
           <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
                  value="${item.priceTotal ? formatNumber(Math.round(item.priceTotal)) : ''}" placeholder="0" inputmode="numeric">
         </td>
-        <td class="text-end price-readonly harga-bsr" data-idx="${idx}">
-          ${item.priceBsr ? formatNumber(Math.round(item.priceBsr)) : '—'}
-        </td>
-        <td class="text-end price-readonly harga-kcl" data-idx="${idx}">
-          ${item.qtyKecil > 0 && item.priceBsr ? formatNumber(Math.round(item.priceBsr / item.qtyKecil)) : '—'}
-        </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="${idx}" title="Hapus">
@@ -672,7 +725,7 @@
       const mainJualVals = { hjual1: item.hjual1, hjual2: item.hjual2, hjual3: item.hjual3, hjual4: item.hjual4, hjual5: item.hjual5, _enabled: true };
 
       detailTr.innerHTML = `
-        <td colspan="10">
+        <td colspan="8">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
             <!-- Left: Harga Beli -->
@@ -757,6 +810,8 @@
 
     const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
     dom.btnPreviewPO.disabled = !allMatched;
+
+    _saveState();
   }
 
   function _bindItemEvents() {
@@ -778,6 +833,7 @@
     $$('.edit-name').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].name = el.value.trim();
+        _saveStateDebounced();
       });
     });
 
@@ -876,6 +932,7 @@
     $$('.edit-satuan-bsr').forEach((el) => {
       el.addEventListener('change', () => {
         state.items[parseInt(el.dataset.idx)].satuanBsr = el.value;
+        _saveStateDebounced();
       });
     });
 
@@ -900,6 +957,7 @@
         const idx = parseInt(el.dataset.idx);
         state.items[idx].disc1 = el.value !== '' ? parseFloat(el.value) : null;
         _updateComputedPrices(idx);
+        _saveStateDebounced();
       });
     });
     $$('.edit-disc2').forEach((el) => {
@@ -907,6 +965,7 @@
         const idx = parseInt(el.dataset.idx);
         state.items[idx].disc2 = el.value !== '' ? parseFloat(el.value) : null;
         _updateComputedPrices(idx);
+        _saveStateDebounced();
       });
     });
     $$('.edit-disc3').forEach((el) => {
@@ -914,6 +973,7 @@
         const idx = parseInt(el.dataset.idx);
         state.items[idx].disc3 = el.value !== '' ? parseFloat(el.value) : null;
         _updateComputedPrices(idx);
+        _saveStateDebounced();
       });
     });
     $$('.edit-ppn').forEach((el) => {
@@ -921,6 +981,7 @@
         const idx = parseInt(el.dataset.idx);
         state.items[idx].ppn = el.value !== '' ? parseFloat(el.value) : null;
         _updateComputedPrices(idx);
+        _saveStateDebounced();
       });
     });
 
@@ -938,6 +999,7 @@
         }
         el.value = val ? formatNumber(val) : '';
         _updateComputedPrices(idx);
+        _saveStateDebounced();
       });
     });
 
@@ -958,6 +1020,7 @@
             else inp.setAttribute('disabled', '');
           });
         }
+        _saveStateDebounced();
       });
     });
 
@@ -967,6 +1030,7 @@
         const idx = parseInt(el.dataset.idx);
         const tier = el.dataset.tier;
         state.items[idx][`bundling${tier}`].minQty = parseInt(el.value) || 0;
+        _saveStateDebounced();
       });
     });
 
@@ -1366,8 +1430,9 @@
         },
       });
 
-      // Close preview, show success
+      // Close preview, show success — clear draft
       bootstrap.Modal.getInstance(dom.poPreviewModal).hide();
+      _clearSavedState();
 
       dom.successPONumber.textContent = data.po_number;
       dom.successTotal.textContent = formatNumber(data.grand_total);

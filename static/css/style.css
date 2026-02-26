@@ -1,8 +1,13 @@
-/* Stock Entry App - Custom Styles */
+/* Stock Entry App - Custom Styles
+   Palette: Green #2e7d32/#43a047  Blue #1565c0/#1976d2
+            Purple #7b1fa2        Orange #e65100
+            Neutral #37474f/#546e7a/#78909c
+*/
 
 body {
-  background-color: #f5f7fa;
+  background-color: #f0f4f0;
   font-size: 0.9rem;
+  color: #37474f;
 }
 
 .navbar-brand {
@@ -11,12 +16,48 @@ body {
 
 /* Cards */
 .card {
-  border: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
 .card-header {
   font-size: 0.95rem;
+}
+
+.card-footer {
+  background: #f8faf8;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Form controls — consistent styling */
+.form-control, .form-select {
+  border-radius: 6px;
+  border-color: #c8e6c9;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #43a047;
+  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
+}
+
+.form-label {
+  color: #37474f;
+}
+
+/* Nav tabs — green accent */
+.nav-tabs .nav-link {
+  color: #546e7a;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.nav-tabs .nav-link.active {
+  color: #2e7d32;
+  border-bottom-color: #2e7d32;
+  font-weight: 700;
 }
 
 /* -----------------------------------------------------------------------
@@ -31,11 +72,11 @@ body {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #5a6370;
+  color: #2e7d32;
   font-weight: 700;
   padding: 0.6rem 0.5rem;
-  border-bottom: 2px solid #dee2e6;
-  background: #f8f9fa;
+  border-bottom: 2px solid #c8e6c9;
+  background: #f1f8e9;
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -119,8 +160,8 @@ body {
 
 #itemTable .item-detail td {
   padding: 0;
-  border-bottom: 2px solid #e0e0e0;
-  background: #f5f7f5;
+  border-bottom: 2px solid #c8e6c9;
+  background: #f5f8f3;
 }
 
 /* -----------------------------------------------------------------------
@@ -207,29 +248,29 @@ body {
   margin-right: 0.5rem;
 }
 
-/* Disc inputs row */
+/* Disc inputs — compact 4-column grid */
 .dp-disc-row {
-  display: flex;
-  gap: 0.85rem;
-  margin-bottom: 0.4rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.35rem;
 }
 
 .dp-disc-field {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.85rem;
 }
 
 .dp-disc-lbl {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #546e7a;
-  min-width: 26px;
+  color: #43a047;
+  min-width: 30px;
 }
 
 .dp-disc-field .pct-input {
-  width: 52px;
+  width: 54px;
   font-size: 0.85rem;
   padding: 0.25rem 0.35rem;
   border: 1px solid #c8e6c9;
@@ -297,26 +338,34 @@ body {
   text-align: left;
 }
 
+.jual-table tbody tr {
+  border-bottom: 1px solid #e3f2fd;
+}
+
+.jual-table tbody tr:nth-child(odd) {
+  background: #fafcff;
+}
+
 .jual-table td {
-  padding: 0.3rem 0.35rem;
+  padding: 0.35rem 0.4rem;
   vertical-align: middle;
 }
 
 .jual-table .jt-label {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: #37474f;
+  color: #1565c0;
   white-space: nowrap;
 }
 
 .jual-table .jual-input {
-  width: 80px;
+  width: 82px;
   font-size: 0.85rem;
-  padding: 0.25rem 0.4rem;
+  padding: 0.28rem 0.4rem;
   border: 1px solid #bbdefb;
   border-radius: 6px;
   text-align: right;
-  background: #fafcff;
+  background: #fff;
 }
 
 .jual-table .jual-input:focus {
@@ -395,11 +444,24 @@ body {
 /* Bundling jual inputs match purple theme */
 .dp-bundling-section .jual-table thead th {
   border-bottom-color: #ede7f6;
+  color: #7b1fa2;
+}
+
+.dp-bundling-section .jual-table .jt-label {
+  color: #7b1fa2;
+}
+
+.dp-bundling-section .jual-table tbody tr {
+  border-bottom-color: #ede7f6;
+}
+
+.dp-bundling-section .jual-table tbody tr:nth-child(odd) {
+  background: #faf8ff;
 }
 
 .dp-bundling-section .jual-input {
   border-color: #d1c4e9;
-  background: #faf8ff;
+  background: #fff;
 }
 
 .dp-bundling-section .jual-input:focus {
@@ -518,6 +580,37 @@ body {
   text-overflow: ellipsis;
   border-radius: 6px;
   font-weight: 600;
+}
+
+#itemTable .btn-review.btn-success {
+  background: #2e7d32;
+  border-color: #2e7d32;
+}
+
+#itemTable .btn-review.btn-warning {
+  background: #f9a825;
+  border-color: #f9a825;
+  color: #37474f;
+}
+
+#itemTable .btn-review.btn-outline-danger {
+  color: #e53935;
+  border-color: #e53935;
+}
+
+#itemTable .btn-review.btn-outline-danger:hover {
+  background: #e53935;
+  color: #fff;
+}
+
+#itemTable .btn-remove {
+  color: #e53935;
+  border-color: #e53935;
+}
+
+#itemTable .btn-remove:hover {
+  background: #e53935;
+  color: #fff;
 }
 
 /* -----------------------------------------------------------------------
@@ -732,8 +825,14 @@ body {
 }
 
 /* -----------------------------------------------------------------------
-   Score badges
+   Badge & score color overrides (match palette)
    ----------------------------------------------------------------------- */
+.badge.bg-success { background: #2e7d32 !important; }
+.badge.bg-primary { background: #1565c0 !important; }
+.badge.bg-info    { background: #00838f !important; }
+.badge.bg-warning { background: #f9a825 !important; color: #37474f !important; }
+.badge.bg-danger  { background: #e53935 !important; }
+
 .score-high { color: #2e7d32; }
 .score-mid  { color: #f9a825; }
 .score-low  { color: #e53935; }

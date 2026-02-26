@@ -135,6 +135,14 @@
       const draft = JSON.parse(raw);
       if (!draft || !Array.isArray(draft.items) || draft.items.length === 0) return false;
 
+      // Clean up disc/ppn values (old data may have "0.0000" strings)
+      draft.items.forEach(item => {
+        item.disc1 = parseFloat(item.disc1) || null;
+        item.disc2 = parseFloat(item.disc2) || null;
+        item.disc3 = parseFloat(item.disc3) || null;
+        item.ppn = parseFloat(item.ppn) || null;
+      });
+
       state.items = draft.items;
 
       // Restore header fields after dropdowns are populated

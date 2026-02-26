@@ -1075,10 +1075,10 @@
         if (m.artpabrik && !item.barcode) item.barcode = m.artpabrik;
         if (m.satbesar) item.satuanBsr = m.satbesar;
         if (m.packing) item.packing = m.packing;
-        item.disc1 = m.pctdisc1 ?? null;
-        item.disc2 = m.pctdisc2 ?? null;
-        item.disc3 = m.pctdisc3 ?? null;
-        item.ppn = m.pctppn ?? null;
+        item.disc1 = parseFloat(m.pctdisc1) || null;
+        item.disc2 = parseFloat(m.pctdisc2) || null;
+        item.disc3 = parseFloat(m.pctdisc3) || null;
+        item.ppn = parseFloat(m.pctppn) || null;
         // Auto-populate harga jual from match
         if (item.hjual1 == null) item.hjual1 = m.hjual || null;
         if (item.hjual2 == null) item.hjual2 = m.hjual2 || null;
@@ -1197,10 +1197,10 @@
     if (match.artpabrik) item.barcode = match.artpabrik;
     if (match.satbesar) item.satuanBsr = match.satbesar;
     if (match.packing) item.packing = match.packing;
-    item.disc1 = match.pctdisc1 ?? null;
-    item.disc2 = match.pctdisc2 ?? null;
-    item.disc3 = match.pctdisc3 ?? null;
-    item.ppn = match.pctppn ?? null;
+    item.disc1 = parseFloat(match.pctdisc1) || null;
+    item.disc2 = parseFloat(match.pctdisc2) || null;
+    item.disc3 = parseFloat(match.pctdisc3) || null;
+    item.ppn = parseFloat(match.pctppn) || null;
     item.hjual1 = match.hjual || null;
     item.hjual2 = match.hjual2 || null;
     item.hjual3 = match.hjual3 || null;

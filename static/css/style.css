@@ -14,12 +14,12 @@
   --clr-primary-700: #1565c0;
   --clr-primary-900: #0d47a1;
 
-  /* --- Colors: Accent (Green) --- */
-  --clr-accent-50:  #e8f5e9;
-  --clr-accent-100: #c8e6c9;
-  --clr-accent-300: #81c784;
-  --clr-accent-600: #43a047;
-  --clr-accent-800: #2e7d32;
+  /* --- Colors: Accent (Teal-Green — higher contrast than pure green) --- */
+  --clr-accent-50:  #e0f2f1;
+  --clr-accent-100: #b2dfdb;
+  --clr-accent-300: #4db6ac;
+  --clr-accent-600: #00897b;
+  --clr-accent-800: #00695c;
 
   /* --- Colors: Neutral (Grey) --- */
   --clr-neutral-50:  #f8f9fa;
@@ -42,7 +42,7 @@
   --clr-card-border: #e0e0e0;
   --clr-input-border: #dee2e6;
   --clr-input-green: var(--clr-accent-100);
-  --clr-input-green-bg: #fafffe;
+  --clr-input-green-bg: #f5fffe;
 
   /* --- Typography --- */
   --fs-2xs: 0.7rem;
@@ -98,6 +98,35 @@ body {
 
 .navbar-brand {
   font-size: var(--fs-xl);
+}
+
+/* Page header with breadcrumb-style context */
+.page-header {
+  padding: var(--sp-2) 0;
+}
+
+.page-title {
+  font-size: 1.15rem;
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-800);
+}
+
+.page-header kbd {
+  font-size: var(--fs-2xs);
+  background: var(--clr-neutral-200);
+  color: var(--clr-neutral-700);
+  border: 1px solid var(--clr-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-weight: var(--fw-medium);
+}
+
+/* Sticky left panel — stays visible while scrolling items */
+@media (min-width: 992px) {
+  .col-lg-4 > .card {
+    position: sticky;
+    top: 1rem;
+  }
 }
 
 /* -----------------------------------------------------------------------
@@ -520,10 +549,10 @@ body {
   background: var(--clr-input-green-bg);
 }
 
-/* Netto row — green highlight */
+/* Netto row — teal highlight */
 .dp-netto-row {
   background: var(--clr-accent-50);
-  border: 1px solid #a5d6a7;
+  border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-lg);
   padding: var(--sp-1) 0.6rem;
   margin-top: var(--sp-1);
@@ -550,10 +579,10 @@ body {
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #558b2f;
+  color: var(--clr-accent-800);
   padding: var(--sp-1) var(--sp-1);
   border-bottom: 2px solid var(--clr-accent-100);
-  background: #f1f8e9;
+  background: var(--clr-accent-50);
   text-align: right;
 }
 
@@ -603,7 +632,7 @@ body {
 .jual-table .jt-margin {
   text-align: right;
   font-size: var(--fs-sm);
-  color: #607d8b;
+  color: var(--clr-neutral-700);
   white-space: nowrap;
 }
 
@@ -616,7 +645,7 @@ body {
   border-radius: var(--radius-md);
   text-align: right;
   background: var(--clr-card-bg);
-  color: #607d8b;
+  color: var(--clr-neutral-700);
 }
 
 .jual-table .jual-pct-input:focus {
@@ -776,7 +805,7 @@ body {
   margin-left: auto;
   float: right;
   background: var(--clr-accent-50);
-  border: 1px solid #a5d6a7;
+  border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
   padding: var(--sp-1) 0.6rem;
 }
@@ -897,11 +926,11 @@ body {
   font-weight: var(--fw-bold);
 }
 
-.dp-stock-info .badge.bg-success { background: rgba(255,255,255,0.9); color: var(--clr-primary-700); font-weight: var(--fw-bold); }
-.dp-stock-info .badge.bg-primary { background: var(--clr-primary-700); }
-.dp-stock-info .badge.bg-info    { background: var(--clr-info); }
+.dp-stock-info .badge.bg-success { background: var(--clr-primary-500); color: #fff; font-weight: var(--fw-bold); }
+.dp-stock-info .badge.bg-primary { background: var(--clr-primary-700); color: #fff; }
+.dp-stock-info .badge.bg-info    { background: var(--clr-info); color: #fff; }
 .dp-stock-info .badge.bg-warning { background: var(--clr-warning); color: var(--clr-neutral-800); }
-.dp-stock-info .badge.bg-danger  { background: var(--clr-danger); }
+.dp-stock-info .badge.bg-danger  { background: var(--clr-danger); color: #fff; }
 
 .dsi-header-left {
   display: flex;
@@ -1143,6 +1172,19 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* -----------------------------------------------------------------------
+   Toast notifications
+   ----------------------------------------------------------------------- */
+.toast-container {
+  z-index: 2100;
+}
+
+.toast {
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-base);
+  box-shadow: var(--shadow-lg);
 }
 
 /* -----------------------------------------------------------------------

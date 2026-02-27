@@ -209,6 +209,27 @@
     if (el) el.remove();
   }
 
+  // Show a Bootstrap toast notification
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const iconMap = { success: 'check-circle-fill', danger: 'exclamation-triangle-fill', warning: 'exclamation-circle-fill', info: 'info-circle-fill' };
+    const icon = iconMap[type] || iconMap.info;
+    const id = 'toast-' + Date.now();
+    const html = `
+      <div id="${id}" class="toast align-items-center text-bg-${type} border-0" role="alert">
+        <div class="d-flex">
+          <div class="toast-body"><i class="bi bi-${icon} me-1"></i> ${message}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+      </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    const toastEl = document.getElementById(id);
+    const bsToast = new bootstrap.Toast(toastEl, { delay: 4000 });
+    bsToast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+  }
+
   // -----------------------------------------------------------------------
   // Init
   // -----------------------------------------------------------------------
@@ -307,6 +328,37 @@
     dom.btnNewReceipt.addEventListener('click', () => {
       bootstrap.Modal.getInstance(dom.poSuccessModal).hide();
       clearAllItems();
+    });
+
+    // --- Keyboard shortcuts ---
+    document.addEventListener('keydown', (e) => {
+      // Alt+N → focus item name input
+      if (e.altKey && e.key === 'n') {
+        e.preventDefault();
+        dom.itemNameInput.focus();
+        dom.itemNameInput.select();
+      }
+      // Escape → collapse any open detail panel
+      if (e.key === 'Escape' && !document.querySelector('.modal.show')) {
+        document.querySelectorAll('#itemTable .item-main.has-detail-open').forEach(row => {
+          row.click();
+        });
+      }
+    });
+
+    // Enter on table inputs → move to next input in same row
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const target = e.target;
+      if (!target.matches('#itemTable .item-main input, #itemTable .item-main select')) return;
+      e.preventDefault();
+      const row = target.closest('tr');
+      const inputs = Array.from(row.querySelectorAll('input, select'));
+      const idx = inputs.indexOf(target);
+      if (idx < inputs.length - 1) {
+        inputs[idx + 1].focus();
+        if (inputs[idx + 1].select) inputs[idx + 1].select();
+      }
     });
   }
 
@@ -417,16 +469,21 @@
       _saveAlias: false,
     });
     renderItemTable();
+    showToast(`"${name}" ditambahkan`, 'success');
   }
 
   function removeItem(idx) {
+    const name = state.items[idx]?.name || 'Item';
     state.items.splice(idx, 1);
     renderItemTable();
+    showToast(`"${name}" dihapus`, 'info');
   }
 
   function clearAllItems() {
+    if (state.items.length === 0) return;
     state.items = [];
     renderItemTable();
+    showToast('Semua item dihapus', 'info');
   }
 
   // Render a jual price table (reusable for main + bundling tiers)
@@ -1379,6 +1436,7 @@
 
     bootstrap.Modal.getInstance(dom.matchModal).hide();
     renderItemTable();
+    showToast(`Matched: "${match.artname || match.artno}"`, 'success');
   }
 
   // -----------------------------------------------------------------------

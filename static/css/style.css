@@ -400,12 +400,33 @@ body {
   white-space: nowrap;
 }
 
-.jual-table .jual-pct,
+.jual-table .jual-pct-input {
+  width: 62px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid #c8e6c9;
+  border-radius: 6px;
+  text-align: right;
+  background: #fff;
+  color: #607d8b;
+}
+
+.jual-table .jual-pct-input:focus {
+  outline: none;
+  border-color: #43a047;
+  box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.18);
+  color: #2e7d32;
+}
+
+.jual-table .jual-pct-input.negative {
+  color: #e53935;
+}
+
 .jual-table .jual-margin {
   font-weight: 700;
 }
 
-.jual-table .jual-pct.negative,
 .jual-table .jual-margin.negative {
   color: #e53935;
 }

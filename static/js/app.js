@@ -447,7 +447,8 @@
         <td class="jt-label">${r.label}</td>
         <td><input type="text" class="jual-input" data-idx="${idx}" data-tier="${t}" data-field="${r.field}"
                    value="${val != null ? formatNumber(val) : ''}" placeholder="—" inputmode="numeric" ${dis}></td>
-        <td class="jt-pct"><span class="jual-pct" data-idx="${idx}" data-tier="${t}" data-field="${r.field}">—</span></td>
+        <td class="jt-pct"><input type="text" class="jual-pct-input" data-idx="${idx}" data-tier="${t}" data-field="${r.field}"
+                   value="" placeholder="—" inputmode="decimal" ${dis}></td>
         <td class="jt-margin"><span class="jual-margin" data-idx="${idx}" data-tier="${t}" data-field="${r.field}">—</span></td>
       </tr>`;
     }).join('');
@@ -569,11 +570,11 @@
 
     // Update jual markup% and margin for a given tier
     function updateJualRow(tier, field, hjualVal) {
-      const pctEl = document.querySelector(`.jual-pct[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
+      const pctEl = document.querySelector(`.jual-pct-input[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
       const mrgEl = document.querySelector(`.jual-margin[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
       if (!pctEl || !mrgEl) return;
       if (hjualVal == null || isNaN(hjualVal) || hjualVal <= 0 || !nettoPcs) {
-        pctEl.textContent = '—';
+        if (document.activeElement !== pctEl) pctEl.value = '';
         mrgEl.textContent = '—';
         pctEl.classList.remove('negative');
         mrgEl.classList.remove('negative');
@@ -582,7 +583,7 @@
       const margin = hjualVal - nettoPcs;
       const pct = (margin / nettoPcs) * 100;
       const isNeg = margin < 0;
-      pctEl.textContent = isNeg ? `(${Math.abs(pct).toFixed(1)}%)` : `${pct.toFixed(1)}%`;
+      if (document.activeElement !== pctEl) pctEl.value = pct.toFixed(1);
       mrgEl.textContent = isNeg ? `(${formatNumber(Math.abs(Math.round(margin)))})` : formatNumber(Math.round(margin));
       pctEl.classList.toggle('negative', isNeg);
       mrgEl.classList.toggle('negative', isNeg);
@@ -701,6 +702,7 @@
       dom.itemCount.textContent = '0 item';
       dom.btnPreviewPO.disabled = true;
       dom.btnClearAll.disabled = true;
+      _saveState();
       return;
     }
 
@@ -1092,6 +1094,41 @@
       });
     });
 
+    // MRG% input handler — edit margin percentage to calculate hjual
+    $$('.jual-pct-input').forEach((el) => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        const tier = el.dataset.tier;
+        const field = el.dataset.field;
+        const pctVal = parseFloat(el.value.replace(',', '.'));
+
+        // Calculate nettoPcs for this item
+        const item = state.items[idx];
+        const hbelibsr = item.priceBsr || 0;
+        const qtyKcl = item.qtyKecil || 0;
+        if (!hbelibsr || qtyKcl <= 0) return;
+        const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+        const nettoPcs = net.final / qtyKcl;
+        if (!nettoPcs) return;
+
+        // hjual = nettoPcs * (1 + pct/100)
+        const hjual = isNaN(pctVal) ? null : Math.round(nettoPcs * (1 + pctVal / 100));
+
+        if (tier === 'main') {
+          item[field] = hjual || null;
+        } else {
+          item[`bundling${tier}`][field] = hjual || null;
+        }
+
+        // Update the harga input
+        const hargaEl = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tier}"][data-field="${field}"]`);
+        if (hargaEl) hargaEl.value = hjual ? formatNumber(hjual) : '';
+
+        _updateComputedPrices(idx);
+        _saveStateDebounced();
+      });
+    });
+
     // Bundling enable toggles
     $$('.bundling-enable').forEach((el) => {
       el.addEventListener('change', () => {
@@ -1099,6 +1136,12 @@
         const tier = el.dataset.tier; // "1" or "2"
         const b = state.items[idx][`bundling${tier}`];
         b.enabled = el.checked;
+        // Toggle min-qty input
+        const minQtyEl = document.querySelector(`.bundling-minqty[data-idx="${idx}"][data-tier="${tier}"]`);
+        if (minQtyEl) {
+          if (el.checked) minQtyEl.removeAttribute('disabled');
+          else minQtyEl.setAttribute('disabled', '');
+        }
         // Toggle fields visibility
         const fields = document.querySelector(`.bundling-fields[data-idx="${idx}"][data-tier="${tier}"]`);
         if (fields) {
@@ -1128,8 +1171,9 @@
       cb.addEventListener('change', e => {
         const idx = +e.target.dataset.idx;
         state.items[idx].autoAdjustJual = e.target.checked;
-        // Toggle readonly on main jual inputs
-        document.querySelectorAll(`.jual-input[data-idx="${idx}"][data-tier="main"]`).forEach(inp => {
+        // Toggle readonly on main jual + mrg% inputs
+        const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
+        document.querySelectorAll(sel).forEach(inp => {
           if (e.target.checked) { inp.setAttribute('readonly', ''); inp.style.opacity = '0.6'; }
           else { inp.removeAttribute('readonly'); inp.style.opacity = ''; }
         });
@@ -1142,7 +1186,8 @@
       // Apply readonly state on initial bind if already checked
       const idx = +cb.dataset.idx;
       if (state.items[idx].autoAdjustJual) {
-        document.querySelectorAll(`.jual-input[data-idx="${idx}"][data-tier="main"]`).forEach(inp => {
+        const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
+        document.querySelectorAll(sel).forEach(inp => {
           inp.setAttribute('readonly', '');
           inp.style.opacity = '0.6';
         });
@@ -1355,7 +1400,8 @@
       const data = await api('/receipt/upload-photo', { method: 'POST', body: formData });
       (data.items || []).forEach((item) => {
         const unit = item.unit && item.unit !== '?' ? item.unit : 'CTN';
-        addItem(item.name, '', item.qty, 0, unit, 1, item.price || 0);
+        const packing = item.packing && item.packing > 0 ? item.packing : 1;
+        addItem(item.name, '', item.qty, 0, unit, packing, item.price || 0);
       });
       dom.ocrStatus.textContent = `${data.items.length} baris terdeteksi. Matching...`;
       dom.photoInput.value = '';

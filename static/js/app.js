@@ -332,12 +332,6 @@
 
     // --- Keyboard shortcuts ---
     document.addEventListener('keydown', (e) => {
-      // Alt+N → focus item name input
-      if (e.altKey && e.key === 'n') {
-        e.preventDefault();
-        dom.itemNameInput.focus();
-        dom.itemNameInput.select();
-      }
       // Escape → collapse any open detail panel
       if (e.key === 'Escape' && !document.querySelector('.modal.show')) {
         document.querySelectorAll('#itemTable .item-main.has-detail-open').forEach(row => {

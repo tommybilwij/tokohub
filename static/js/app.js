@@ -200,7 +200,7 @@
     const el = document.createElement('div');
     el.className = 'spinner-overlay';
     el.id = 'globalSpinner';
-    el.innerHTML = '<div class="spinner-border text-success" style="width:3rem;height:3rem"></div>';
+    el.innerHTML = '<div class="spinner-border text-success spinner-lg"></div>';
     document.body.appendChild(el);
   }
 
@@ -472,7 +472,7 @@
                    value="${b.minQty || ''}" placeholder="0" min="1" step="1" ${disabled}>
           </span>
         </div>
-        <div class="bundling-fields" data-idx="${idx}" data-tier="${tier}" ${b.enabled ? '' : 'style="opacity:0.4;pointer-events:none"'}>
+        <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
           ${_renderJualTable(idx, tier, vals)}
         </div>
       </div>`;
@@ -696,7 +696,7 @@
     if (state.items.length === 0) {
       tbody.innerHTML = `
         <tr><td colspan="8" class="text-center text-muted py-5">
-          <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3"></i><br>
+          <i class="bi bi-inbox empty-state-icon"></i><br>
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
@@ -745,7 +745,7 @@
         </td>
         <td>
           <input type="text" class="form-control edit-name" data-idx="${idx}"
-                 value="${item.name.replace(/"/g, '&quot;')}">
+                 value="${item.name.replace(/"/g, '&quot;')}" title="${item.name.replace(/"/g, '&quot;')}">
         </td>
         <td>
           <input type="text" class="form-control edit-barcode" data-idx="${idx}"
@@ -759,7 +759,7 @@
                      value="${item.qtyBesar}" min="0" step="1">
               <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
             </div>
-            <select class="form-select edit-satuan-bsr" data-idx="${idx}" style="width:72px">
+            <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
               ${unitOpts}
             </select>
           </div>
@@ -1145,8 +1145,7 @@
         // Toggle fields visibility
         const fields = document.querySelector(`.bundling-fields[data-idx="${idx}"][data-tier="${tier}"]`);
         if (fields) {
-          fields.style.opacity = el.checked ? '1' : '0.4';
-          fields.style.pointerEvents = el.checked ? '' : 'none';
+          fields.classList.toggle('bundling-fields-disabled', !el.checked);
           fields.querySelectorAll('input').forEach(inp => {
             if (el.checked) inp.removeAttribute('disabled');
             else inp.setAttribute('disabled', '');
@@ -1174,8 +1173,8 @@
         // Toggle readonly on main jual + mrg% inputs
         const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
         document.querySelectorAll(sel).forEach(inp => {
-          if (e.target.checked) { inp.setAttribute('readonly', ''); inp.style.opacity = '0.6'; }
-          else { inp.removeAttribute('readonly'); inp.style.opacity = ''; }
+          if (e.target.checked) { inp.setAttribute('readonly', ''); inp.classList.add('input-readonly'); }
+          else { inp.removeAttribute('readonly'); inp.classList.remove('input-readonly'); }
         });
         if (e.target.checked) {
           _autoAdjustJual(idx);
@@ -1189,7 +1188,7 @@
         const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
         document.querySelectorAll(sel).forEach(inp => {
           inp.setAttribute('readonly', '');
-          inp.style.opacity = '0.6';
+          inp.classList.add('input-readonly');
         });
       }
     });

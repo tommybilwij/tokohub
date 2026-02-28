@@ -487,10 +487,10 @@
     const dis = tier != null && !values._enabled ? 'disabled' : '';
     const rows = [
       { label: 'Jual 1', field: 'hjual1' },
-      { label: 'Member', field: 'hjual2' },
       { label: 'Jual 3', field: 'hjual3' },
       { label: 'Jual 4', field: 'hjual4' },
       { label: 'Jual 5', field: 'hjual5' },
+      { label: 'Member', field: 'hjual2' },
     ];
     const rowsHTML = rows.map(r => {
       const val = values[r.field];
@@ -520,7 +520,7 @@
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
-                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" ${disabled}>
+                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" ${disabled}> <span style="text-transform:none">Pcs</span>
           </span>
         </div>
         <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
@@ -577,8 +577,22 @@
     const qty = item.qtyBesar || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
+    _updateDetailLabels(idx);
     _updateComputedPrices(idx);
     _saveStateDebounced();
+  }
+
+  /** Update all dynamic satuan/qty labels in the detail panel */
+  function _updateDetailLabels(idx) {
+    const item = state.items[idx];
+    const sat = item.satuanBsr || 'Bsr';
+    const qtyBsr = item.qtyBesar || 1;
+    const detailRow = document.querySelector(`.item-detail[data-idx="${idx}"]`);
+    if (!detailRow) return;
+    // Update all /SatuanBsr unit labels
+    detailRow.querySelectorAll('.dp-unit-bsr').forEach(el => { el.textContent = '/' + sat; });
+    // Update qty besar display in header
+    detailRow.querySelectorAll('.dp-qty-bsr').forEach(el => { el.textContent = qtyBsr; });
   }
 
   function _updateComputedPrices(idx) {
@@ -594,12 +608,15 @@
     if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(Math.round(hbelibsr)) : '—';
     if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(Math.round(hbelibsr / qtyKcl)) : '—';
 
-    // Disc amounts — update amt inputs
+    // Disc amounts — update per-unit and total amt inputs
+    const qtyBsr = item.qtyBesar || 1;
     const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
     const amtMap = { disc1: net.d1, disc2: net.d2, disc3: net.d3, ppn: net.ppnAmt };
     ['disc1','disc2','disc3','ppn'].forEach(f => {
       const amtEl = document.querySelector(`.edit-disc-amt[data-idx="${idx}"][data-field="${f}"]`);
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
+      const totalEl = document.querySelector(`.edit-disc-total[data-idx="${idx}"][data-field="${f}"]`);
+      if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(Math.round(amtMap[f] * qtyBsr)) : '';
     });
 
     // Netto /Bsr and /Pcs (final = netto + ppn)
@@ -853,48 +870,60 @@
               <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
                 <span class="dp-label">Beli</span>
-                <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit">/${satuanBsr}</span>
+                <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit dp-unit-bsr">/${satuanBsr}</span>
                 <span class="dp-val hbeli-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
-              <div class="dp-disc-row">
-                <div class="dp-disc-field">
-                  <span class="dp-disc-lbl">D1</span>
-                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
-                         value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100">
-                  <span class="dp-disc-eq">% =</span>
-                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
-                         value="" placeholder="0" inputmode="numeric">
-                </div>
-                <div class="dp-disc-field">
-                  <span class="dp-disc-lbl">D2</span>
-                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
-                         value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100">
-                  <span class="dp-disc-eq">% =</span>
-                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
-                         value="" placeholder="0" inputmode="numeric">
-                </div>
-              </div>
-              <div class="dp-disc-row">
-                <div class="dp-disc-field">
-                  <span class="dp-disc-lbl">D3</span>
-                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
-                         value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100">
-                  <span class="dp-disc-eq">% =</span>
-                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
-                         value="" placeholder="0" inputmode="numeric">
-                </div>
-                <div class="dp-disc-field">
-                  <span class="dp-disc-lbl">PPN</span>
-                  <input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
-                         value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100">
-                  <span class="dp-disc-eq">% =</span>
-                  <input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
-                         value="" placeholder="0" inputmode="numeric">
-                </div>
-              </div>
+              <table class="beli-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th class="dp-th-total"><span class="dp-unit-bsr">/${satuanBsr}</span> &times; <span class="dp-qty-bsr">${item.qtyBesar || 1}</span> =</th>
+                    <th class="dp-unit-bsr">/${satuanBsr}</th>
+                    <th>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="bt-label">D1</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc1"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
+                               value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr>
+                    <td class="bt-label">D2</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc2"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
+                               value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr>
+                    <td class="bt-label">D3</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
+                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr>
+                    <td class="bt-label">PPN</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="ppn"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
+                               value="" placeholder="0" inputmode="numeric"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
+                               value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                </tbody>
+              </table>
               <div class="dp-netto-row">
                 <span class="dp-label">Netto</span>
-                <span class="dp-netto-val netto-bsr" data-idx="${idx}">—</span><span class="dp-unit">/${satuanBsr}</span>
+                <span class="dp-netto-val netto-bsr" data-idx="${idx}">—</span><span class="dp-unit dp-unit-bsr">/${satuanBsr}</span>
                 <span class="dp-netto-val netto-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
             </div>
@@ -1059,7 +1088,10 @@
     // Satuan Besar
     $$('.edit-satuan-bsr').forEach((el) => {
       el.addEventListener('change', () => {
-        state.items[parseInt(el.dataset.idx)].satuanBsr = el.value;
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].satuanBsr = el.value;
+        _updateDetailLabels(idx);
+        _updateComputedPrices(idx);
         _saveStateDebounced();
       });
     });
@@ -1118,6 +1150,29 @@
           item[field] = base > 0 ? Math.round((amt / base) * 10000) / 100 : 0;
         }
         // Update the percentage input to reflect calculated %
+        const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
+        if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
+        _updateComputedPrices(idx);
+        _saveStateDebounced();
+      }
+      el.addEventListener('input', handler);
+      el.addEventListener('change', handler);
+    });
+    // Total amount input → divide by qty besar to get per-unit, then convert to percentage
+    $$('.edit-disc-total').forEach(el => {
+      function handler() {
+        const idx = parseInt(el.dataset.idx);
+        const field = el.dataset.field;
+        const item = state.items[idx];
+        const totalAmt = parsePrice(el.value);
+        const qtyBsr = item.qtyBesar || 1;
+        if (!totalAmt) {
+          item[field] = null;
+        } else {
+          const perUnit = totalAmt / qtyBsr;
+          const base = _discBase(item, field);
+          item[field] = base > 0 ? Math.round((perUnit / base) * 10000) / 100 : 0;
+        }
         const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
         if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
         _updateComputedPrices(idx);

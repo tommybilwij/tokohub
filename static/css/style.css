@@ -474,6 +474,7 @@ body {
 /* -----------------------------------------------------------------------
    Harga Beli — values & inputs
    ----------------------------------------------------------------------- */
+/* Beli/Netto standalone rows */
 .dp-beli-row,
 .dp-netto-row {
   display: flex;
@@ -501,62 +502,104 @@ body {
   margin-right: var(--sp-2);
 }
 
-/* Disc inputs — compact grid */
-.dp-disc-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--sp-2) var(--sp-4);
-  margin-bottom: var(--sp-2);
-}
-
-.dp-disc-field {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-}
-
-.dp-disc-lbl {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
-  color: var(--clr-accent-600);
-  min-width: 30px;
-}
-
-.dp-disc-field .pct-input {
-  width: 54px;
-  font-size: var(--fs-base);
-  padding: var(--sp-1) var(--sp-1);
-  border: 1px solid var(--clr-accent-100);
-  border-radius: var(--radius-md);
-  text-align: right;
-  background: var(--clr-input-green-bg);
-}
-
-.dp-disc-eq {
-  font-size: var(--fs-sm);
-  color: #90a4ae;
-}
-
-.dp-disc-field .amt-input {
-  width: 72px;
-  font-size: var(--fs-base);
-  font-weight: var(--fw-bold);
-  padding: var(--sp-1) var(--sp-1);
-  border: 1px solid var(--clr-accent-100);
-  border-radius: var(--radius-md);
-  text-align: right;
-  color: var(--clr-neutral-800);
-  background: var(--clr-input-green-bg);
-}
-
 /* Netto row — green highlight */
 .dp-netto-row {
   background: linear-gradient(90deg, #e8f5e9, #f1f8e9);
   border: 1px solid #a5d6a7;
   border-radius: var(--radius-lg);
   padding: var(--sp-1) 0.6rem;
-  margin-top: var(--sp-1);
+  margin-top: var(--sp-2);
   margin-bottom: 0;
+}
+
+/* -----------------------------------------------------------------------
+   Beli Price Table (mirrors jual-table structure)
+   ----------------------------------------------------------------------- */
+.beli-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+
+.beli-table thead th {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clr-accent-800);
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 2px solid var(--clr-accent-100);
+  background: var(--clr-accent-50);
+  text-align: center;
+}
+
+.beli-table thead th:first-child {
+  text-align: left;
+}
+
+.beli-table .dp-th-total {
+  font-size: var(--fs-2xs);
+  white-space: nowrap;
+}
+
+.beli-table tbody tr {
+  border-bottom: 1px solid var(--clr-accent-100);
+}
+
+.beli-table tbody tr:nth-child(odd) {
+  background: var(--clr-input-green-bg);
+}
+
+.beli-table td {
+  padding: var(--sp-1) var(--sp-2);
+  vertical-align: middle;
+  text-align: center;
+}
+
+.beli-table td:first-child {
+  text-align: left;
+}
+
+.beli-table .bt-label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  color: var(--clr-accent-800);
+  white-space: nowrap;
+}
+
+/* Inputs inside beli-table */
+.beli-table .pct-input {
+  width: 58px;
+  font-size: var(--fs-base);
+  padding: var(--sp-1) var(--sp-1);
+  border: 1px solid var(--clr-accent-100);
+  border-radius: var(--radius-md);
+  text-align: center;
+  background: var(--clr-card-bg);
+}
+
+.beli-table .amt-input {
+  width: 82px;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  padding: var(--sp-1) var(--sp-1);
+  border: 1px solid var(--clr-accent-100);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--clr-neutral-800);
+  background: var(--clr-card-bg);
+}
+
+.beli-table .amt-total {
+  width: 100%;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  padding: var(--sp-1) var(--sp-1);
+  border: 1px solid var(--clr-accent-100);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--clr-neutral-800);
+  background: var(--clr-card-bg);
 }
 
 .dp-netto-val {

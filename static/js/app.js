@@ -570,7 +570,7 @@
       shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
     }
     const finalBsr = net.final + shippingForItem;
-    const qtyKcl = item.qtyKecil || item.packing || 1;
+    const qtyKcl = item.packing || 1;
     const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
     if (!currentNettoPcs) return;
 
@@ -594,7 +594,7 @@
     const item = state.items[idx];
     const qty = item.qtyBesar || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
-    item.priceKcl = item.qtyKecil > 0 ? item.priceBsr / item.qtyKecil : 0;
+    item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
     _updateDetailLabels(idx);
     _updateComputedPrices(idx);
     _saveStateDebounced();
@@ -616,8 +616,8 @@
   function _updateComputedPrices(idx) {
     const item = state.items[idx];
     const hbelibsr = item.priceBsr || 0;
-    // Use qtyKecil (user-entered pcs/pak) for /Pcs display, consistent with main row H/Kcl
-    const qtyKcl = item.qtyKecil || 0;
+    // Use packing (conversion factor, e.g. 20 pcs/CTN) for /Pcs display and margin calc
+    const qtyKcl = item.packing || 0;
     const showPcs = qtyKcl > 0;
 
     // H.Beli /Bsr and /Pcs
@@ -1265,7 +1265,7 @@
         // Calculate nettoPcs for this item
         const item = state.items[idx];
         const hbelibsr = item.priceBsr || 0;
-        const qtyKcl = item.qtyKecil || 0;
+        const qtyKcl = item.packing || 0;
         if (!hbelibsr || qtyKcl <= 0) return;
         const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
         const nettoPcs = net.final / qtyKcl;

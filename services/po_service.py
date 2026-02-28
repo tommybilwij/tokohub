@@ -366,21 +366,22 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                 )
 
                 # Update bundling (itempaket): delete old rows, insert new ones
+                bundlings = [b for b in [line.get('bundling1'), line.get('bundling2')]
+                             if b and b.get('min_qty')]
                 cursor.execute(
                     "DELETE FROM itempaket WHERE artno = %s",
                     (line['artno'],)
                 )
-                for bund in [line.get('bundling1'), line.get('bundling2')]:
-                    if bund and bund.get('min_qty'):
-                        cursor.execute(
-                            """INSERT INTO itempaket
-                               (artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                            (line['artno'], bund['min_qty'],
-                             bund.get('hjual1') or 0, bund.get('hjual2') or 0,
-                             bund.get('hjual3') or 0, bund.get('hjual4') or 0,
-                             bund.get('hjual5') or 0)
-                        )
+                for bund in bundlings:
+                    cursor.execute(
+                        """REPLACE INTO itempaket
+                           (artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                        (line['artno'], int(bund['min_qty']),
+                         bund.get('hjual1') or 0, bund.get('hjual2') or 0,
+                         bund.get('hjual3') or 0, bund.get('hjual4') or 0,
+                         bund.get('hjual5') or 0)
+                    )
 
             # Atomic counter increments
             cursor.execute("UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1")

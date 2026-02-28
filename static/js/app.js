@@ -974,7 +974,7 @@
               <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
                 ? ` <span class="auto-adjust-group">
                        <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
-                         <i class="bi bi-chevron-bar-up"></i> /100
+                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
                        </button>
                        <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
                          <i class="bi bi-arrow-repeat"></i> Ikuti Margin

@@ -163,6 +163,9 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'hbelikcl': float(hbelikcl),
             'hbelinetto': float(hbelinetto),
             'netto_full': float(netto_full),
+            'jlhdisc1': float(disc1 * qty),
+            'jlhdisc2': float(disc2 * qty),
+            'jlhdisc3': float(disc3 * qty),
             'pctdisc1': float(pctdisc1),
             'pctdisc2': float(pctdisc2),
             'pctdisc3': float(pctdisc3),
@@ -174,6 +177,8 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'hjual4': float(item['hjual4_override']) if item.get('hjual4_override') is not None else float(stock['hjual4'] or 0),
             'hjual5': float(item['hjual5_override']) if item.get('hjual5_override') is not None else float(stock['hjual5'] or 0),
             'amount': float(amount),
+            'bundling1': item.get('bundling1'),
+            'bundling2': item.get('bundling2'),
         })
         grand_total += amount
 
@@ -273,7 +278,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                        VALUES (%s, %s, %s, %s, %s,
                                %s, %s, %s,
                                %s, %s, %s,
-                               0, 0, 0,
+                               %s, %s, %s,
                                %s, %s,
                                %s, %s, %s,
                                %s, %s, %s, %s, %s,
@@ -282,6 +287,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['qty'],
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
                      line['pctppn'], line['jlhppn'],
                      line['packing'], line['satuanbsr'], line['satuankcl'],
                      line['hjual'], line['hjual2'], line['hjual3'],
@@ -323,7 +329,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                                %s, %s, %s, %s, %s,
                                %s, %s, %s,
                                %s, %s, %s,
-                               0, 0, 0,
+                               %s, %s, %s,
                                %s, %s,
                                %s, %s, %s, %s, %s,
                                %s,
@@ -334,12 +340,47 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['satuanbsr'], line['satuankcl'],
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
                      line['pctppn'], line['jlhppn'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
                      line['amount'],
                      supplier_id, fp_number, fp_becreff)
                 )
+
+                # Update stock prices
+                cursor.execute(
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           pctppn = %s,
+                           hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['pctppn'],
+                     line['hjual'], line['hjual2'], line['hjual3'],
+                     line['hjual4'], line['hjual5'],
+                     line['artno'])
+                )
+
+                # Update bundling (itempaket): delete old rows, insert new ones
+                cursor.execute(
+                    "DELETE FROM itempaket WHERE artno = %s",
+                    (line['artno'],)
+                )
+                for bund in [line.get('bundling1'), line.get('bundling2')]:
+                    if bund and bund.get('min_qty'):
+                        cursor.execute(
+                            """INSERT INTO itempaket
+                               (artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                            (line['artno'], bund['min_qty'],
+                             bund.get('hjual1') or 0, bund.get('hjual2') or 0,
+                             bund.get('hjual3') or 0, bund.get('hjual4') or 0,
+                             bund.get('hjual5') or 0)
+                        )
 
             # Atomic counter increments
             cursor.execute("UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1")

@@ -365,19 +365,20 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['artno'])
                 )
 
-                # Update bundling (itempaket): delete old rows, insert new ones
+                # Update bundling (itempaket): PK is (artno, subartno)
                 bundlings = [b for b in [line.get('bundling1'), line.get('bundling2')]
                              if b and b.get('min_qty')]
                 cursor.execute(
                     "DELETE FROM itempaket WHERE artno = %s",
                     (line['artno'],)
                 )
-                for bund in bundlings:
+                for i_bund, bund in enumerate(bundlings, start=1):
                     cursor.execute(
-                        """REPLACE INTO itempaket
-                           (artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-                        (line['artno'], int(bund['min_qty']),
+                        """INSERT INTO itempaket
+                           (artno, subartno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                        (line['artno'], str(i_bund),
+                         int(bund['min_qty']),
                          bund.get('hjual1') or 0, bund.get('hjual2') or 0,
                          bund.get('hjual3') or 0, bund.get('hjual4') or 0,
                          bund.get('hjual5') or 0)

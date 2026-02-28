@@ -64,11 +64,13 @@
   // Utilities
   // -----------------------------------------------------------------------
   function formatNumber(n) {
-    return Math.round(n).toLocaleString('en-US');
+    const num = Number(n);
+    if (isNaN(num)) return '0';
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parsePrice(str) {
-    return parseInt(String(str).replace(/[^0-9]/g, ''), 10) || 0;
+    return parseFloat(String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
   function computeQty(item) {
@@ -92,7 +94,7 @@
     const d3 = afterD2 * (pctdisc3 || 0) / 100;
     const netto = afterD2 - d3;
     const ppnAmt = netto * (pctppn || 0) / 100;
-    return { d1: Math.round(d1), d2: Math.round(d2), d3: Math.round(d3), ppnAmt: Math.round(ppnAmt), netto: Math.round(netto), final: Math.round(netto + ppnAmt) };
+    return { d1, d2, d3, ppnAmt, netto, final: netto + ppnAmt };
   }
 
   function debounce(fn, ms) {
@@ -310,10 +312,11 @@
     dom.vendorSelect.addEventListener('change', _saveStateDebounced);
     dom.orderDate.addEventListener('change', _saveStateDebounced);
 
-    // Shipping cost: format on blur
+    // Shipping cost: format on blur + recalc all items
     dom.shippingCostInput.addEventListener('change', () => {
       const val = parsePrice(dom.shippingCostInput.value);
       dom.shippingCostInput.value = val ? formatNumber(val) : '0';
+      state.items.forEach((_, idx) => _updateComputedPrices(idx));
       _saveStateDebounced();
     });
 
@@ -497,7 +500,7 @@
       return `<tr>
         <td class="jt-label">${r.label}</td>
         <td><input type="text" class="jual-input" data-idx="${idx}" data-tier="${t}" data-field="${r.field}"
-                   value="${val != null ? formatNumber(val) : ''}" placeholder="—" inputmode="numeric" ${dis}></td>
+                   value="${val != null ? formatNumber(val) : ''}" placeholder="—" inputmode="decimal" ${dis}></td>
         <td class="jt-pct"><input type="text" class="jual-pct-input" data-idx="${idx}" data-tier="${t}" data-field="${r.field}"
                    value="" placeholder="—" inputmode="decimal" ${dis}></td>
         <td class="jt-margin"><span class="jual-margin" data-idx="${idx}" data-tier="${t}" data-field="${r.field}">—</span></td>
@@ -520,7 +523,7 @@
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
-                   value="${b.minQty || ''}" placeholder="0" min="1" step="1" ${disabled}> <span style="text-transform:none">Pcs</span>
+                   value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${disabled}> <span style="text-transform:none">Pcs</span>
           </span>
         </div>
         <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
@@ -532,36 +535,43 @@
   // Auto-adjust harga jual based on harga beli delta
   function _autoAdjustJual(idx) {
     const item = state.items[idx];
-    if (!item.autoAdjustJual) return;
+    if (!item.matches || !item.matches.length) return;
+    const m = item.matches[0];
 
-    // Compute refs from match data if missing (legacy items or fresh state)
-    if ((item._refNettoPcs == null || !item._refHjual) && item.matches && item.matches.length) {
-      const m = item.matches[0];
-      const dbBeli = parseFloat(m.hbelibsr) || 0;
-      const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
-      const dbPacking = parseInt(m.packing) || 1;
-      item._refNettoPcs = dbNet.final / dbPacking;
-      item._refHjual = {
-        hjual1: parseFloat(m.hjual) || null, hjual2: parseFloat(m.hjual2) || null,
-        hjual3: parseFloat(m.hjual3) || null, hjual4: parseFloat(m.hjual4) || null,
-        hjual5: parseFloat(m.hjual5) || null
-      };
-    }
+    // Reference netto per pcs from STOK SAAT INI
+    const dbBeli = parseFloat(m.hbelibsr) || 0;
+    const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+    const dbPacking = parseInt(m.packing) || 1;
+    const refNettoPcs = dbNet.final / dbPacking;
+    if (!refNettoPcs) return;
 
-    if (item._refNettoPcs == null || !item._refHjual) return;
+    // Reference jual prices
+    const refHjual = {
+      hjual1: parseFloat(m.hjual) || 0, hjual2: parseFloat(m.hjual2) || 0,
+      hjual3: parseFloat(m.hjual3) || 0, hjual4: parseFloat(m.hjual4) || 0,
+      hjual5: parseFloat(m.hjual5) || 0
+    };
 
+    // Current netto per pcs (including shipping)
     const hbelibsr = item.priceBsr || 0;
     const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+    const totalShipping = parsePrice(dom.shippingCostInput.value);
+    let shippingForItem = 0;
+    if (totalShipping > 0) {
+      const itemCount = state.items.length;
+      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
+    }
+    const finalBsr = net.final + shippingForItem;
     const qtyKcl = item.qtyKecil || item.packing || 1;
-    const currentNettoPcs = qtyKcl > 0 ? net.final / qtyKcl : 0;
-    const delta = currentNettoPcs - item._refNettoPcs;
+    const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
+    if (!currentNettoPcs) return;
 
-    if (isNaN(delta)) return;
-
+    // Apply same absolute margin (rupiah) from reference to current netto
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-      const ref = parseFloat(item._refHjual[f]);
-      if (ref && ref > 0) {
-        item[f] = Math.round(ref + delta);
+      const refVal = refHjual[f];
+      if (refVal > 0) {
+        const margin = refVal - refNettoPcs;
+        item[f] = currentNettoPcs + margin;
       }
     });
     // Update jual input values in DOM
@@ -605,8 +615,8 @@
     // H.Beli /Bsr and /Pcs
     const hbeliBsrEl = document.querySelector(`.hbeli-bsr[data-idx="${idx}"]`);
     const hbeliPcsEl = document.querySelector(`.hbeli-pcs[data-idx="${idx}"]`);
-    if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(Math.round(hbelibsr)) : '—';
-    if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(Math.round(hbelibsr / qtyKcl)) : '—';
+    if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(hbelibsr) : '—';
+    if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(hbelibsr / qtyKcl) : '—';
 
     // Disc amounts — update per-unit and total amt inputs
     const qtyBsr = item.qtyBesar || 1;
@@ -616,25 +626,33 @@
       const amtEl = document.querySelector(`.edit-disc-amt[data-idx="${idx}"][data-field="${f}"]`);
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
       const totalEl = document.querySelector(`.edit-disc-total[data-idx="${idx}"][data-field="${f}"]`);
-      if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(Math.round(amtMap[f] * qtyBsr)) : '';
+      if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
     });
 
-    // Netto /Bsr and /Pcs (final = netto + ppn)
+    // Shipping cost divided equally per item
+    const totalShipping = parsePrice(dom.shippingCostInput.value);
+    let shippingForItem = 0;
+    if (totalShipping > 0) {
+      const itemCount = state.items.length;
+      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
+    }
+    const shippingValEl = document.querySelector(`.bt-shipping-val[data-idx="${idx}"]`);
+    if (shippingValEl) shippingValEl.textContent = shippingForItem ? formatNumber(shippingForItem) : '—';
+
+    // Netto /Bsr and /Pcs (final = netto + ppn + shipping for this item)
+    const finalBsr = net.final + shippingForItem;
     const nettoBsrEl = document.querySelector(`.netto-bsr[data-idx="${idx}"]`);
     const nettoPcsEl = document.querySelector(`.netto-pcs[data-idx="${idx}"]`);
     if (hbelibsr) {
-      if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(net.final);
-      if (nettoPcsEl) nettoPcsEl.textContent = showPcs ? formatNumber(Math.round(net.final / qtyKcl)) : '—';
+      if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(finalBsr);
+      if (nettoPcsEl) nettoPcsEl.textContent = showPcs ? formatNumber(finalBsr / qtyKcl) : '—';
     } else {
       if (nettoBsrEl) nettoBsrEl.textContent = '—';
       if (nettoPcsEl) nettoPcsEl.textContent = '—';
     }
 
-    // Auto-adjust jual prices if enabled (before margin calcs)
-    _autoAdjustJual(idx);
-
-    // Reference cost per pcs for markup calculations (uses qtyKecil to match display)
-    const nettoPcs = (hbelibsr && showPcs) ? net.final / qtyKcl : 0;
+    // Reference cost per pcs for markup calculations
+    const nettoPcs = (hbelibsr && showPcs) ? finalBsr / qtyKcl : 0;
 
     // Update jual markup% and margin for a given tier
     function updateJualRow(tier, field, hjualVal) {
@@ -653,7 +671,7 @@
       const pct = (margin / nettoPcs) * 100;
       const isNeg = margin < 0;
       if (document.activeElement !== pctEl) pctEl.value = pct.toFixed(1);
-      mrgEl.textContent = isNeg ? `-${formatNumber(Math.abs(Math.round(margin)))}` : formatNumber(Math.round(margin));
+      mrgEl.textContent = isNeg ? `-${formatNumber(Math.abs(margin))}` : formatNumber(margin);
       pctEl.classList.toggle('negative', isNeg);
       mrgEl.classList.toggle('negative', isNeg);
     }
@@ -680,7 +698,7 @@
     else typeBadge = `<span class="badge bg-success">${m.score}%</span>`;
 
     const packNum = m.packing ? parseInt(m.packing) : '';
-    const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? Math.round(m.hbelibsr / packNum) : 0);
+    const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
 
     // Disc pills (only non-zero — parseFloat to handle string "0.0000")
     const discItems = [];
@@ -705,9 +723,19 @@
       { label: 'Member', val: m.hjual2 },
     ];
 
-    const jualHTML = jualItems.map(j =>
-      `<div class="dsi-jual-item"><span class="dsi-jual-lbl">${j.label}</span><span class="dsi-jual-val">${j.val ? formatNumber(j.val) : '—'}</span></div>`
-    ).join('');
+    // Netto per pcs for margin calc (rounded to match displayed value)
+    const dsiNettoPcs = netPrices && packNum ? netPrices.final / packNum
+                      : (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
+
+    const jualHTML = jualItems.map(j => {
+      let marginHTML = '';
+      if (parseFloat(j.val) > 0 && dsiNettoPcs) {
+        const mg = j.val - dsiNettoPcs;
+        const isNeg = mg < 0;
+        marginHTML = `<span class="dsi-jual-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
+      }
+      return `<div class="dsi-jual-item"><span class="dsi-jual-lbl">${j.label}</span><span class="dsi-jual-val">${j.val ? formatNumber(j.val) : '—'}</span>${marginHTML}</div>`;
+    }).join('');
 
     // Bundling
     const bundlings = m._bundlings || [];
@@ -747,7 +775,7 @@
             ${netPrices ? `<div class="dsi-row dsi-netto-row">
               <span class="dsi-lbl">Netto</span>
               <span class="dsi-val dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-              <span class="dsi-val dsi-netto-val dsi-val-sm">${packNum ? formatNumber(Math.round(netPrices.final / packNum)) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+              <span class="dsi-val dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
             </div>` : ''}
           </div>
           <div class="dsi-col-jual">
@@ -825,7 +853,7 @@
             <div class="qty-stepper">
               <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
               <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
-                     value="${item.qtyBesar}" min="0" step="1">
+                     value="${item.qtyBesar}" min="0" step="0.01">
               <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
             </div>
             <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
@@ -837,13 +865,13 @@
           <div class="qty-stepper">
             <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
             <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
-                   value="${item.qtyKecil}" min="0" step="1">
+                   value="${item.qtyKecil}" min="0" step="0.01">
             <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
           </div>
         </td>
         <td>
           <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
-                 value="${item.priceTotal ? formatNumber(Math.round(item.priceTotal)) : ''}" placeholder="0" inputmode="numeric">
+                 value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
         </td>
         <td>${matchHTML}</td>
         <td>
@@ -887,38 +915,43 @@
                   <tr>
                     <td class="bt-label">D1</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc1"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">D2</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc2"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">D3</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
                                value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">PPN</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="ppn"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
-                               value="" placeholder="0" inputmode="numeric"></td>
+                               value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr class="beli-row-shipping" title="Dari input Biaya Kirim di bawah, dibagi rata per item">
+                    <td class="bt-label">B.Kirim</td>
+                    <td colspan="2" class="bt-shipping-val" data-idx="${idx}">—</td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
@@ -931,10 +964,9 @@
             <!-- Right: Harga Jual -->
             <div class="dp-section dp-jual">
               <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
-                ? ` <label class="auto-adjust-toggle">
-                       <input type="checkbox" class="form-check-input auto-adjust-jual" data-idx="${idx}" ${item.autoAdjustJual ? 'checked' : ''}>
-                       <span>Ikuti H.Beli</span>
-                     </label>`
+                ? ` <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
+                       <i class="bi bi-arrow-repeat"></i> Ikuti H.Beli
+                     </button>`
                 : ''}</div>
               ${_renderJualTable(idx, null, mainJualVals)}
             </div>
@@ -1107,7 +1139,7 @@
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
         state.items[idx].priceTotal = parsePrice(el.value);
-        el.value = state.items[idx].priceTotal ? formatNumber(Math.round(state.items[idx].priceTotal)) : '';
+        el.value = state.items[idx].priceTotal ? formatNumber(state.items[idx].priceTotal) : '';
         _recalcFromTotal(idx);
       });
     });
@@ -1219,7 +1251,7 @@
         if (!nettoPcs) return;
 
         // hjual = nettoPcs * (1 + pct/100)
-        const hjual = isNaN(pctVal) ? null : Math.round(nettoPcs * (1 + pctVal / 100));
+        const hjual = isNaN(pctVal) ? null : nettoPcs * (1 + pctVal / 100);
 
         if (tier === 'main') {
           item[field] = hjual || null;
@@ -1272,32 +1304,15 @@
       });
     });
 
-    // Auto-adjust jual toggle
-    $$('.auto-adjust-jual').forEach(cb => {
-      cb.addEventListener('change', e => {
-        const idx = +e.target.dataset.idx;
-        state.items[idx].autoAdjustJual = e.target.checked;
-        // Toggle readonly on main jual + mrg% inputs
-        const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
-        document.querySelectorAll(sel).forEach(inp => {
-          if (e.target.checked) { inp.setAttribute('readonly', ''); inp.classList.add('input-readonly'); }
-          else { inp.removeAttribute('readonly'); inp.classList.remove('input-readonly'); }
-        });
-        if (e.target.checked) {
-          _autoAdjustJual(idx);
-          _updateComputedPrices(idx);
-        }
+    // Ikuti H.Beli button — one-time adjust jual to match existing margins
+    $$('.btn-auto-adjust-jual').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = +btn.dataset.idx;
+        _autoAdjustJual(idx);
+        _updateComputedPrices(idx);
         _saveStateDebounced();
       });
-      // Apply readonly state on initial bind if already checked
-      const idx = +cb.dataset.idx;
-      if (state.items[idx].autoAdjustJual) {
-        const sel = `.jual-input[data-idx="${idx}"][data-tier="main"], .jual-pct-input[data-idx="${idx}"][data-tier="main"]`;
-        document.querySelectorAll(sel).forEach(inp => {
-          inp.setAttribute('readonly', '');
-          inp.classList.add('input-readonly');
-        });
-      }
     });
 
     // Remove buttons

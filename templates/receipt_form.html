@@ -166,7 +166,7 @@
             <div class="input-group input-group-sm w-fixed-150">
               <span class="input-group-text">Rp</span>
               <input type="text" id="shippingCostInput" class="form-control text-end"
-                     value="0" placeholder="0" inputmode="numeric">
+                     value="0.00" placeholder="0.00" inputmode="decimal">
             </div>
           </div>
           <button class="btn btn-outline-danger btn-sm" id="btnClearAll" disabled>
@@ -212,34 +212,37 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Supplier:</strong> <span id="poSupplierName"></span>
+        <div class="po-summary">
+          <div class="po-summary-item">
+            <span class="po-summary-label">Supplier</span>
+            <span class="po-summary-value" id="poSupplierName"></span>
           </div>
-          <div class="col-md-4">
-            <strong>Tanggal:</strong> <span id="poDate"></span>
+          <div class="po-summary-item">
+            <span class="po-summary-label">Tanggal</span>
+            <span class="po-summary-value" id="poDate"></span>
           </div>
-          <div class="col-md-4 text-end">
-            <strong>Total:</strong>
-            <span id="poGrandTotal" class="fs-5 fw-bold text-success"></span>
+          <div class="po-summary-item po-summary-total">
+            <span class="po-summary-label">Total</span>
+            <span class="po-summary-value" id="poGrandTotal"></span>
           </div>
         </div>
         <div class="table-responsive">
-          <table class="table table-sm table-bordered">
-            <thead class="table-light">
+          <table class="po-preview-table">
+            <thead>
               <tr>
                 <th>#</th>
                 <th>Artno</th>
                 <th>Nama</th>
                 <th class="text-end">Qty</th>
                 <th>Satuan</th>
-                <th class="text-end">Harga Beli</th>
-                <th class="text-end">Harga Kcl</th>
-                <th class="text-end">Disc1%</th>
-                <th class="text-end">Disc2%</th>
-                <th class="text-end">Disc3%</th>
-                <th class="text-end">PPN%</th>
+                <th class="text-end">H.Beli</th>
+                <th class="text-end">H.Kcl</th>
+                <th class="text-end">Disc1</th>
+                <th class="text-end">Disc2</th>
+                <th class="text-end">Disc3</th>
+                <th class="text-end">PPN</th>
                 <th class="text-end">Netto</th>
+                <th class="text-end">Netto Total</th>
                 <th class="text-end">Amount</th>
               </tr>
             </thead>

@@ -9,7 +9,7 @@ import json
 import os
 import logging
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
 from config import settings
 from services.db import get_connection
@@ -129,7 +129,7 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             hbelibsr = stock['hbelibsr'] or Decimal('0')
 
         # Calculate small-unit price
-        hbelikcl = hbelibsr / packing if packing else hbelibsr
+        hbelikcl = (hbelibsr / packing).quantize(Decimal('0.01'), rounding=ROUND_DOWN) if packing else hbelibsr
 
         # Discounts (use override if provided, else 0 — empty means no discount)
         pctdisc1 = Decimal(str(item['disc1_override'])) if item.get('disc1_override') is not None else Decimal('0')
@@ -148,18 +148,21 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
         ppn = hbelinetto * pctppn / 100
 
         amount = (hbelinetto + ppn) * qty
+        netto_full = hbelinetto + ppn  # per-unit netto including PPN (before shipping)
 
         lines.append({
             'artno': artno,
             'artpabrik': stock['artpabrik'] or '',
             'artname': stock['artname'] or '',
             'qty': float(qty),
+            'qty_besar': int(item.get('qty_besar', qty)),
             'packing': float(packing),
             'satuanbsr': stock['satbesar'] or '',
             'satuankcl': stock['satkecil'] or '',
             'hbelibsr': float(hbelibsr),
             'hbelikcl': float(hbelikcl),
             'hbelinetto': float(hbelinetto),
+            'netto_full': float(netto_full),
             'pctdisc1': float(pctdisc1),
             'pctdisc2': float(pctdisc2),
             'pctdisc3': float(pctdisc3),
@@ -174,13 +177,16 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
         })
         grand_total += amount
 
-    # Distribute shipping cost proportionally into each line's jlhppn
+    # Distribute shipping cost equally into each line's netto_full and proportionally into jlhppn/amount
+    num_lines = len(lines)
     if shipping > 0 and grand_total > 0:
+        shipping_per_item = float(shipping / num_lines)
         for line in lines:
             weight = Decimal(str(line['amount'])) / grand_total
             line_shipping = float(shipping * weight)
             line['jlhppn'] = line['jlhppn'] + line_shipping
             line['amount'] = line['amount'] + line_shipping
+            line['netto_full'] = line['netto_full'] + shipping_per_item
         grand_total += shipping
 
     return {

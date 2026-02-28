@@ -73,6 +73,11 @@
     return parseFloat(String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
+  /** Truncate (floor) a number to 2 decimal places — no rounding up. */
+  function trunc2(n) {
+    return Math.floor(n * 100) / 100;
+  }
+
   function computeQty(item) {
     const big = item.qtyBesar || 0;
     const small = item.qtyKecil || 0;
@@ -167,7 +172,10 @@
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
         if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
-        if (draft.header.shippingCost && dom.shippingCostInput) dom.shippingCostInput.value = draft.header.shippingCost;
+        if (draft.header.shippingCost && dom.shippingCostInput) {
+          const sc = parsePrice(draft.header.shippingCost);
+          dom.shippingCostInput.value = sc ? formatNumber(sc) : '0.00';
+        }
       }
 
       return true;
@@ -315,7 +323,7 @@
     // Shipping cost: format on blur + recalc all items
     dom.shippingCostInput.addEventListener('change', () => {
       const val = parsePrice(dom.shippingCostInput.value);
-      dom.shippingCostInput.value = val ? formatNumber(val) : '0';
+      dom.shippingCostInput.value = val ? formatNumber(val) : '0.00';
       state.items.forEach((_, idx) => _updateComputedPrices(idx));
       _saveStateDebounced();
     });
@@ -616,7 +624,7 @@
     const hbeliBsrEl = document.querySelector(`.hbeli-bsr[data-idx="${idx}"]`);
     const hbeliPcsEl = document.querySelector(`.hbeli-pcs[data-idx="${idx}"]`);
     if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(hbelibsr) : '—';
-    if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(hbelibsr / qtyKcl) : '—';
+    if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(trunc2(hbelibsr / qtyKcl)) : '—';
 
     // Disc amounts — update per-unit and total amt inputs
     const qtyBsr = item.qtyBesar || 1;
@@ -698,7 +706,7 @@
     else typeBadge = `<span class="badge bg-success">${m.score}%</span>`;
 
     const packNum = m.packing ? parseInt(m.packing) : '';
-    const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
+    const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? trunc2(m.hbelibsr / packNum) : 0);
 
     // Disc pills (only non-zero — parseFloat to handle string "0.0000")
     const discItems = [];
@@ -964,9 +972,14 @@
             <!-- Right: Harga Jual -->
             <div class="dp-section dp-jual">
               <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
-                ? ` <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
-                       <i class="bi bi-arrow-repeat"></i> Ikuti H.Beli
-                     </button>`
+                ? ` <span class="auto-adjust-group">
+                       <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
+                         <i class="bi bi-chevron-bar-up"></i> /100
+                       </button>
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
+                         <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+                       </button>
+                     </span>`
                 : ''}</div>
               ${_renderJualTable(idx, null, mainJualVals)}
             </div>
@@ -1180,7 +1193,7 @@
           item[field] = null;
         } else {
           const base = _discBase(item, field);
-          item[field] = base > 0 ? Math.round((amt / base) * 10000) / 100 : 0;
+          item[field] = base > 0 ? Math.round((amt / base) * 1000000) / 10000 : 0;
         }
         // Update the percentage input to reflect calculated %
         const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
@@ -1190,6 +1203,10 @@
       }
       el.addEventListener('input', handler);
       el.addEventListener('change', handler);
+      el.addEventListener('blur', () => {
+        const v = parsePrice(el.value);
+        el.value = v ? formatNumber(v) : '';
+      });
     });
     // Total amount input → divide by qty besar to get per-unit, then convert to percentage
     $$('.edit-disc-total').forEach(el => {
@@ -1204,7 +1221,7 @@
         } else {
           const perUnit = totalAmt / qtyBsr;
           const base = _discBase(item, field);
-          item[field] = base > 0 ? Math.round((perUnit / base) * 10000) / 100 : 0;
+          item[field] = base > 0 ? Math.round((perUnit / base) * 1000000) / 10000 : 0;
         }
         const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
         if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
@@ -1213,6 +1230,10 @@
       }
       el.addEventListener('input', handler);
       el.addEventListener('change', handler);
+      el.addEventListener('blur', () => {
+        const v = parsePrice(el.value);
+        el.value = v ? formatNumber(v) : '';
+      });
     });
 
     // Unified jual input handler (main + bundling)
@@ -1305,6 +1326,25 @@
     });
 
     // Ikuti H.Beli button — one-time adjust jual to match existing margins
+    // Round up jual prices to nearest 100
+    $$('.btn-round-hundred').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = +btn.dataset.idx;
+        const item = state.items[idx];
+        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+          if (item[f] > 0) item[f] = Math.ceil(item[f] / 100) * 100;
+        });
+        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+          const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="main"][data-field="${f}"]`);
+          if (input) input.value = (item[f] != null && !isNaN(item[f])) ? formatNumber(item[f]) : '';
+        });
+        _updateComputedPrices(idx);
+        _saveStateDebounced();
+      });
+    });
+
+    // Ikuti Margin — apply same absolute margin from STOK SAAT INI
     $$('.btn-auto-adjust-jual').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -1585,6 +1625,7 @@
     const payload = {
       artno: i.selectedArtno,
       qty: computeQty(i),
+      qty_besar: i.qtyBesar || 0,
       price_override: i.priceBsr || 0,
       disc1_override: i.disc1,
       disc2_override: i.disc2,
@@ -1642,37 +1683,45 @@
     dom.poDate.textContent = data.order_date;
     dom.poGrandTotal.textContent = formatNumber(data.grand_total);
 
+    const fmtDisc = (v) => {
+      if (!v) return '<span class="po-disc-zero">-</span>';
+      const n = parseFloat(v);
+      if (n === 0) return '<span class="po-disc-zero">-</span>';
+      return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+    };
+
     dom.poPreviewBody.innerHTML = '';
+    let totalAmount = 0;
     data.lines.forEach((line, i) => {
+      totalAmount += line.amount || 0;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${i + 1}</td>
-        <td><code>${line.artno}</code></td>
+        <td class="po-rownum">${i + 1}</td>
+        <td class="po-artno">${line.artno}</td>
         <td>${line.artname}</td>
-        <td class="text-end">${line.qty}</td>
+        <td class="po-num">${line.qty_besar || line.qty}</td>
         <td>${line.satuanbsr}</td>
-        <td class="text-end">${formatNumber(line.hbelibsr)}</td>
-        <td class="text-end">${formatNumber(line.hbelikcl)}</td>
-        <td class="text-end">${line.pctdisc1 || ''}</td>
-        <td class="text-end">${line.pctdisc2 || ''}</td>
-        <td class="text-end">${line.pctdisc3 || ''}</td>
-        <td class="text-end">${line.pctppn || ''}</td>
-        <td class="text-end">${formatNumber(line.hbelinetto)}</td>
-        <td class="text-end">${formatNumber(line.amount)}</td>
+        <td class="po-num">${formatNumber(line.hbelibsr)}</td>
+        <td class="po-num">${formatNumber(line.hbelikcl)}</td>
+        <td class="po-num">${fmtDisc(line.pctdisc1)}</td>
+        <td class="po-num">${fmtDisc(line.pctdisc2)}</td>
+        <td class="po-num">${fmtDisc(line.pctdisc3)}</td>
+        <td class="po-num">${fmtDisc(line.pctppn)}</td>
+        <td class="po-num">${formatNumber(line.netto_full)}</td>
+        <td class="po-num">${formatNumber(line.netto_full * (line.qty_besar || line.qty))}</td>
+        <td class="po-num po-amount">${formatNumber(line.amount)}</td>
       `;
       dom.poPreviewBody.appendChild(tr);
     });
 
-    // Show shipping cost row if present
-    if (data.shipping_cost > 0) {
-      const tr = document.createElement('tr');
-      tr.className = 'table-info';
-      tr.innerHTML = `
-        <td colspan="12" class="text-end fw-semibold">Biaya Kirim (ditambahkan ke PPN)</td>
-        <td class="text-end fw-semibold">${formatNumber(data.shipping_cost)}</td>
-      `;
-      dom.poPreviewBody.appendChild(tr);
-    }
+    // Grand total row
+    const trTotal = document.createElement('tr');
+    trTotal.className = 'po-row-grand-total';
+    trTotal.innerHTML = `
+      <td colspan="13" class="text-end">Grand Total</td>
+      <td class="po-num po-grand-total-value">${formatNumber(data.grand_total)}</td>
+    `;
+    dom.poPreviewBody.appendChild(trTotal);
   }
 
   // -----------------------------------------------------------------------

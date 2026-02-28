@@ -884,6 +884,15 @@ body {
   border-color: var(--clr-accent-300);
 }
 
+.auto-adjust-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  float: right;
+}
+
+
 /* Expand toggle icon */
 .expand-toggle {
   display: inline-flex;
@@ -1320,4 +1329,151 @@ body {
   .dsi-col-jual {
     gap: 0.3rem;
   }
+}
+
+/* -----------------------------------------------------------------------
+   PO Preview Modal — Table & Summary
+   ----------------------------------------------------------------------- */
+
+/* Summary card */
+.po-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  background: var(--clr-neutral-50);
+  border: 1px solid var(--clr-neutral-200);
+  border-left: 4px solid var(--clr-primary-500);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.po-summary-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.po-summary-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--clr-neutral-500);
+}
+
+.po-summary-value {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-800);
+}
+
+.po-summary-total {
+  margin-left: auto;
+}
+
+.po-summary-total .po-summary-value {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  color: var(--clr-accent-800);
+}
+
+/* Table */
+.po-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+}
+
+.po-preview-table thead th {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--clr-primary-700);
+  padding: var(--sp-2) var(--sp-2);
+  border: none;
+  white-space: nowrap;
+}
+
+.po-preview-table thead th:first-child {
+  border-radius: var(--radius-md) 0 0 0;
+}
+
+.po-preview-table thead th:last-child {
+  border-radius: 0 var(--radius-md) 0 0;
+}
+
+.po-preview-table tbody td {
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--clr-neutral-200);
+  vertical-align: middle;
+}
+
+.po-preview-table tbody tr:nth-child(odd) {
+  background: var(--clr-neutral-50);
+}
+
+.po-preview-table tbody tr:nth-child(even) {
+  background: var(--clr-card-bg);
+}
+
+/* Number columns — monospace, right-aligned */
+.po-preview-table .po-num {
+  text-align: right;
+  font-family: 'SFMono-Regular', 'Menlo', monospace;
+  font-size: var(--fs-base);
+}
+
+/* Amount column — bold */
+.po-preview-table .po-amount {
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-800);
+}
+
+/* Row number */
+.po-preview-table .po-rownum {
+  text-align: center;
+  color: var(--clr-neutral-500);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+}
+
+/* Artno code */
+.po-preview-table .po-artno {
+  font-family: 'SFMono-Regular', 'Menlo', monospace;
+  font-size: var(--fs-sm);
+  color: var(--clr-primary-700);
+  font-weight: var(--fw-semibold);
+}
+
+/* Disc values — muted when zero */
+.po-preview-table .po-disc-zero {
+  color: var(--clr-neutral-300);
+}
+
+/* Shipping row */
+.po-preview-table .po-row-shipping td {
+  background: var(--clr-accent-50);
+  border-top: 1px dashed var(--clr-accent-300);
+  border-bottom: 1px dashed var(--clr-accent-300);
+  font-weight: var(--fw-semibold);
+  color: var(--clr-accent-800);
+}
+
+/* Grand total row */
+.po-preview-table .po-row-grand-total td {
+  background: var(--clr-accent-50);
+  border-top: 2px solid var(--clr-accent-600);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  color: var(--clr-accent-800);
+  padding: var(--sp-3) var(--sp-2);
+}
+
+.po-preview-table .po-grand-total-value {
+  font-size: var(--fs-lg);
+  font-weight: 800;
+  color: var(--clr-accent-800);
 }

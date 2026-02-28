@@ -644,15 +644,16 @@
       if (hjualVal == null || isNaN(hjualVal) || hjualVal <= 0 || !nettoPcs) {
         if (document.activeElement !== pctEl) pctEl.value = '';
         mrgEl.textContent = '—';
-        pctEl.classList.remove('negative');
-        mrgEl.classList.remove('negative');
+        const noMargin = nettoPcs > 0 && (hjualVal == null || isNaN(hjualVal) || hjualVal <= 0);
+        pctEl.classList.toggle('negative', noMargin);
+        mrgEl.classList.toggle('negative', noMargin);
         return;
       }
       const margin = hjualVal - nettoPcs;
       const pct = (margin / nettoPcs) * 100;
       const isNeg = margin < 0;
       if (document.activeElement !== pctEl) pctEl.value = pct.toFixed(1);
-      mrgEl.textContent = isNeg ? `(${formatNumber(Math.abs(Math.round(margin)))})` : formatNumber(Math.round(margin));
+      mrgEl.textContent = isNeg ? `-${formatNumber(Math.abs(Math.round(margin)))}` : formatNumber(Math.round(margin));
       pctEl.classList.toggle('negative', isNeg);
       mrgEl.classList.toggle('negative', isNeg);
     }

@@ -570,34 +570,38 @@ body {
 /* Inputs inside beli-table */
 .beli-table .pct-input {
   width: 58px;
+  margin: 0 auto;
+  display: block;
   font-size: var(--fs-base);
   padding: var(--sp-1) var(--sp-1);
   border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
-  text-align: center;
+  text-align: right;
   background: var(--clr-card-bg);
 }
 
 .beli-table .amt-input {
   width: 82px;
+  margin: 0 auto;
+  display: block;
   font-size: var(--fs-base);
-  font-weight: var(--fw-bold);
   padding: var(--sp-1) var(--sp-1);
   border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
-  text-align: center;
+  text-align: right;
   color: var(--clr-neutral-800);
   background: var(--clr-card-bg);
 }
 
 .beli-table .amt-total {
-  width: 100%;
+  width: 100px;
+  margin: 0 auto;
+  display: block;
   font-size: var(--fs-base);
-  font-weight: var(--fw-bold);
   padding: var(--sp-1) var(--sp-1);
   border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
-  text-align: center;
+  text-align: right;
   color: var(--clr-neutral-800);
   background: var(--clr-card-bg);
 }

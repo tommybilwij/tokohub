@@ -14,12 +14,12 @@
   --clr-primary-700: #1565c0;
   --clr-primary-900: #0d47a1;
 
-  /* --- Colors: Accent (Teal-Green — higher contrast than pure green) --- */
-  --clr-accent-50:  #e0f2f1;
-  --clr-accent-100: #b2dfdb;
-  --clr-accent-300: #4db6ac;
-  --clr-accent-600: #00897b;
-  --clr-accent-800: #00695c;
+  /* --- Colors: Accent (Green) --- */
+  --clr-accent-50:  #e8f5e9;
+  --clr-accent-100: #c8e6c9;
+  --clr-accent-300: #81c784;
+  --clr-accent-600: #43a047;
+  --clr-accent-800: #2e7d32;
 
   /* --- Colors: Neutral (Grey) --- */
   --clr-neutral-50:  #f8f9fa;
@@ -42,7 +42,7 @@
   --clr-card-border: #e0e0e0;
   --clr-input-border: #dee2e6;
   --clr-input-green: var(--clr-accent-100);
-  --clr-input-green-bg: #f5fffe;
+  --clr-input-green-bg: #fafffe;
 
   /* --- Typography --- */
   --fs-2xs: 0.7rem;
@@ -433,7 +433,7 @@ body {
 
 .dp-section-header {
   font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 0.6rem;
@@ -451,8 +451,8 @@ body {
 /* --- Editable sections: soft white bg + green left border (no gradient) --- */
 .dp-beli {
   border-color: var(--clr-accent-100);
-  border-left: 3px solid var(--clr-accent-600);
-  background: var(--clr-card-bg);
+  border-left: 4px solid var(--clr-accent-600);
+  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
 }
 
 .dp-beli .dp-section-header {
@@ -462,8 +462,8 @@ body {
 
 .dp-jual {
   border-color: var(--clr-accent-100);
-  border-left: 3px solid var(--clr-accent-600);
-  background: var(--clr-card-bg);
+  border-left: 4px solid var(--clr-accent-600);
+  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
 }
 
 .dp-jual .dp-section-header {
@@ -491,7 +491,7 @@ body {
 
 .dp-val {
   font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
+  font-weight: 800;
   color: var(--clr-accent-800);
 }
 
@@ -549,10 +549,10 @@ body {
   background: var(--clr-input-green-bg);
 }
 
-/* Netto row — teal highlight */
+/* Netto row — green highlight */
 .dp-netto-row {
-  background: var(--clr-accent-50);
-  border: 1px solid var(--clr-accent-100);
+  background: linear-gradient(90deg, #e8f5e9, #f1f8e9);
+  border: 1px solid #a5d6a7;
   border-radius: var(--radius-lg);
   padding: var(--sp-1) 0.6rem;
   margin-top: var(--sp-1);
@@ -560,8 +560,8 @@ body {
 }
 
 .dp-netto-val {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
+  font-size: 0.92rem;
+  font-weight: 800;
   color: var(--clr-accent-800);
 }
 
@@ -926,7 +926,7 @@ body {
   font-weight: var(--fw-bold);
 }
 
-.dp-stock-info .badge.bg-success { background: var(--clr-primary-500); color: #fff; font-weight: var(--fw-bold); }
+.dp-stock-info .badge.bg-success { background-color: rgba(255,255,255,0.9) !important; color: var(--clr-primary-700) !important; font-weight: 800 !important; }
 .dp-stock-info .badge.bg-primary { background: var(--clr-primary-700); color: #fff; }
 .dp-stock-info .badge.bg-info    { background: var(--clr-info); color: #fff; }
 .dp-stock-info .badge.bg-warning { background: var(--clr-warning); color: var(--clr-neutral-800); }

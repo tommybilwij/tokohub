@@ -485,7 +485,7 @@ body {
 .dp-label {
   font-size: var(--fs-base);
   font-weight: var(--fw-bold);
-  color: var(--clr-neutral-800);
+  color: var(--clr-accent-600);
   min-width: 46px;
 }
 
@@ -856,6 +856,12 @@ body {
 #itemTable .btn-review.btn-success {
   background: var(--clr-primary-500);
   border-color: var(--clr-primary-500);
+}
+
+#itemTable .btn-review.btn-success .badge.bg-success {
+  background-color: rgba(255,255,255,0.9) !important;
+  color: var(--clr-primary-700) !important;
+  font-weight: 800 !important;
 }
 
 #itemTable .btn-review.btn-warning {

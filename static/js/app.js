@@ -852,7 +852,7 @@
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
-                <span class="dp-label">H.Beli</span>
+                <span class="dp-label">Beli</span>
                 <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit">/${satuanBsr}</span>
                 <span class="dp-val hbeli-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>

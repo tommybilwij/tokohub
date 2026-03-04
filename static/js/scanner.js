@@ -50,6 +50,9 @@
   let cameraRunning = false;
   let lastDetectedTime = 0;
   const COOLDOWN_MS = 2000;
+  let pendingCode = null;
+  let pendingCount = 0;
+  const CONFIRM_COUNT = 2;
 
   // -----------------------------------------------------------------------
   // Helpers
@@ -103,8 +106,8 @@
         target: dom.viewport,
         constraints: {
           ...constraints,
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
       },
       decoder: {
@@ -115,9 +118,10 @@
           'code_128_reader',
           'code_39_reader',
         ],
+        multiple: false,
       },
       locate: true,
-      frequency: 10,
+      frequency: 15,
     }, function (err) {
       if (err) {
         console.error('Quagga init error:', err);
@@ -172,12 +176,24 @@
   function onBarcodeDetected(result) {
     const now = Date.now();
     if (now - lastDetectedTime < COOLDOWN_MS) return;
-    lastDetectedTime = now;
 
     const code = result.codeResult.code;
     if (!code) return;
 
-    // Haptic feedback
+    // Require CONFIRM_COUNT consecutive same reads to reduce false positives
+    if (code === pendingCode) {
+      pendingCount++;
+    } else {
+      pendingCode = code;
+      pendingCount = 1;
+    }
+    if (pendingCount < CONFIRM_COUNT) return;
+
+    // Confirmed detection
+    lastDetectedTime = now;
+    pendingCode = null;
+    pendingCount = 0;
+
     if (navigator.vibrate) navigator.vibrate(100);
 
     dom.searchInput.value = code;

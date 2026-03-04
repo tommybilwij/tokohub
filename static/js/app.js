@@ -502,6 +502,35 @@
       _refHjual: null,
       _saveAlias: false,
     });
+    // Auto-fill hjual, bundling, and ref values from first match when auto-matched
+    const added = state.items[state.items.length - 1];
+    if (status === 'auto' && matches && matches.length) {
+      const m = matches[0];
+      added.hjual1 = parseFloat(m.hjual) || null;
+      added.hjual2 = parseFloat(m.hjual2) || null;
+      added.hjual3 = parseFloat(m.hjual3) || null;
+      added.hjual4 = parseFloat(m.hjual4) || null;
+      added.hjual5 = parseFloat(m.hjual5) || null;
+      const bndl = m._bundlings || [];
+      [1, 2].forEach((t, i) => {
+        const b = added[`bundling${t}`];
+        const db = bndl[i];
+        if (db) {
+          b.enabled = true;
+          b.minQty = db.qty || 0;
+          b.hjual1 = parseFloat(db.hjual1) || null;
+          b.hjual2 = parseFloat(db.hjual2) || null;
+          b.hjual3 = parseFloat(db.hjual3) || null;
+          b.hjual4 = parseFloat(db.hjual4) || null;
+          b.hjual5 = parseFloat(db.hjual5) || null;
+        }
+      });
+      const dbBeli = parseFloat(m.hbelibsr) || 0;
+      const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+      const dbPacking = parseInt(m.packing) || 1;
+      added._refNettoPcs = dbNet.final / dbPacking;
+      added._refHjual = { hjual1: added.hjual1, hjual2: added.hjual2, hjual3: added.hjual3, hjual4: added.hjual4, hjual5: added.hjual5 };
+    }
     renderItemTable();
     showToast(`"${name}" ditambahkan`, 'success');
   }
@@ -647,7 +676,7 @@
   // Price recalculation helper (used by render and event handlers)
   function _recalcFromTotal(idx) {
     const item = state.items[idx];
-    const qty = item.qtyBesar || 1;
+    const qty = computeQty(item) || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
     _updateDetailLabels(idx);
@@ -673,12 +702,13 @@
     const hbelibsr = item.priceBsr || 0;
     // Use packing (conversion factor, e.g. 20 pcs/CTN) for /Pcs display and margin calc
     const qtyKcl = item.packing || 0;
-    const showPcs = qtyKcl > 0;
+    const showPcs = qtyKcl > 0 && (item.qtyKecil || 0) > 0;
+    const showBsr = (item.qtyBesar || 0) > 0;
 
     // H.Beli /Bsr and /Pcs
     const hbeliBsrEl = document.querySelector(`.hbeli-bsr[data-idx="${idx}"]`);
     const hbeliPcsEl = document.querySelector(`.hbeli-pcs[data-idx="${idx}"]`);
-    if (hbeliBsrEl) hbeliBsrEl.textContent = hbelibsr ? formatNumber(hbelibsr) : '—';
+    if (hbeliBsrEl) hbeliBsrEl.textContent = (hbelibsr && showBsr) ? formatNumber(hbelibsr) : '—';
     if (hbeliPcsEl) hbeliPcsEl.textContent = (hbelibsr && showPcs) ? formatNumber(trunc2(hbelibsr / qtyKcl)) : '—';
 
     // Disc amounts — update per-unit and total amt inputs
@@ -706,7 +736,7 @@
     const finalBsr = net.final + shippingForItem;
     const nettoBsrEl = document.querySelector(`.netto-bsr[data-idx="${idx}"]`);
     const nettoPcsEl = document.querySelector(`.netto-pcs[data-idx="${idx}"]`);
-    if (hbelibsr) {
+    if (hbelibsr && showBsr) {
       if (nettoBsrEl) nettoBsrEl.textContent = formatNumber(finalBsr);
       if (nettoPcsEl) nettoPcsEl.textContent = showPcs ? formatNumber(finalBsr / qtyKcl) : '—';
     } else {
@@ -714,8 +744,8 @@
       if (nettoPcsEl) nettoPcsEl.textContent = '—';
     }
 
-    // Reference cost per pcs for markup calculations
-    const nettoPcs = (hbelibsr && showPcs) ? finalBsr / qtyKcl : 0;
+    // Reference cost per pcs for markup calculations (always use packing, independent of qtyKecil)
+    const nettoPcs = (hbelibsr && qtyKcl > 0) ? finalBsr / qtyKcl : 0;
 
     // Update jual markup% and margin for a given tier
     function updateJualRow(tier, field, hjualVal) {

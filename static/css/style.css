@@ -579,7 +579,7 @@ body {
 
 /* Inputs inside beli-table */
 .beli-table .pct-input {
-  width: 58px;
+  width: 78px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);

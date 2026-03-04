@@ -439,7 +439,7 @@
         if (!requireHeaderFields()) return;
         dom.searchResults.classList.add('d-none');
         addItem(item.artname, item.artpabrik || '', 1, 0, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
-                item.pctdisc1 ?? null, item.pctdisc2 ?? null, item.pctdisc3 ?? null, item.pctppn ?? null);
+                null, null, null, null);
         dom.itemNameInput.value = '';
         dom.itemNameInput.focus();
       });

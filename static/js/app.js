@@ -151,17 +151,46 @@
         ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
           if (item[f] != null && isNaN(item[f])) item[f] = null;
         });
-        // Backfill auto-adjust refs for legacy matched items
-        if (item.status === 'auto' && item.matches && item.matches.length && item._refNettoPcs == null) {
+        // Backfill from match data for legacy items
+        if (item.status === 'auto' && item.matches && item.matches.length) {
           const m = item.matches[0];
-          const dbBeli = m.hbelibsr || 0;
-          const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
-          const dbPacking = parseInt(m.packing) || 1;
-          item._refNettoPcs = dbNet.final / dbPacking;
-          item._refHjual = {
-            hjual1: m.hjual || null, hjual2: m.hjual2 || null,
-            hjual3: m.hjual3 || null, hjual4: m.hjual4 || null, hjual5: m.hjual5 || null
-          };
+          // Always backfill hjual from DB match if item has no values
+          if (!parseFloat(item.hjual1) && !parseFloat(item.hjual2) && !parseFloat(item.hjual3) && !parseFloat(item.hjual4) && !parseFloat(item.hjual5)) {
+            item.hjual1 = parseFloat(m.hjual) || null;
+            item.hjual2 = parseFloat(m.hjual2) || null;
+            item.hjual3 = parseFloat(m.hjual3) || null;
+            item.hjual4 = parseFloat(m.hjual4) || null;
+            item.hjual5 = parseFloat(m.hjual5) || null;
+            console.log('[backfill hjual]', item.artname, item.hjual1, item.hjual2, item.hjual3);
+          }
+          // Backfill bundling from DB if not set
+          const bundlings = m._bundlings || [];
+          [1, 2].forEach((t, i) => {
+            const b = item[`bundling${t}`];
+            const db = bundlings[i];
+            if (db && !b.enabled) {
+              b.enabled = true;
+              b.minQty = db.qty || 0;
+              b.hjual1 = parseFloat(db.hjual1) || null;
+              b.hjual2 = parseFloat(db.hjual2) || null;
+              b.hjual3 = parseFloat(db.hjual3) || null;
+              b.hjual4 = parseFloat(db.hjual4) || null;
+              b.hjual5 = parseFloat(db.hjual5) || null;
+            }
+          });
+          // Backfill auto-adjust refs
+          if (item._refNettoPcs == null) {
+            const dbBeli = m.hbelibsr || 0;
+            const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+            const dbPacking = parseInt(m.packing) || 1;
+            item._refNettoPcs = dbNet.final / dbPacking;
+          }
+          if (!item._refHjual) {
+            item._refHjual = {
+              hjual1: m.hjual || null, hjual2: m.hjual2 || null,
+              hjual3: m.hjual3 || null, hjual4: m.hjual4 || null, hjual5: m.hjual5 || null
+            };
+          }
         }
       });
 
@@ -1396,11 +1425,26 @@
         if (m.packing) item.packing = m.packing;
         // disc/ppn NOT auto-populated — user enters manually
         // Auto-populate harga jual from match
-        if (item.hjual1 == null) item.hjual1 = m.hjual || null;
-        if (item.hjual2 == null) item.hjual2 = m.hjual2 || null;
-        if (item.hjual3 == null) item.hjual3 = m.hjual3 || null;
-        if (item.hjual4 == null) item.hjual4 = m.hjual4 || null;
-        if (item.hjual5 == null) item.hjual5 = m.hjual5 || null;
+        if (!parseFloat(item.hjual1)) item.hjual1 = parseFloat(m.hjual) || null;
+        if (!parseFloat(item.hjual2)) item.hjual2 = parseFloat(m.hjual2) || null;
+        if (!parseFloat(item.hjual3)) item.hjual3 = parseFloat(m.hjual3) || null;
+        if (!parseFloat(item.hjual4)) item.hjual4 = parseFloat(m.hjual4) || null;
+        if (!parseFloat(item.hjual5)) item.hjual5 = parseFloat(m.hjual5) || null;
+        // Auto-populate bundling from match
+        const bndl = m._bundlings || [];
+        [1, 2].forEach((t, i) => {
+          const b = item[`bundling${t}`];
+          const db = bndl[i];
+          if (db && !b.enabled) {
+            b.enabled = true;
+            b.minQty = db.qty || 0;
+            b.hjual1 = parseFloat(db.hjual1) || null;
+            b.hjual2 = parseFloat(db.hjual2) || null;
+            b.hjual3 = parseFloat(db.hjual3) || null;
+            b.hjual4 = parseFloat(db.hjual4) || null;
+            b.hjual5 = parseFloat(db.hjual5) || null;
+          }
+        });
         // Auto-populate price from match if not yet set
         if (m.hbelibsr && !item.priceTotal) {
           item.priceTotal = m.hbelibsr * (item.qtyBesar || 1);
@@ -1509,11 +1553,28 @@
     if (match.satbesar) item.satuanBsr = match.satbesar;
     if (match.packing) item.packing = match.packing;
     // disc/ppn NOT auto-populated — user enters manually
-    item.hjual1 = match.hjual || null;
-    item.hjual2 = match.hjual2 || null;
-    item.hjual3 = match.hjual3 || null;
-    item.hjual4 = match.hjual4 || null;
-    item.hjual5 = match.hjual5 || null;
+    item.hjual1 = parseFloat(match.hjual) || null;
+    item.hjual2 = parseFloat(match.hjual2) || null;
+    item.hjual3 = parseFloat(match.hjual3) || null;
+    item.hjual4 = parseFloat(match.hjual4) || null;
+    item.hjual5 = parseFloat(match.hjual5) || null;
+
+    // Auto-fill bundling from existing DB data
+    const bundlings = match._bundlings || [];
+    [1, 2].forEach((t, i) => {
+      const b = item[`bundling${t}`];
+      const db = bundlings[i];
+      if (db) {
+        b.enabled = true;
+        b.minQty = db.qty || 0;
+        b.hjual1 = db.hjual1 || null;
+        b.hjual2 = db.hjual2 || null;
+        b.hjual3 = db.hjual3 || null;
+        b.hjual4 = db.hjual4 || null;
+        b.hjual5 = db.hjual5 || null;
+      }
+    });
+
     if (match.hbelibsr && !item.priceTotal) {
       item.priceTotal = match.hbelibsr * (item.qtyBesar || 1);
     }

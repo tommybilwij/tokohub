@@ -55,6 +55,41 @@
   const CONFIRM_COUNT = 2;
 
   // -----------------------------------------------------------------------
+  // Sharpening filter
+  // -----------------------------------------------------------------------
+  var PROC_W = 640;
+  var PROC_H = 480;
+  var procCanvas = document.createElement('canvas');
+  procCanvas.width = PROC_W;
+  procCanvas.height = PROC_H;
+  var procCtx = procCanvas.getContext('2d', { willReadFrequently: true });
+
+  function sharpenFrame() {
+    var img = procCtx.getImageData(0, 0, PROC_W, PROC_H);
+    var s = img.data;
+    var d = new Uint8ClampedArray(s.length);
+    var stride = PROC_W * 4;
+    d.set(s);
+    for (var y = 1; y < PROC_H - 1; y++) {
+      for (var x = 1; x < PROC_W - 1; x++) {
+        var p = y * stride + x * 4;
+        for (var c = 0; c < 3; c++) {
+          // Kernel: [0,-1,0,-1,5,-1,0,-1,0]
+          d[p + c] = Math.max(0, Math.min(255,
+            5 * s[p + c]
+            - s[p - stride + c]
+            - s[p + stride + c]
+            - s[p - 4 + c]
+            - s[p + 4 + c]
+          ));
+        }
+        d[p + 3] = 255;
+      }
+    }
+    procCtx.putImageData(new ImageData(d, PROC_W, PROC_H), 0, 0);
+  }
+
+  // -----------------------------------------------------------------------
   // Helpers
   // -----------------------------------------------------------------------
   function fmt(n) {
@@ -76,8 +111,14 @@
   }
 
   // -----------------------------------------------------------------------
-  // Camera
+  // Camera (manual stream + sharpened decode)
   // -----------------------------------------------------------------------
+  var mediaStream = null;
+  var videoEl = null;
+  var decodeInterval = null;
+  var isDecoding = false;
+  var DECODE_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'code_128_reader', 'code_39_reader'];
+
   async function populateCameras() {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -89,70 +130,76 @@
         dom.cameraSelect.classList.remove('d-none');
       }
     } catch (e) {
-      // ignore - camera enumeration may not be available
+      // ignore
     }
   }
 
   function startCamera() {
-    const deviceId = dom.cameraSelect.value || undefined;
-    const constraints = deviceId
-      ? { deviceId: { exact: deviceId } }
-      : { facingMode: 'environment' };
+    var deviceId = dom.cameraSelect.value || undefined;
+    var vConstraints = deviceId
+      ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } };
 
-    Quagga.init({
-      inputStream: {
-        name: 'Live',
-        type: 'LiveStream',
-        target: dom.viewport,
-        constraints: {
-          ...constraints,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-      },
-      decoder: {
-        readers: [
-          'ean_reader',
-          'ean_8_reader',
-          'upc_reader',
-          'code_128_reader',
-          'code_39_reader',
-        ],
-        multiple: false,
-      },
-      locate: true,
-      frequency: 15,
-    }, function (err) {
-      if (err) {
-        console.error('Quagga init error:', err);
-        alert('Gagal akses kamera: ' + (err.message || err));
-        return;
-      }
-      Quagga.start();
+    navigator.mediaDevices.getUserMedia({ video: vConstraints }).then(function (stream) {
+      mediaStream = stream;
+      videoEl = document.createElement('video');
+      videoEl.setAttribute('playsinline', '');
+      videoEl.setAttribute('autoplay', '');
+      videoEl.muted = true;
+      videoEl.style.width = '100%';
+      videoEl.style.display = 'block';
+      videoEl.srcObject = stream;
+      dom.viewport.appendChild(videoEl);
+
       cameraRunning = true;
       dom.placeholder.classList.add('d-none');
       dom.crosshair.classList.remove('d-none');
       dom.btnToggle.innerHTML = '<i class="bi bi-stop-fill"></i> Stop';
       dom.btnToggle.classList.replace('btn-light', 'btn-danger');
       populateCameras();
-    });
 
-    Quagga.onDetected(onBarcodeDetected);
+      decodeInterval = setInterval(processFrame, 100);
+    }).catch(function (err) {
+      console.error('Camera error:', err);
+      alert('Gagal akses kamera: ' + (err.message || err));
+    });
   }
 
   function stopCamera() {
-    Quagga.stop();
-    Quagga.offDetected(onBarcodeDetected);
+    if (decodeInterval) { clearInterval(decodeInterval); decodeInterval = null; }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(function (t) { t.stop(); });
+      mediaStream = null;
+    }
+    if (videoEl) { videoEl.remove(); videoEl = null; }
     cameraRunning = false;
+    isDecoding = false;
     dom.placeholder.classList.remove('d-none');
     dom.crosshair.classList.add('d-none');
     dom.btnToggle.innerHTML = '<i class="bi bi-play-fill"></i> Start';
     dom.btnToggle.classList.replace('btn-danger', 'btn-light');
-    // Remove Quagga's video element
-    const video = dom.viewport.querySelector('video');
-    if (video) video.remove();
-    const canvas = dom.viewport.querySelectorAll('canvas');
-    canvas.forEach(c => c.remove());
+  }
+
+  function processFrame() {
+    if (!videoEl || videoEl.readyState < 2 || isDecoding) return;
+
+    // Draw downsampled frame to processing canvas
+    procCtx.drawImage(videoEl, 0, 0, PROC_W, PROC_H);
+    // Apply sharpening convolution
+    sharpenFrame();
+
+    isDecoding = true;
+    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.85);
+    Quagga.decodeSingle({
+      src: dataUrl,
+      decoder: { readers: DECODE_READERS, multiple: false },
+      locate: true,
+    }, function (result) {
+      isDecoding = false;
+      if (result && result.codeResult && result.codeResult.code) {
+        onBarcodeDetected(result);
+      }
+    });
   }
 
   dom.btnToggle.addEventListener('click', function () {

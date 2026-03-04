@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <h4 class="mb-4"><i class="bi bi-gear"></i> Pengaturan</h4>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Mode LAN</h5>
+        <p class="mb-2">
+          Status:
+          {% if lan_mode %}
+            <span class="badge bg-success">Aktif</span>
+          {% else %}
+            <span class="badge bg-secondary">Nonaktif</span>
+          {% endif %}
+        </p>
+
+        {% if lan_mode and lan_token %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">IP Lokal</label>
+          <div class="input-group">
+            <input type="text" class="form-control" readonly
+                   value="{{ local_ip }}">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">URL Akses</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="lanUrl" readonly
+                   value="http://{{ local_ip }}:{{ server_port }}?token={{ lan_token }}">
+            <button class="btn btn-outline-primary" type="button" onclick="copyUrl()">
+              <i class="bi bi-clipboard"></i> Salin
+            </button>
+          </div>
+          <div class="form-text">Buka URL ini dari perangkat lain di WiFi yang sama.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Token</label>
+          <div class="input-group">
+            <input type="text" class="form-control font-monospace" readonly
+                   value="{{ lan_token }}">
+          </div>
+        </div>
+        {% elif not lan_mode %}
+        <p class="text-muted">
+          Jalankan server dengan flag <code>--lan</code> untuk mengaktifkan akses dari perangkat lain di jaringan lokal.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Info Server</h5>
+        <table class="table table-sm mb-0">
+          <tr><td class="fw-semibold">Port</td><td>{{ server_port }}</td></tr>
+          <tr><td class="fw-semibold">IP Lokal</td><td>{{ local_ip }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyUrl() {
+  const input = document.getElementById('lanUrl');
+  navigator.clipboard.writeText(input.value).then(() => {
+    window.showToast && showToast('URL disalin!', 'success');
+  });
+}
+</script>
+{% endblock %}

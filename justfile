@@ -124,6 +124,52 @@ check-stock:
 setup: install db-import migrate
     @echo "Setup complete! Run 'just run' to start the app."
 
+# ---------------------------------------------------------------------------
+# Tauri / PyInstaller build
+# ---------------------------------------------------------------------------
+
+# Get the Rust target triple for sidecar naming
+_target-triple := `rustc --print host-tuple 2>/dev/null || rustc -vV | grep '^host:' | cut -d' ' -f2`
+
+# Build the PyInstaller sidecar and copy to src-tauri/binaries/
+build-sidecar:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building PyInstaller sidecar..."
+    uv run --group dev pyinstaller pyinstaller.spec --noconfirm --clean
+    echo "Copying sidecar to src-tauri/binaries/..."
+    mkdir -p src-tauri/binaries
+    TRIPLE="{{_target-triple}}"
+    # Copy the executable with target-triple naming
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+        cp dist/stock-entry-server/stock-entry-server.exe "src-tauri/binaries/stock-entry-server-${TRIPLE}.exe"
+    else
+        cp dist/stock-entry-server/stock-entry-server "src-tauri/binaries/stock-entry-server-${TRIPLE}"
+    fi
+    # Copy _internal directory for PyInstaller runtime
+    rm -rf src-tauri/binaries/_internal
+    cp -r dist/stock-entry-server/_internal src-tauri/binaries/_internal
+    echo "Sidecar ready: src-tauri/binaries/stock-entry-server-${TRIPLE}"
+
+# Build the Tauri desktop app
+build-tauri:
+    cargo tauri build
+
+# Full build: sidecar + Tauri app
+build-app: build-sidecar build-tauri
+
+# Dev mode: build sidecar then run Tauri in dev mode
+dev-tauri: build-sidecar
+    cargo tauri dev
+
+# Clean all build artifacts
+clean-build:
+    rm -rf dist/ build/ src-tauri/binaries/ src-tauri/target/
+
+# ---------------------------------------------------------------------------
+# Database management
+# ---------------------------------------------------------------------------
+
 # Clean up local MariaDB data directory
 db-clean: db-stop
     #!/usr/bin/env bash

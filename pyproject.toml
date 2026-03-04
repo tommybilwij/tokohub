@@ -16,5 +16,10 @@ dependencies = [
     "cryptography>=46.0.5",
 ]
 
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.0",
+]
+
 [project.scripts]
 serve = "app:main"

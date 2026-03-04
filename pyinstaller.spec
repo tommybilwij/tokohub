@@ -1,0 +1,68 @@
+# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec for stock-entry-server (--onedir mode)
+
+import os
+
+block_cipher = None
+base_dir = os.path.abspath('.')
+
+a = Analysis(
+    ['app.py'],
+    pathex=[base_dir],
+    binaries=[],
+    datas=[
+        ('templates', 'templates'),
+        ('static', 'static'),
+        ('schema', 'schema'),
+        ('profiles', 'profiles'),
+    ],
+    hiddenimports=[
+        'mysql.connector',
+        'mysql.connector.plugins',
+        'mysql.connector.plugins.mysql_native_password',
+        'mysql.connector.plugins.caching_sha2_password',
+        'pydantic',
+        'pydantic_settings',
+        'pydantic_settings.yaml_config',
+        'yaml',
+        'rapidfuzz',
+        'rapidfuzz.process',
+        'rapidfuzz.fuzz',
+        'openpyxl',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageFilter',
+        'cryptography',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    cipher=block_cipher,
+)
+
+pyz = PYZ(a.pure, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='stock-entry-server',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,  # Tauri captures stdout/stderr
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='stock-entry-server',
+)

@@ -3,11 +3,20 @@
 import io
 import csv
 import os
+import sys
+import argparse
 import logging
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify, Response
 from werkzeug.utils import secure_filename
+
+# Resolve base directory (supports PyInstaller frozen builds)
+if getattr(sys, 'frozen', False):
+    _BASE_DIR = Path(sys._MEIPASS)
+else:
+    _BASE_DIR = Path(__file__).parent
 
 from config import settings
 
@@ -18,11 +27,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(_BASE_DIR / 'templates'),
+    static_folder=str(_BASE_DIR / 'static'),
+)
 app.config['UPLOAD_FOLDER'] = str(settings.upload_folder)
 app.config['MAX_CONTENT_LENGTH'] = settings.max_content_length
 
 os.makedirs(settings.upload_folder, exist_ok=True)
+
+# LAN mode state (set in main() when --lan is used)
+_lan_token: str = ''
 
 
 def _allowed_file(filename):
@@ -67,6 +83,38 @@ def scanner_page():
 @app.route('/sales-history')
 def sales_history_page():
     return render_template('sales_history.html')
+
+
+@app.route('/settings')
+def settings_page():
+    from services.lan_auth import get_local_ip
+    return render_template('settings.html',
+                           lan_mode=settings.lan_mode or bool(_lan_token),
+                           lan_token=_lan_token,
+                           local_ip=get_local_ip(),
+                           server_port=settings.server_port)
+
+
+# ---------------------------------------------------------------------------
+# API: Health check (used by Tauri to detect Flask readiness)
+# ---------------------------------------------------------------------------
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/lan/status')
+def api_lan_status():
+    from services.lan_auth import get_local_ip
+    ip = get_local_ip()
+    return jsonify({
+        'lan_mode': settings.lan_mode or bool(_lan_token),
+        'local_ip': ip,
+        'port': settings.server_port,
+        'token': _lan_token,
+        'url': f'http://{ip}:{settings.server_port}?token={_lan_token}' if _lan_token else '',
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +509,8 @@ def _ensure_schema():
     """Create stock_alias table if it doesn't exist."""
     try:
         from services.db import execute_modify
-        with open(os.path.join(os.path.dirname(__file__), 'schema', 'stock_alias.sql')) as f:
+        schema_path = _BASE_DIR / 'schema' / 'stock_alias.sql'
+        with open(schema_path) as f:
             sql = f.read()
         execute_modify(sql)
         logger.info("stock_alias table ensured")
@@ -469,11 +518,45 @@ def _ensure_schema():
         logger.warning("Could not create stock_alias table (may already exist): %s", e)
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser(description='Stock Entry Server')
+    parser.add_argument('--port', type=int, default=settings.server_port)
+    parser.add_argument('--host', type=str, default=settings.server_host)
+    parser.add_argument('--lan', action='store_true', default=settings.lan_mode)
+    return parser.parse_args()
+
+
 def main():
+    global _lan_token
+
+    args = _parse_args()
     _ensure_schema()
-    from services.ssl import ensure_ssl_cert
-    cert_file, key_file = ensure_ssl_cert()
-    app.run(host='0.0.0.0', port=5000, debug=True, ssl_context=(cert_file, key_file))
+
+    host = args.host
+    port = args.port
+
+    # LAN mode: bind 0.0.0.0 and enable token auth
+    if args.lan:
+        host = '0.0.0.0'
+        from services.lan_auth import setup_lan_auth, get_local_ip
+        _lan_token = setup_lan_auth(app, settings.lan_token)
+        logger.info("LAN mode enabled — access from: http://%s:%d?token=%s",
+                     get_local_ip(), port, _lan_token)
+
+    # When running as frozen PyInstaller binary, disable debug & reloader
+    is_frozen = getattr(sys, 'frozen', False)
+    use_debug = not is_frozen
+
+    ssl_context = None
+    if not is_frozen:
+        try:
+            from services.ssl import ensure_ssl_cert
+            cert_file, key_file = ensure_ssl_cert()
+            ssl_context = (cert_file, key_file)
+        except Exception:
+            logger.info("SSL not available, running HTTP only")
+
+    app.run(host=host, port=port, debug=use_debug, ssl_context=ssl_context)
 
 
 if __name__ == '__main__':

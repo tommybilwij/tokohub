@@ -79,6 +79,14 @@ class Settings(BaseSettings):
     fuzzy_top_n: int = 5
     fuzzy_min_score: int = 40
 
+    # Server
+    server_port: int = 5000
+    server_host: str = '127.0.0.1'
+
+    # LAN mode
+    lan_mode: bool = False
+    lan_token: str = ''
+
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
 

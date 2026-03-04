@@ -1,0 +1,29 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/stock-entry-server",
+          "sidecar": true,
+          "args": [
+            {
+              "validator": "--port=\\d+"
+            },
+            {
+              "validator": "--host=.*"
+            },
+            {
+              "validator": "--lan"
+            }
+          ]
+        }
+      ]
+    },
+    "shell:allow-stdin-write"
+  ]
+}

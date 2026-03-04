@@ -448,7 +448,7 @@
   // -----------------------------------------------------------------------
   // Item Management
   // -----------------------------------------------------------------------
-  async function addItemFromInput() {
+  function addItemFromInput() {
     if (!requireHeaderFields()) return;
 
     const name = dom.itemNameInput.value.trim();
@@ -458,9 +458,6 @@
     dom.itemNameInput.value = '';
     dom.itemNameInput.focus();
     dom.searchResults.classList.add('d-none');
-
-    // Auto-match (alias/barcode check)
-    try { await _doMatch(); } catch (e) { /* silent */ }
   }
 
   function addItem(name, barcode, qtyBesar, qtyKecil, satuanBsr, packing, priceTotal, status, matches, selectedArtno, disc1, disc2, disc3, ppn) {

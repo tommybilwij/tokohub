@@ -147,9 +147,18 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
         disc3 = after_disc2 * pctdisc3 / 100
         hbelinetto = after_disc2 - disc3
 
+        # Per-small-unit discount amounts (for stock table)
+        disc1_kcl = hbelikcl * pctdisc1 / 100
+        after_disc1_kcl = hbelikcl - disc1_kcl
+        disc2_kcl = after_disc1_kcl * pctdisc2 / 100
+        after_disc2_kcl = after_disc1_kcl - disc2_kcl
+        disc3_kcl = after_disc2_kcl * pctdisc3 / 100
+        hbelinetto_kcl = after_disc2_kcl - disc3_kcl
+
         # Tax (use override if provided, else 0 — empty means no tax)
         pctppn = Decimal(str(item['ppn_override'])) if item.get('ppn_override') is not None else Decimal('0')
         ppn = hbelinetto * pctppn / 100
+        ppn_kcl = hbelinetto_kcl * pctppn / 100
 
         amount = (hbelinetto + ppn) * qty
         netto_full = hbelinetto + ppn  # per-unit netto including PPN (before shipping)
@@ -175,6 +184,11 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'pctdisc3': float(pctdisc3),
             'pctppn': float(pctppn),
             'jlhppn': float(ppn * qty),
+            'jlhdisc1_kcl': float(disc1_kcl),
+            'jlhdisc2_kcl': float(disc2_kcl),
+            'jlhdisc3_kcl': float(disc3_kcl),
+            'hbelinetto_kcl': float(hbelinetto_kcl),
+            'jlhppn_kcl': float(ppn_kcl),
             'hjual': float(item['hjual1_override']) if item.get('hjual1_override') is not None else float(stock['hjual'] or 0),
             'hjual2': float(item['hjual2_override']) if item.get('hjual2_override') is not None else float(stock['hjual2'] or 0),
             'hjual3': float(item['hjual3_override']) if item.get('hjual3_override') is not None else float(stock['hjual3'] or 0),
@@ -279,7 +293,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                         pctppn, jlhppn,
                         packing, satuanbsr, satuankcl,
                         hjual, hjual2, hjual3, hjual4, hjual5,
-                        amount)
+                        amount, qtybonus)
                        VALUES (%s, %s, %s, %s, %s,
                                %s, %s, %s,
                                %s, %s, %s,
@@ -287,7 +301,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                                %s, %s,
                                %s, %s, %s,
                                %s, %s, %s, %s, %s,
-                               %s)""",
+                               %s, %s)""",
                     (becreff, line['artno'], line['artpabrik'], line['artname'],
                      line['qty'],
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
@@ -297,7 +311,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['packing'], line['satuanbsr'], line['satuankcl'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
-                     line['amount'])
+                     line['amount'], line.get('foc', 0))
                 )
 
                 # Atomic balance update: curqty += qty * packing + foc
@@ -357,16 +371,18 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                 # Update stock prices
                 cursor.execute(
                     """UPDATE stock
-                       SET hbelibsr = %s, hbelikcl = %s,
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
                            pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                           pctppn = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
                            hjual = %s, hjual2 = %s, hjual3 = %s,
                            hjual4 = %s, hjual5 = %s,
                            satbesar = %s, packing = %s
                        WHERE artno = %s""",
-                    (line['hbelibsr'], line['hbelikcl'],
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                     line['pctppn'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
                      line['satuanbsr'], line['packing'],

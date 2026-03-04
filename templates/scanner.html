@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Scanner{% endblock %}
+
+{% block content %}
+<div class="scanner-page mx-auto">
+
+  <!-- Camera Card -->
+  <div class="card mb-3">
+    <div class="card-header card-header-primary d-flex align-items-center justify-content-between py-2">
+      <h6 class="mb-0"><i class="bi bi-camera-video"></i> Camera</h6>
+      <div class="d-flex align-items-center gap-2">
+        <select id="cameraSelect" class="form-select form-select-sm scanner-cam-select d-none">
+          <option value="">Pilih kamera...</option>
+        </select>
+        <button id="btnToggleCamera" class="btn btn-sm btn-light">
+          <i class="bi bi-play-fill"></i> Start
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0 position-relative">
+      <div id="scannerViewport" class="scanner-viewport">
+        <div class="scanner-placeholder d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+          <i class="bi bi-upc-scan" style="font-size:2.5rem;opacity:0.3"></i>
+          <small class="mt-1">Tap Start untuk scan</small>
+        </div>
+        <div class="scanner-crosshair d-none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Input -->
+  <div class="position-relative mb-3">
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input id="searchInput" type="text" class="form-control"
+             placeholder="Cari barcode atau nama barang..." autocomplete="off">
+    </div>
+    <div id="searchDropdown" class="list-group search-dropdown d-none"></div>
+  </div>
+
+  <!-- Barcode Alert -->
+  <div id="barcodeAlert" class="alert alert-info d-flex align-items-center gap-2 py-2 d-none">
+    <span class="spinner-border spinner-border-sm"></span>
+    <span>Mencari <strong id="barcodeValue"></strong>...</span>
+  </div>
+
+  <!-- Stock Detail Card -->
+  <div id="stockDetail" class="card d-none">
+    <!-- Header -->
+    <div class="card-header card-header-light py-2">
+      <div class="fw-bold" id="sdArtname" style="font-size:var(--fs-lg)"></div>
+      <div class="text-muted" style="font-size:var(--fs-sm);font-family:monospace" id="sdArtno"></div>
+    </div>
+    <div class="card-body py-2">
+
+      <!-- Info Grid: barcode / packing / satuan -->
+      <div class="sd-info-grid mb-3">
+        <div class="sd-info-item">
+          <div class="sd-info-label">Barcode</div>
+          <div class="sd-info-value" id="sdBarcode">-</div>
+        </div>
+        <div class="sd-info-item">
+          <div class="sd-info-label">Packing</div>
+          <div class="sd-info-value" id="sdPacking">-</div>
+        </div>
+        <div class="sd-info-item">
+          <div class="sd-info-label">Satuan</div>
+          <div class="sd-info-value" id="sdSatuan">-</div>
+        </div>
+      </div>
+
+      <!-- Stock Balance Banner -->
+      <div class="sd-stock-banner mb-3" id="sdStockBanner">
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="sd-stock-label"><i class="bi bi-box-seam"></i> Stok</span>
+          <span id="sdStockLoading" class="spinner-border spinner-border-sm d-none"></span>
+        </div>
+        <div id="sdStockBalances"></div>
+      </div>
+
+      <!-- Harga Beli Section -->
+      <div class="sd-section mb-3">
+        <div class="sd-section-header"><i class="bi bi-tag"></i> Harga Beli</div>
+        <div class="sd-beli-grid">
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">H.Beli Bsr</span>
+            <span class="sd-beli-value" id="sdHbeliBsr">-</span>
+          </div>
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">H.Beli Kcl</span>
+            <span class="sd-beli-value" id="sdHbeliKcl">-</span>
+          </div>
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">Disc 1</span>
+            <span class="sd-beli-value" id="sdDisc1">-</span>
+          </div>
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">Disc 2</span>
+            <span class="sd-beli-value" id="sdDisc2">-</span>
+          </div>
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">Disc 3</span>
+            <span class="sd-beli-value" id="sdDisc3">-</span>
+          </div>
+          <div class="sd-beli-item">
+            <span class="sd-beli-label">PPN</span>
+            <span class="sd-beli-value" id="sdPPN">-</span>
+          </div>
+        </div>
+        <!-- Netto -->
+        <div class="sd-netto-row mt-2">
+          <span class="sd-netto-label">Netto/Kcl</span>
+          <span class="sd-netto-value" id="sdNetto">-</span>
+        </div>
+      </div>
+
+      <!-- Harga Jual Table -->
+      <div class="sd-section mb-3">
+        <div class="sd-section-header"><i class="bi bi-cash-stack"></i> Harga Jual</div>
+        <table class="sd-jual-table">
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Harga</th>
+              <th>Margin</th>
+            </tr>
+          </thead>
+          <tbody id="sdJualBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Bundling Table (conditional) -->
+      <div id="sdBundlingSection" class="sd-section d-none">
+        <div class="sd-section-header"><i class="bi bi-box2"></i> Bundling</div>
+        <table class="sd-jual-table">
+          <thead>
+            <tr>
+              <th>Qty</th>
+              <th>H.Jual 1</th>
+              <th>H.Jual 2</th>
+              <th>H.Jual 3</th>
+            </tr>
+          </thead>
+          <tbody id="sdBundlingBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- No Result Card -->
+  <div id="noResultCard" class="card d-none">
+    <div class="card-body text-center py-4 text-muted">
+      <i class="bi bi-search" style="font-size:2rem;opacity:0.3"></i>
+      <div class="mt-2">Barang tidak ditemukan</div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
+<script src="{{ url_for('static', filename='js/scanner.js') }}?v={{ range(10000,99999) | random }}"></script>
+{% endblock %}

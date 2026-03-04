@@ -1,0 +1,398 @@
+/**
+ * Scanner Page - Barcode scanner + stock lookup
+ */
+(function () {
+  'use strict';
+
+  // -----------------------------------------------------------------------
+  // DOM refs
+  // -----------------------------------------------------------------------
+  const $ = (sel) => document.querySelector(sel);
+  const dom = {
+    viewport:       $('#scannerViewport'),
+    btnToggle:      $('#btnToggleCamera'),
+    cameraSelect:   $('#cameraSelect'),
+    placeholder:    $('.scanner-placeholder'),
+    crosshair:      $('.scanner-crosshair'),
+    searchInput:    $('#searchInput'),
+    searchDropdown: $('#searchDropdown'),
+    barcodeAlert:   $('#barcodeAlert'),
+    barcodeValue:   $('#barcodeValue'),
+    stockDetail:    $('#stockDetail'),
+    noResultCard:   $('#noResultCard'),
+    // stock detail fields
+    sdArtname:      $('#sdArtname'),
+    sdArtno:        $('#sdArtno'),
+    sdBarcode:      $('#sdBarcode'),
+    sdPacking:      $('#sdPacking'),
+    sdSatuan:       $('#sdSatuan'),
+    sdStockBanner:  $('#sdStockBanner'),
+    sdStockLoading: $('#sdStockLoading'),
+    sdStockBalances:$('#sdStockBalances'),
+    sdHbeliBsr:     $('#sdHbeliBsr'),
+    sdHbeliKcl:     $('#sdHbeliKcl'),
+    sdDisc1:        $('#sdDisc1'),
+    sdDisc2:        $('#sdDisc2'),
+    sdDisc3:        $('#sdDisc3'),
+    sdPPN:          $('#sdPPN'),
+    sdNetto:        $('#sdNetto'),
+    sdJualBody:     $('#sdJualBody'),
+    sdBundlingSection: $('#sdBundlingSection'),
+    sdBundlingBody: $('#sdBundlingBody'),
+  };
+
+  // Guard: only run on scanner page
+  if (!dom.viewport) return;
+
+  // -----------------------------------------------------------------------
+  // State
+  // -----------------------------------------------------------------------
+  let cameraRunning = false;
+  let lastDetectedTime = 0;
+  const COOLDOWN_MS = 2000;
+
+  // -----------------------------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------------------------
+  function fmt(n) {
+    if (n == null || isNaN(n)) return '-';
+    return Number(n).toLocaleString('id-ID');
+  }
+
+  function fmtPct(n) {
+    if (!n) return '-';
+    return Number(n).toFixed(2) + '%';
+  }
+
+  // -----------------------------------------------------------------------
+  // Camera
+  // -----------------------------------------------------------------------
+  async function populateCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videos = devices.filter(d => d.kind === 'videoinput');
+      if (videos.length > 1) {
+        dom.cameraSelect.innerHTML = videos.map((d, i) =>
+          `<option value="${d.deviceId}">${d.label || 'Camera ' + (i + 1)}</option>`
+        ).join('');
+        dom.cameraSelect.classList.remove('d-none');
+      }
+    } catch (e) {
+      // ignore - camera enumeration may not be available
+    }
+  }
+
+  function startCamera() {
+    const deviceId = dom.cameraSelect.value || undefined;
+    const constraints = deviceId
+      ? { deviceId: { exact: deviceId } }
+      : { facingMode: 'environment' };
+
+    Quagga.init({
+      inputStream: {
+        name: 'Live',
+        type: 'LiveStream',
+        target: dom.viewport,
+        constraints: {
+          ...constraints,
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+      },
+      decoder: {
+        readers: [
+          'ean_reader',
+          'ean_8_reader',
+          'upc_reader',
+          'code_128_reader',
+          'code_39_reader',
+        ],
+      },
+      locate: true,
+      frequency: 10,
+    }, function (err) {
+      if (err) {
+        console.error('Quagga init error:', err);
+        alert('Gagal akses kamera: ' + (err.message || err));
+        return;
+      }
+      Quagga.start();
+      cameraRunning = true;
+      dom.placeholder.classList.add('d-none');
+      dom.crosshair.classList.remove('d-none');
+      dom.btnToggle.innerHTML = '<i class="bi bi-stop-fill"></i> Stop';
+      dom.btnToggle.classList.replace('btn-light', 'btn-danger');
+      populateCameras();
+    });
+
+    Quagga.onDetected(onBarcodeDetected);
+  }
+
+  function stopCamera() {
+    Quagga.stop();
+    Quagga.offDetected(onBarcodeDetected);
+    cameraRunning = false;
+    dom.placeholder.classList.remove('d-none');
+    dom.crosshair.classList.add('d-none');
+    dom.btnToggle.innerHTML = '<i class="bi bi-play-fill"></i> Start';
+    dom.btnToggle.classList.replace('btn-danger', 'btn-light');
+    // Remove Quagga's video element
+    const video = dom.viewport.querySelector('video');
+    if (video) video.remove();
+    const canvas = dom.viewport.querySelectorAll('canvas');
+    canvas.forEach(c => c.remove());
+  }
+
+  dom.btnToggle.addEventListener('click', function () {
+    if (cameraRunning) {
+      stopCamera();
+    } else {
+      startCamera();
+    }
+  });
+
+  dom.cameraSelect.addEventListener('change', function () {
+    if (cameraRunning) {
+      stopCamera();
+      startCamera();
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Barcode detection
+  // -----------------------------------------------------------------------
+  function onBarcodeDetected(result) {
+    const now = Date.now();
+    if (now - lastDetectedTime < COOLDOWN_MS) return;
+    lastDetectedTime = now;
+
+    const code = result.codeResult.code;
+    if (!code) return;
+
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    dom.searchInput.value = code;
+    lookupBarcode(code);
+  }
+
+  async function lookupBarcode(code) {
+    showBarcodeAlert(code);
+    hideResults();
+
+    try {
+      const res = await fetch(`/api/stock/search?q=${encodeURIComponent(code)}&limit=1`);
+      const data = await res.json();
+      hideBarcodeAlert();
+
+      if (data.length > 0 && data[0].match_type === 'barcode') {
+        displayStockDetail(data[0]);
+      } else if (data.length > 0) {
+        displayStockDetail(data[0]);
+      } else {
+        showNoResult();
+      }
+    } catch (e) {
+      hideBarcodeAlert();
+      console.error('Lookup failed:', e);
+      showNoResult();
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Text search (debounced)
+  // -----------------------------------------------------------------------
+  let searchTimer = null;
+
+  dom.searchInput.addEventListener('input', function () {
+    const q = this.value.trim();
+    clearTimeout(searchTimer);
+    if (!q) {
+      dom.searchDropdown.classList.add('d-none');
+      return;
+    }
+    searchTimer = setTimeout(() => textSearch(q), 300);
+  });
+
+  dom.searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(searchTimer);
+      const q = this.value.trim();
+      if (q) textSearch(q);
+    }
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener('click', function (e) {
+    if (!dom.searchDropdown.contains(e.target) && e.target !== dom.searchInput) {
+      dom.searchDropdown.classList.add('d-none');
+    }
+  });
+
+  async function textSearch(query) {
+    try {
+      const res = await fetch(`/api/stock/search?q=${encodeURIComponent(query)}&limit=10`);
+      const data = await res.json();
+
+      if (!data.length) {
+        dom.searchDropdown.classList.add('d-none');
+        return;
+      }
+
+      dom.searchDropdown.innerHTML = data.map((item, i) => `
+        <button type="button" class="list-group-item list-group-item-action" data-idx="${i}">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-semibold" style="font-size:var(--fs-base)">${esc(item.artname)}</div>
+              <small class="text-muted" style="font-family:monospace">${esc(item.artno)}</small>
+            </div>
+            <span class="badge ${item.score >= 85 ? 'bg-primary' : item.score >= 60 ? 'bg-warning text-dark' : 'bg-secondary'}"
+                  style="font-size:var(--fs-2xs)">${item.score}${item.match_type === 'barcode' ? ' BC' : item.match_type === 'alias' ? ' AL' : ''}</span>
+          </div>
+        </button>
+      `).join('');
+
+      // Store data for click handler
+      dom.searchDropdown._data = data;
+      dom.searchDropdown.classList.remove('d-none');
+    } catch (e) {
+      console.error('Search failed:', e);
+    }
+  }
+
+  dom.searchDropdown.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-idx]');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.idx);
+    const data = dom.searchDropdown._data;
+    if (data && data[idx]) {
+      dom.searchDropdown.classList.add('d-none');
+      dom.searchInput.value = data[idx].artname;
+      displayStockDetail(data[idx]);
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Display stock detail
+  // -----------------------------------------------------------------------
+  function displayStockDetail(item) {
+    hideResults();
+
+    dom.sdArtname.textContent = item.artname || '-';
+    dom.sdArtno.textContent = item.artno || '-';
+    dom.sdBarcode.textContent = item.artpabrik || '-';
+    dom.sdPacking.textContent = item.packing ? (item.packing + ' ' + (item.satkecil || '')) : '-';
+    dom.sdSatuan.textContent = (item.satbesar || '-') + ' / ' + (item.satkecil || '-');
+
+    // Harga Beli
+    dom.sdHbeliBsr.textContent = fmt(item.hbelibsr);
+    dom.sdHbeliKcl.textContent = fmt(item.hbelikcl);
+    dom.sdDisc1.textContent = fmtPct(item.pctdisc1);
+    dom.sdDisc2.textContent = fmtPct(item.pctdisc2);
+    dom.sdDisc3.textContent = fmtPct(item.pctdisc3);
+    dom.sdPPN.textContent = fmtPct(item.pctppn);
+
+    // Calculate Netto
+    let netto = item.hbelikcl || 0;
+    if (item.pctdisc1) netto *= (1 - item.pctdisc1 / 100);
+    if (item.pctdisc2) netto *= (1 - item.pctdisc2 / 100);
+    if (item.pctdisc3) netto *= (1 - item.pctdisc3 / 100);
+    if (item.pctppn) netto *= (1 + item.pctppn / 100);
+    dom.sdNetto.textContent = fmt(Math.round(netto));
+
+    // Harga Jual table
+    const tiers = [
+      { label: 'H.Jual 1', val: item.hjual },
+      { label: 'H.Jual 2', val: item.hjual2 },
+      { label: 'H.Jual 3', val: item.hjual3 },
+      { label: 'H.Jual 4', val: item.hjual4 },
+      { label: 'H.Jual 5', val: item.hjual5 },
+    ];
+    dom.sdJualBody.innerHTML = tiers.map(t => {
+      const margin = (t.val && netto) ? (((t.val - netto) / netto) * 100).toFixed(2) + '%' : '-';
+      const marginClass = (t.val && netto && t.val < netto) ? 'text-danger' : '';
+      return `<tr>
+        <td>${t.label}</td>
+        <td class="text-end">${fmt(t.val)}</td>
+        <td class="text-end ${marginClass}">${margin}</td>
+      </tr>`;
+    }).join('');
+
+    // Bundling
+    const bundlings = item._bundlings || [];
+    if (bundlings.length > 0) {
+      dom.sdBundlingSection.classList.remove('d-none');
+      dom.sdBundlingBody.innerHTML = bundlings.map(b => `<tr>
+        <td>${b.qty}</td>
+        <td class="text-end">${fmt(b.hjual1)}</td>
+        <td class="text-end">${fmt(b.hjual2)}</td>
+        <td class="text-end">${fmt(b.hjual3)}</td>
+      </tr>`).join('');
+    } else {
+      dom.sdBundlingSection.classList.add('d-none');
+    }
+
+    dom.stockDetail.classList.remove('d-none');
+
+    // Fetch stock balance
+    fetchBalance(item.artno);
+  }
+
+  async function fetchBalance(artno) {
+    dom.sdStockLoading.classList.remove('d-none');
+    dom.sdStockBalances.innerHTML = '';
+
+    try {
+      const res = await fetch(`/api/stock/balance/${encodeURIComponent(artno)}`);
+      const rows = await res.json();
+      dom.sdStockLoading.classList.add('d-none');
+
+      if (rows.length === 0) {
+        dom.sdStockBalances.innerHTML = '<div class="text-muted" style="font-size:var(--fs-sm)">Tidak ada data stok</div>';
+        return;
+      }
+
+      dom.sdStockBalances.innerHTML = rows.map(r =>
+        `<div class="sd-balance-row">
+          <span class="sd-balance-wh">${esc(r.warehouseid || 'DEFAULT')}</span>
+          <span class="sd-balance-qty">${fmt(r.curqty)}</span>
+        </div>`
+      ).join('');
+    } catch (e) {
+      dom.sdStockLoading.classList.add('d-none');
+      dom.sdStockBalances.innerHTML = '<div class="text-danger" style="font-size:var(--fs-sm)">Gagal memuat stok</div>';
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // UI helpers
+  // -----------------------------------------------------------------------
+  function showBarcodeAlert(code) {
+    dom.barcodeValue.textContent = code;
+    dom.barcodeAlert.classList.remove('d-none');
+  }
+
+  function hideBarcodeAlert() {
+    dom.barcodeAlert.classList.add('d-none');
+  }
+
+  function hideResults() {
+    dom.stockDetail.classList.add('d-none');
+    dom.noResultCard.classList.add('d-none');
+    dom.sdBundlingSection.classList.add('d-none');
+  }
+
+  function showNoResult() {
+    dom.noResultCard.classList.remove('d-none');
+    dom.stockDetail.classList.add('d-none');
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+})();

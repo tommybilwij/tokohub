@@ -57,9 +57,24 @@ def history_page():
     return render_template('history.html', orders=rows, total=total, page=page)
 
 
+@app.route('/scanner')
+def scanner_page():
+    return render_template('scanner.html')
+
+
 # ---------------------------------------------------------------------------
 # API: Stock search
 # ---------------------------------------------------------------------------
+
+@app.route('/api/stock/balance/<artno>')
+def api_stock_balance(artno):
+    from services.db import execute_query
+    rows = execute_query(
+        "SELECT warehouseid, curqty FROM stlastbal WHERE artno = %s",
+        (artno,)
+    )
+    return jsonify(rows)
+
 
 @app.route('/api/stock/search')
 def api_stock_search():

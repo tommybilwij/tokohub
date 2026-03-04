@@ -765,29 +765,19 @@
           <span class="dsi-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
         </div>
 
-        <div class="dsi-sections">
-          <table class="dsi-price-tbl">
-            <tbody>
-              <tr class="dsi-beli-head-row"><td colspan="${numCols}"><span class="dsi-section-lbl">Harga Beli</span></td></tr>
-              <tr class="dsi-beli-detail-row">
-                <td colspan="${numCols}">
-                  <div class="dsi-beli-block">
-                    <div class="dsi-beli-line">
-                      <span class="dsi-beli-label">Beli</span>
-                      <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-                      <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-                    </div>
-                    ${discHTML ? `<div class="dsi-disc-pills">${discHTML}</div>` : ''}
-                    ${netPrices ? `<div class="dsi-netto-bar">
-                      <span class="dsi-lbl">Netto</span>
-                      <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-                      <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-                    </div>` : ''}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="dsi-beli-header"><span class="dsi-section-lbl">Harga Beli</span></div>
+        <div class="dsi-beli-block">
+          <div class="dsi-beli-line">
+            <span class="dsi-beli-label">Beli</span>
+            <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+            <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+          </div>
+          ${discHTML ? `<div class="dsi-disc-pills">${discHTML}</div>` : ''}
+          ${netPrices ? `<div class="dsi-netto-bar">
+            <span class="dsi-lbl">Netto</span>
+            <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+            <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+          </div>` : ''}
         </div>
 
         <div class="dsi-jual-header"><span class="dsi-section-lbl">Harga Jual</span></div>

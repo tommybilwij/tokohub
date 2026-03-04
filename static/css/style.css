@@ -1063,19 +1063,9 @@ body {
   color: var(--clr-neutral-700);
 }
 
-/* --- Harga Beli header row in unified table --- */
-.dsi-price-tbl .dsi-beli-head-row td {
-  text-align: left;
-  padding: 0.4rem 1rem;
-  background: var(--clr-neutral-100);
-  border-bottom: 1px solid var(--clr-neutral-200);
-  white-space: normal;
-}
-
-/* --- Beli detail row: contains beli block with disc table --- */
-.dsi-price-tbl .dsi-beli-detail-row td {
-  padding: 0.6rem 1rem 0.5rem;
-  border-bottom: none;
+/* --- Harga Beli header (outside card, on panel bg) --- */
+.dsi-beli-header {
+  padding: 0.5rem 0 0.2rem;
 }
 
 /* --- Harga Jual header (outside the card, like Harga Beli) --- */
@@ -1091,6 +1081,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+  padding: 0.4rem 0.6rem 0.5rem;
 }
 
 .dsi-beli-line {

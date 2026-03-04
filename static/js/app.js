@@ -538,6 +538,7 @@
   function clearAllItems() {
     if (state.items.length === 0) return;
     state.items = [];
+    dom.shippingCostInput.value = '0.00';
     renderItemTable();
     showToast('Semua item dihapus', 'info');
   }

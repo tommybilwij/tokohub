@@ -56,7 +56,15 @@
   // -----------------------------------------------------------------------
   function fmt(n) {
     if (n == null || isNaN(n)) return '-';
-    return Number(n).toLocaleString('id-ID');
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtQty(n) {
+    if (n == null || isNaN(n)) return '-';
+    var v = Number(n);
+    return v % 1 === 0
+      ? v.toLocaleString('en-US')
+      : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
   function fmtPct(n) {
@@ -282,7 +290,7 @@
     dom.sdArtname.textContent = item.artname || '-';
     dom.sdArtno.textContent = item.artno || '-';
     dom.sdBarcode.textContent = item.artpabrik || '-';
-    dom.sdPacking.textContent = item.packing ? (item.packing + ' ' + (item.satkecil || '')) : '-';
+    dom.sdPacking.textContent = item.packing ? (Math.round(item.packing) + ' ' + (item.satkecil || '')) : '-';
     dom.sdSatuan.textContent = (item.satbesar || '-') + ' / ' + (item.satkecil || '-');
 
     // Harga Beli
@@ -304,14 +312,15 @@
     // Harga Jual table
     const tiers = [
       { label: 'H.Jual 1', val: item.hjual },
-      { label: 'H.Jual 2', val: item.hjual2 },
+      { label: 'Member', val: item.hjual2 },
       { label: 'H.Jual 3', val: item.hjual3 },
       { label: 'H.Jual 4', val: item.hjual4 },
       { label: 'H.Jual 5', val: item.hjual5 },
     ];
     dom.sdJualBody.innerHTML = tiers.map(t => {
-      const margin = (t.val && netto) ? (((t.val - netto) / netto) * 100).toFixed(2) + '%' : '-';
-      const marginClass = (t.val && netto && t.val < netto) ? 'text-danger' : '';
+      const hasMargin = t.val > 0 && netto > 0;
+      const margin = hasMargin ? (((t.val - netto) / netto) * 100).toFixed(2) + '%' : '-';
+      const marginClass = (hasMargin && t.val < netto) ? 'text-danger' : '';
       return `<tr>
         <td>${t.label}</td>
         <td class="text-end">${fmt(t.val)}</td>
@@ -328,6 +337,8 @@
         <td class="text-end">${fmt(b.hjual1)}</td>
         <td class="text-end">${fmt(b.hjual2)}</td>
         <td class="text-end">${fmt(b.hjual3)}</td>
+        <td class="text-end">${fmt(b.hjual4)}</td>
+        <td class="text-end">${fmt(b.hjual5)}</td>
       </tr>`).join('');
     } else {
       dom.sdBundlingSection.classList.add('d-none');
@@ -336,10 +347,10 @@
     dom.stockDetail.classList.remove('d-none');
 
     // Fetch stock balance
-    fetchBalance(item.artno);
+    fetchBalance(item.artno, item.satkecil);
   }
 
-  async function fetchBalance(artno) {
+  async function fetchBalance(artno, satkecil) {
     dom.sdStockLoading.classList.remove('d-none');
     dom.sdStockBalances.innerHTML = '';
 
@@ -356,7 +367,7 @@
       dom.sdStockBalances.innerHTML = rows.map(r =>
         `<div class="sd-balance-row">
           <span class="sd-balance-wh">${esc(r.warehouseid || 'DEFAULT')}</span>
-          <span class="sd-balance-qty">${fmt(r.curqty)}</span>
+          <span class="sd-balance-qty">${fmtQty(r.curqty)} <small class="sd-balance-unit">${esc(satkecil || '')}</small></span>
         </div>`
       ).join('');
     } catch (e) {

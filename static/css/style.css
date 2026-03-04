@@ -1716,6 +1716,12 @@ body {
   color: var(--clr-accent-800);
 }
 
+.sd-balance-unit {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--clr-neutral-500);
+}
+
 /* Sections */
 .sd-section {
   background: var(--clr-card-bg);

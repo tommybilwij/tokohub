@@ -1066,11 +1066,13 @@ body {
 /* --- Harga Beli header (outside card, on panel bg) --- */
 .dsi-beli-header {
   padding: 0.5rem 0 0.2rem;
+  border-bottom: 1px solid var(--clr-neutral-300);
 }
 
 /* --- Harga Jual header (outside the card, like Harga Beli) --- */
 .dsi-jual-header {
   padding: 0.5rem 0 0.2rem;
+  border-bottom: 1px solid var(--clr-neutral-300);
 }
 
 .dsi-jual-card {

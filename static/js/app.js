@@ -557,7 +557,7 @@
         <div class="dp-section-header">
           <label class="bundling-toggle">
             <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${tier}" ${checked}>
-            Bundling ${tier}
+            Harga Jual (Bundling ${tier})
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
@@ -1024,7 +1024,7 @@
             </div>
             <!-- Right: Harga Jual -->
             <div class="dp-section dp-jual">
-              <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
+              <div class="dp-section-header">Harga Jual (Satuan)${(item.status === 'auto' && item._refHjual)
                 ? ` <span class="auto-adjust-group">
                        <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
                          <i class="bi bi-chevron-bar-up"></i> Bulatan 100

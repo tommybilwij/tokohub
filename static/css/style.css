@@ -866,7 +866,7 @@ body {
   align-items: center;
   gap: 0.3rem;
   cursor: pointer;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   color: var(--clr-accent-800);
   margin: 0;
@@ -875,7 +875,8 @@ body {
   background: var(--clr-accent-50);
   border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
-  padding: var(--sp-1) 0.6rem;
+  padding: 0.2rem 0.55rem;
+  line-height: 1.2;
   transition: background-color var(--ease-default), border-color var(--ease-default);
 }
 

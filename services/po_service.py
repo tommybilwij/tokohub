@@ -21,28 +21,6 @@ class POCreationError(Exception):
     """Raised when PO creation fails."""
 
 
-def _claim_counters():
-    """Atomically claim nextrec counters without holding long locks.
-
-    Uses a separate autocommit connection so the row lock on nextrec
-    is held only for microseconds (single UPDATE), not for the entire
-    PO transaction.  POS can read/write nextrec without waiting.
-
-    Trade-off: if the PO transaction later fails, counters are already
-    incremented — this just leaves a harmless gap in the sequence.
-    """
-    with get_connection(autocommit=True) as conn:
-        cur = conn.cursor(dictionary=True)
-        cur.execute("UPDATE nextrec SET newpo = LAST_INSERT_ID(newpo + 1)")
-        cur.execute("SELECT LAST_INSERT_ID() AS val")
-        becreff = cur.fetchone()['val']
-        cur.execute("UPDATE nextrec SET newpurch = LAST_INSERT_ID(newpurch + 1)")
-        cur.execute("SELECT LAST_INSERT_ID() AS val")
-        fp_becreff = cur.fetchone()['val']
-        cur.close()
-        return becreff, fp_becreff
-
-
 def _generate_po_number(cursor, order_date):
     """Generate PO number: PP{YYMMDD}{5-digit-seq}.
 
@@ -266,13 +244,18 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
     order_date = order_date or date.today()
     preview = preview_po(supplier_id, items, order_date, shipping_cost=shipping_cost)
 
-    # Claim counters atomically BEFORE the main transaction so nextrec
-    # row lock is released in microseconds — POS is never blocked.
-    becreff, fp_becreff = _claim_counters()
-
     with get_connection() as conn:
         cursor = conn.cursor(dictionary=True)
         try:
+            # Read current counters (no lock — just a SELECT).
+            # The actual increment is batched at the end to minimise lock time.
+            cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1")
+            nextrec = cursor.fetchone()
+            if not nextrec:
+                raise POCreationError("nextrec table is empty")
+            becreff = nextrec['newpo']
+            fp_becreff = nextrec['newpurch']
+
             # Generate PO and FP numbers
             po_number = _generate_po_number(cursor, order_date)
             fp_number = _generate_fp_number(cursor, order_date)
@@ -331,24 +314,6 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['hjual4'], line['hjual5'],
                      line['amount'], line.get('foc', 0))
                 )
-
-                # Atomic balance update: curqty += qty * packing + foc
-                foc = Decimal(str(line.get('foc', 0)))
-                qty_small_unit = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
-                cursor.execute(
-                    """UPDATE stlastbal
-                       SET curqty = curqty + %s
-                       WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
-                    (float(qty_small_unit), line['artno'])
-                )
-
-                # If no row existed, insert it
-                if cursor.rowcount == 0:
-                    cursor.execute(
-                        """INSERT INTO stlastbal (artno, curqty, warehouseid)
-                           VALUES (%s, %s, 'LAPANGAN')""",
-                        (line['artno'], float(qty_small_unit))
-                    )
 
                 # Insert stock history (sthist) for purchase tracking
                 cursor.execute(
@@ -425,6 +390,31 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                          bund.get('hjual3') or 0, bund.get('hjual4') or 0,
                          bund.get('hjual5') or 0)
                     )
+
+            # Batch stock balance updates LAST, right before commit.
+            # stlastbal row locks are held only for the few ms it takes
+            # to run these UPDATEs + the commit — not the entire transaction.
+            for line in preview['lines']:
+                foc = Decimal(str(line.get('foc', 0)))
+                qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
+                cursor.execute(
+                    """UPDATE stlastbal
+                       SET curqty = curqty + %s
+                       WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
+                    (float(qty_small), line['artno'])
+                )
+                if cursor.rowcount == 0:
+                    cursor.execute(
+                        """INSERT INTO stlastbal (artno, curqty, warehouseid)
+                           VALUES (%s, %s, 'LAPANGAN')""",
+                        (line['artno'], float(qty_small))
+                    )
+
+            # Increment nextrec counters — batched here at the end so the
+            # single-row lock is held only for this UPDATE + commit (~ms).
+            cursor.execute(
+                "UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1"
+            )
 
             conn.commit()
 

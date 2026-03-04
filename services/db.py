@@ -23,15 +23,15 @@ def get_pool():
 
 
 @contextmanager
-def get_connection(autocommit=False):
+def get_connection():
     """Yield a connection from the pool, returning it on exit.
 
-    autocommit=False (default): callers manage transactions (commit/rollback).
-    autocommit=True: each statement commits immediately — row locks are held
-    only for the duration of that single statement, not the whole session.
+    Autocommit is disabled so that callers can use proper transactions
+    (commit/rollback).  The helper ``get_cursor`` already commits on
+    success and rolls back on failure.
     """
     conn = get_pool().get_connection()
-    conn.autocommit = autocommit
+    conn.autocommit = False
     try:
         yield conn
     finally:

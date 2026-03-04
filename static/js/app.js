@@ -547,10 +547,11 @@
   }
 
   // Render a bundling group (1 or 2) for the detail panel
-  function _renderBundlingGroup(idx, tier, b) {
+  function _renderBundlingGroup(idx, tier, b, item) {
     const checked = b.enabled ? 'checked' : '';
     const disabled = b.enabled ? '' : 'disabled';
     const vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
+    const showBtns = b.enabled && item.status === 'auto' && item._refHjual;
     return `
       <div class="dp-bundling-section">
         <div class="dp-section-header">
@@ -562,6 +563,14 @@
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
                    value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${disabled}> <span style="text-transform:none">Pcs</span>
           </span>
+          ${showBtns ? `<span class="auto-adjust-group">
+            <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" data-tier="${tier}" title="Bulatkan ke ratusan">
+              <i class="bi bi-chevron-bar-up"></i> Bulatan 100
+            </button>
+            <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}" data-tier="${tier}">
+              <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+            </button>
+          </span>` : ''}
         </div>
         <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
           ${_renderJualTable(idx, tier, vals)}
@@ -570,7 +579,7 @@
   }
 
   // Auto-adjust harga jual based on harga beli delta
-  function _autoAdjustJual(idx) {
+  function _autoAdjustJual(idx, tier) {
     const item = state.items[idx];
     if (!item.matches || !item.matches.length) return;
     const m = item.matches[0];
@@ -582,12 +591,25 @@
     const refNettoPcs = dbNet.final / dbPacking;
     if (!refNettoPcs) return;
 
-    // Reference jual prices
-    const refHjual = {
-      hjual1: parseFloat(m.hjual) || 0, hjual2: parseFloat(m.hjual2) || 0,
-      hjual3: parseFloat(m.hjual3) || 0, hjual4: parseFloat(m.hjual4) || 0,
-      hjual5: parseFloat(m.hjual5) || 0
-    };
+    // Reference jual prices — use bundling ref if tier specified
+    let refHjual;
+    if (tier) {
+      const bundlings = m._bundlings || [];
+      const bIdx = parseInt(tier) - 1;
+      const db = bundlings[bIdx];
+      if (!db) return;
+      refHjual = {
+        hjual1: parseFloat(db.hjual1) || 0, hjual2: parseFloat(db.hjual2) || 0,
+        hjual3: parseFloat(db.hjual3) || 0, hjual4: parseFloat(db.hjual4) || 0,
+        hjual5: parseFloat(db.hjual5) || 0
+      };
+    } else {
+      refHjual = {
+        hjual1: parseFloat(m.hjual) || 0, hjual2: parseFloat(m.hjual2) || 0,
+        hjual3: parseFloat(m.hjual3) || 0, hjual4: parseFloat(m.hjual4) || 0,
+        hjual5: parseFloat(m.hjual5) || 0
+      };
+    }
 
     // Current netto per pcs (including shipping)
     const hbelibsr = item.priceBsr || 0;
@@ -603,18 +625,22 @@
     const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
     if (!currentNettoPcs) return;
 
+    // Target: main item or bundling tier
+    const target = tier ? item[`bundling${tier}`] : item;
+    const tierKey = tier || 'main';
+
     // Apply same absolute margin (rupiah) from reference to current netto
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
       const refVal = refHjual[f];
       if (refVal > 0) {
         const margin = refVal - refNettoPcs;
-        item[f] = currentNettoPcs + margin;
+        target[f] = currentNettoPcs + margin;
       }
     });
     // Update jual input values in DOM
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-      const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="main"][data-field="${f}"]`);
-      if (input) input.value = (item[f] != null && !isNaN(item[f])) ? formatNumber(item[f]) : '';
+      const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
+      if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
     });
   }
 
@@ -757,11 +783,11 @@
 
     // Build price table rows: main + bundlings
     const bundlings = m._bundlings || [];
-    const priceHeaders = ['Jual 1', 'Member', 'Jual 3', 'Jual 4', 'Jual 5'];
-    const mainPrices = [m.hjual, m.hjual2, m.hjual3, m.hjual4, m.hjual5];
+    const priceHeaders = ['Jual 1', 'Jual 3', 'Jual 4', 'Jual 5', 'Member'];
+    const mainPrices = [m.hjual, m.hjual3, m.hjual4, m.hjual5, m.hjual2];
     const priceRows = [{ label: 'Satuan', prices: mainPrices, isMain: true }];
     bundlings.forEach(b => {
-      priceRows.push({ label: `Bundling \u2265${b.qty}`, prices: [b.hjual1, b.hjual2, b.hjual3, b.hjual4, b.hjual5], isMain: false });
+      priceRows.push({ label: `Bundling \u2265${b.qty}`, prices: [b.hjual1, b.hjual3, b.hjual4, b.hjual5, b.hjual2], isMain: false });
     });
 
     const numCols = priceHeaders.length + 1;
@@ -1011,8 +1037,8 @@
               ${_renderJualTable(idx, null, mainJualVals)}
             </div>
             <!-- Full-width: Bundling -->
-            ${_renderBundlingGroup(idx, 1, item.bundling1)}
-            ${_renderBundlingGroup(idx, 2, item.bundling2)}
+            ${_renderBundlingGroup(idx, 1, item.bundling1, item)}
+            ${_renderBundlingGroup(idx, 2, item.bundling2, item)}
           </div>
         </td>
       `;
@@ -1358,13 +1384,16 @@
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
+        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
         const item = state.items[idx];
+        const target = tier ? item[`bundling${tier}`] : item;
+        const tierKey = tier || 'main';
         ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          if (item[f] > 0) item[f] = Math.ceil(item[f] / 100) * 100;
+          if (target[f] > 0) target[f] = Math.ceil(target[f] / 100) * 100;
         });
         ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="main"][data-field="${f}"]`);
-          if (input) input.value = (item[f] != null && !isNaN(item[f])) ? formatNumber(item[f]) : '';
+          const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
+          if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
         });
         _updateComputedPrices(idx);
         _saveStateDebounced();
@@ -1376,7 +1405,8 @@
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        _autoAdjustJual(idx);
+        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
+        _autoAdjustJual(idx, tier);
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });

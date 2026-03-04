@@ -1,10 +1,12 @@
 """Flask application for Stock Receipt Entry."""
 
+import io
+import csv
 import os
 import logging
 from datetime import date
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from werkzeug.utils import secure_filename
 
 from config import settings
@@ -60,6 +62,11 @@ def history_page():
 @app.route('/scanner')
 def scanner_page():
     return render_template('scanner.html')
+
+
+@app.route('/sales-history')
+def sales_history_page():
+    return render_template('sales_history.html')
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +318,86 @@ def commit_po():
     except Exception as e:
         logger.exception("PO commit failed")
         return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# API: Sales History
+# ---------------------------------------------------------------------------
+
+_SALES_SQL = """\
+SELECT stockid AS artno, artname, artpabrik AS barcode, hjual,
+       SUM(qty) AS total_qty, SUM(amount) AS total_amount
+FROM sthist
+WHERE tipetrans = 3 AND posttime BETWEEN %s AND %s
+GROUP BY stockid, artname, artpabrik, hjual
+ORDER BY total_amount DESC
+"""
+
+
+def _parse_sales_range():
+    """Parse from/to, accepting date or datetime-local (YYYY-MM-DDTHH:MM)."""
+    raw_from = request.args.get('from', '').strip().replace('T', ' ')
+    raw_to = request.args.get('to', '').strip().replace('T', ' ')
+    if not raw_from or not raw_to:
+        return None, None
+    if len(raw_from) == 10:
+        raw_from += ' 00:00:00'
+    elif len(raw_from) == 16:
+        raw_from += ':00'
+    if len(raw_to) == 10:
+        raw_to += ' 23:59:59'
+    elif len(raw_to) == 16:
+        raw_to += ':59'
+    return raw_from, raw_to
+
+
+@app.route('/api/sales/history')
+def api_sales_history():
+    dt_from, dt_to = _parse_sales_range()
+    if not dt_from:
+        return jsonify([])
+
+    from services.db import execute_query
+    rows = execute_query(_SALES_SQL, (dt_from, dt_to))
+    # Convert Decimal to float for JSON serialisation
+    for r in rows:
+        for k in ('hjual', 'total_qty', 'total_amount'):
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+    return jsonify(rows)
+
+
+@app.route('/api/sales/export')
+def api_sales_export():
+    dt_from, dt_to = _parse_sales_range()
+    if not dt_from:
+        return jsonify({'error': 'from and to are required'}), 400
+
+    from services.db import execute_query
+    rows = execute_query(_SALES_SQL, (dt_from, dt_to))
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(['Artno', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
+    for r in rows:
+        writer.writerow([
+            r.get('artno', ''),
+            r.get('artname', ''),
+            r.get('barcode', ''),
+            r.get('hjual', 0),
+            r.get('total_qty', 0),
+            r.get('total_amount', 0),
+        ])
+
+    output = buf.getvalue()
+    f = request.args.get('from', '').replace('T', '_').replace(':', '')
+    t = request.args.get('to', '').replace('T', '_').replace(':', '')
+    filename = f'penjualan_{f}_{t}.csv'
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
 
 
 # ---------------------------------------------------------------------------

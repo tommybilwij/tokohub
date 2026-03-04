@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Histori Penjualan{% endblock %}
+
+{% block content %}
+<div class="sh-page">
+  <h5 class="mb-3"><i class="bi bi-graph-up"></i> Histori Penjualan</h5>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-presets">
+      <button class="sh-preset active" data-preset="today">Hari Ini</button>
+      <button class="sh-preset" data-preset="yesterday">Kemarin</button>
+      <button class="sh-preset" data-preset="7d">7 Hari</button>
+      <button class="sh-preset" data-preset="30d">30 Hari</button>
+      <button class="sh-preset" data-preset="month">Bulan Ini</button>
+      <button class="sh-preset" data-preset="year">Tahun Ini</button>
+    </div>
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="datetime-local" id="shDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="datetime-local" id="shDateTo" class="form-control form-control-sm">
+      </label>
+      <button class="btn btn-sm btn-primary" id="shBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Banner -->
+  <div class="sh-summary d-none" id="shSummary">
+    <div class="sh-summary-item">
+      <span class="sh-summary-label">Jenis Barang</span>
+      <span class="sh-summary-value" id="shTotalItems">0</span>
+    </div>
+    <div class="sh-summary-item">
+      <span class="sh-summary-label">Total Qty</span>
+      <span class="sh-summary-value" id="shTotalQty">0</span>
+    </div>
+    <div class="sh-summary-item">
+      <span class="sh-summary-label">Total Penjualan</span>
+      <span class="sh-summary-value sh-summary-green" id="shTotalSales">0</span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="shLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results Table -->
+  <div class="d-none" id="shResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="shResultCount"></small>
+      <button class="btn btn-sm btn-outline-success" id="shBtnExport">
+        <i class="bi bi-download"></i> Export CSV
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th class="text-center" style="width:40px">#</th>
+            <th class="sh-sortable" data-col="artname">Nama Barang <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="barcode">Barcode <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="hjual">Harga Jual <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="total_qty">Qty <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="total_amount">Total <i class="bi bi-chevron-expand"></i></th>
+          </tr>
+        </thead>
+        <tbody id="shTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="shEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada data penjualan untuk periode ini.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/sales_history.js') }}?v={{ range(10000,99999) | random }}"></script>
+{% endblock %}

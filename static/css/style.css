@@ -1824,3 +1824,178 @@ body {
 .sd-jual-table tbody tr:nth-child(odd) {
   background: var(--clr-neutral-50);
 }
+
+/* -----------------------------------------------------------------------
+   Sales History Page
+   ----------------------------------------------------------------------- */
+.sh-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.sh-filter-bar {
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sh-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sh-preset {
+  background: var(--clr-neutral-100);
+  border: 1px solid var(--clr-neutral-300);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--clr-neutral-700);
+  cursor: pointer;
+  transition: all var(--ease-default);
+}
+
+.sh-preset:hover {
+  background: var(--clr-primary-50);
+  border-color: var(--clr-primary-500);
+  color: var(--clr-primary-700);
+}
+
+.sh-preset.active {
+  background: var(--clr-primary-500);
+  border-color: var(--clr-primary-500);
+  color: #fff;
+}
+
+.sh-custom-range {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.sh-date-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: var(--clr-neutral-500);
+}
+
+.sh-date-label input {
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+}
+
+/* Summary banner */
+.sh-summary {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.sh-summary-item {
+  flex: 1;
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-3) var(--sp-4);
+  text-align: center;
+}
+
+.sh-summary-label {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--clr-neutral-500);
+  font-weight: var(--fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.sh-summary-value {
+  display: block;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-800);
+}
+
+.sh-summary-green {
+  color: var(--clr-accent-800);
+}
+
+/* Results table */
+.sh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.sh-table thead th {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clr-neutral-500);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 2px solid var(--clr-neutral-200);
+  background: var(--clr-neutral-50);
+  white-space: nowrap;
+}
+
+.sh-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sh-sortable:hover {
+  color: var(--clr-primary-500);
+}
+
+.sh-sortable i {
+  font-size: var(--fs-2xs);
+  margin-left: 2px;
+  opacity: 0.5;
+}
+
+.sh-sortable:hover i,
+.sh-sortable i.bi-chevron-up,
+.sh-sortable i.bi-chevron-down {
+  opacity: 1;
+}
+
+.sh-table tbody td {
+  padding: var(--sp-1) var(--sp-2);
+  border-bottom: 1px solid var(--clr-neutral-200);
+  vertical-align: middle;
+}
+
+.sh-table tbody tr:nth-child(odd) {
+  background: var(--clr-neutral-50);
+}
+
+.sh-table tbody tr:hover {
+  background: var(--clr-primary-50);
+}
+
+@media (max-width: 576px) {
+  .sh-summary {
+    flex-direction: column;
+  }
+  .sh-custom-range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sh-custom-range .btn {
+    align-self: flex-start;
+  }
+}

@@ -4,7 +4,7 @@ import io
 import csv
 import os
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from flask import Flask, render_template, request, jsonify, Response
 from werkzeug.utils import secure_filename
@@ -324,14 +324,7 @@ def commit_po():
 # API: Sales History
 # ---------------------------------------------------------------------------
 
-_SALES_SQL = """\
-SELECT stockid AS artno, artname, artpabrik AS barcode, hjual,
-       SUM(qty) AS total_qty, SUM(amount) AS total_amount
-FROM sthist
-WHERE tipetrans = 3 AND posttime BETWEEN %s AND %s
-GROUP BY stockid, artname, artpabrik, hjual
-ORDER BY total_amount DESC
-"""
+_KASSA_IDS = ('002', '003', '004')
 
 
 def _parse_sales_range():
@@ -351,15 +344,63 @@ def _parse_sales_range():
     return raw_from, raw_to
 
 
+def _sl_table_names(dt_from, dt_to):
+    """Return list of existing sl* table names covering the date range."""
+    d_from = datetime.strptime(dt_from[:10], '%Y-%m-%d').date()
+    d_to = datetime.strptime(dt_to[:10], '%Y-%m-%d').date()
+
+    from services.db import execute_query
+    candidates = []
+    d = d_from
+    while d <= d_to:
+        prefix = d.strftime('%y%m%d')
+        for k in _KASSA_IDS:
+            candidates.append(f'sl{prefix}{k}')
+        d += timedelta(days=1)
+
+    if not candidates:
+        return []
+
+    placeholders = ','.join(['%s'] * len(candidates))
+    rows = execute_query(
+        f"SELECT TABLE_NAME FROM information_schema.TABLES "
+        f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({placeholders})",
+        tuple(candidates)
+    )
+    return [r['TABLE_NAME'] for r in rows]
+
+
+def _query_sales(dt_from, dt_to):
+    """Query sl* tables for sales in the given datetime range."""
+    tables = _sl_table_names(dt_from, dt_to)
+    if not tables:
+        return []
+
+    unions = ' UNION ALL '.join(
+        f"SELECT artno, transtime, qty, unitprc, netamount FROM `{t}`"
+        for t in tables
+    )
+    sql = (
+        f"SELECT s.artno, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
+        f"SUM(s.qty) AS total_qty, SUM(s.netamount) AS total_amount "
+        f"FROM ({unions}) s "
+        f"JOIN stock st ON st.artno = s.artno "
+        f"WHERE s.transtime BETWEEN %s AND %s "
+        f"GROUP BY s.artno, st.artname, st.artpabrik, s.unitprc "
+        f"ORDER BY total_amount DESC"
+    )
+
+    from services.db import execute_query
+    return execute_query(sql, (dt_from, dt_to))
+
+
 @app.route('/api/sales/history')
 def api_sales_history():
     dt_from, dt_to = _parse_sales_range()
     if not dt_from:
         return jsonify([])
 
-    from services.db import execute_query
-    rows = execute_query(_SALES_SQL, (dt_from, dt_to))
-    # Convert Decimal to float for JSON serialisation
+    rows = _query_sales(dt_from, dt_to)
     for r in rows:
         for k in ('hjual', 'total_qty', 'total_amount'):
             if r.get(k) is not None:
@@ -373,8 +414,7 @@ def api_sales_export():
     if not dt_from:
         return jsonify({'error': 'from and to are required'}), 400
 
-    from services.db import execute_query
-    rows = execute_query(_SALES_SQL, (dt_from, dt_to))
+    rows = _query_sales(dt_from, dt_to)
 
     buf = io.StringIO()
     writer = csv.writer(buf)

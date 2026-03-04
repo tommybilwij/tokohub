@@ -1,11 +1,10 @@
-"""LAN mode authentication middleware."""
+"""LAN mode — restrict access to private network IPs only."""
 
 import ipaddress
 import logging
-import secrets
 import socket
 
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, abort
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +37,8 @@ def _is_private_ip(ip_str: str) -> bool:
         return False
 
 
-def setup_lan_auth(app: Flask, token: str) -> str:
-    """Register before_request hook for LAN token auth. Returns the active token."""
-    if not token:
-        token = secrets.token_urlsafe(24)
-        logger.info("Generated LAN access token: %s", token)
+def setup_lan_auth(app: Flask):
+    """Register before_request hook that only allows private network IPs."""
 
     @app.before_request
     def _lan_auth_check():
@@ -60,16 +56,4 @@ def setup_lan_auth(app: Flask, token: str) -> str:
         if not _is_private_ip(remote):
             abort(403)
 
-        # Check token from query param or Authorization header
-        req_token = request.args.get('token', '')
-        if not req_token:
-            auth = request.headers.get('Authorization', '')
-            if auth.startswith('Bearer '):
-                req_token = auth[7:]
-
-        if req_token != token:
-            return jsonify({'error': 'Invalid or missing access token'}), 401
-
         return None
-
-    return token

@@ -37,8 +37,7 @@ app.config['MAX_CONTENT_LENGTH'] = settings.max_content_length
 
 os.makedirs(settings.upload_folder, exist_ok=True)
 
-# LAN mode state (set in main() when --lan is used)
-_lan_token: str = ''
+_lan_active: bool = False
 
 
 def _allowed_file(filename):
@@ -89,8 +88,7 @@ def sales_history_page():
 def settings_page():
     from services.lan_auth import get_local_ip
     return render_template('settings.html',
-                           lan_mode=settings.lan_mode or bool(_lan_token),
-                           lan_token=_lan_token,
+                           lan_mode=_lan_active,
                            local_ip=get_local_ip(),
                            server_port=settings.server_port)
 
@@ -109,11 +107,10 @@ def api_lan_status():
     from services.lan_auth import get_local_ip
     ip = get_local_ip()
     return jsonify({
-        'lan_mode': settings.lan_mode or bool(_lan_token),
+        'lan_mode': _lan_active,
         'local_ip': ip,
         'port': settings.server_port,
-        'token': _lan_token,
-        'url': f'http://{ip}:{settings.server_port}?token={_lan_token}' if _lan_token else '',
+        'url': f'http://{ip}:{settings.server_port}' if _lan_active else '',
     })
 
 
@@ -527,7 +524,7 @@ def _parse_args():
 
 
 def main():
-    global _lan_token
+    global _lan_active
 
     args = _parse_args()
     _ensure_schema()
@@ -535,13 +532,14 @@ def main():
     host = args.host
     port = args.port
 
-    # LAN mode: bind 0.0.0.0 and enable token auth
+    # LAN mode: bind 0.0.0.0 and restrict to private network IPs
     if args.lan:
         host = '0.0.0.0'
         from services.lan_auth import setup_lan_auth, get_local_ip
-        _lan_token = setup_lan_auth(app, settings.lan_token)
-        logger.info("LAN mode enabled — access from: http://%s:%d?token=%s",
-                     get_local_ip(), port, _lan_token)
+        setup_lan_auth(app)
+        _lan_active = True
+        logger.info("LAN mode enabled — access from: http://%s:%d",
+                     get_local_ip(), port)
 
     # When running as frozen PyInstaller binary, disable debug & reloader
     is_frozen = getattr(sys, 'frozen', False)

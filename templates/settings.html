@@ -18,35 +18,19 @@
           {% endif %}
         </p>
 
-        {% if lan_mode and lan_token %}
-        <div class="mb-3">
-          <label class="form-label fw-semibold">IP Lokal</label>
-          <div class="input-group">
-            <input type="text" class="form-control" readonly
-                   value="{{ local_ip }}">
-          </div>
-        </div>
-
+        {% if lan_mode %}
         <div class="mb-3">
           <label class="form-label fw-semibold">URL Akses</label>
           <div class="input-group">
             <input type="text" class="form-control" id="lanUrl" readonly
-                   value="http://{{ local_ip }}:{{ server_port }}?token={{ lan_token }}">
+                   value="http://{{ local_ip }}:{{ server_port }}">
             <button class="btn btn-outline-primary" type="button" onclick="copyUrl()">
               <i class="bi bi-clipboard"></i> Salin
             </button>
           </div>
           <div class="form-text">Buka URL ini dari perangkat lain di WiFi yang sama.</div>
         </div>
-
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Token</label>
-          <div class="input-group">
-            <input type="text" class="form-control font-monospace" readonly
-                   value="{{ lan_token }}">
-          </div>
-        </div>
-        {% elif not lan_mode %}
+        {% else %}
         <p class="text-muted">
           Jalankan server dengan flag <code>--lan</code> untuk mengaktifkan akses dari perangkat lain di jaringan lokal.
         </p>

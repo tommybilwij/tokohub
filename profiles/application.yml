@@ -28,4 +28,3 @@ server_host: "127.0.0.1"
 
 # LAN mode (allow other devices on the same WiFi)
 lan_mode: false
-lan_token: ""

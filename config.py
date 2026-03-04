@@ -85,7 +85,6 @@ class Settings(BaseSettings):
 
     # LAN mode
     lan_mode: bool = False
-    lan_token: str = ''
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)

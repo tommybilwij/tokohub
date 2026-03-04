@@ -763,7 +763,7 @@
       const margin = hjualVal - nettoPcs;
       const pct = (margin / nettoPcs) * 100;
       const isNeg = margin < 0;
-      if (document.activeElement !== pctEl) pctEl.value = pct.toFixed(1);
+      if (document.activeElement !== pctEl) pctEl.value = pct.toFixed(2);
       mrgEl.textContent = isNeg ? `-${formatNumber(Math.abs(margin))}` : formatNumber(margin);
       pctEl.classList.toggle('negative', isNeg);
       mrgEl.classList.toggle('negative', isNeg);

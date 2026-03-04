@@ -44,7 +44,7 @@ def _generate_fp_number(cursor, order_date):
     """Generate Faktur Pembelian number: FP{YYMMDD}{5-digit-seq}."""
     prefix = f"FP{order_date.strftime('%y%m%d')}"
     cursor.execute(
-        "SELECT nofaktur FROM sthist WHERE nofaktur LIKE %s ORDER BY nofaktur DESC LIMIT 1",
+        "SELECT nofaktur FROM icbym WHERE nofaktur LIKE %s ORDER BY nofaktur DESC LIMIT 1",
         (f"{prefix}%",)
     )
     row = cursor.fetchone()
@@ -315,6 +315,10 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['amount'], line.get('foc', 0))
                 )
 
+                # Total small units received: qty * packing + foc
+                foc = Decimal(str(line.get('foc', 0)))
+                qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
+
                 # Insert stock history (sthist) for purchase tracking
                 cursor.execute(
                     """INSERT INTO sthist
@@ -339,7 +343,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                                %s, 'LAPANGAN', %s, %s, 1,
                                1, 1)""",
                     (line['artno'], line['artpabrik'], line['artname'], order_date,
-                     line['qty'], float(qty_small_unit), line['packing'],
+                     line['qty'], float(qty_small), line['packing'],
                      line['satuanbsr'], line['satuankcl'],
                      line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],

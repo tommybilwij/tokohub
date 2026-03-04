@@ -1866,9 +1866,17 @@
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
     const shippingCost = parsePrice(dom.shippingCostInput.value);
-    const items = state.items
-      .filter((i) => i.selectedArtno)
-      .map(_buildItemPayload);
+    const matched = state.items.filter((i) => i.selectedArtno);
+
+    // Block if any item has QTY KCL = 0
+    for (const it of matched) {
+      if (!it.qtyKecil || it.qtyKecil <= 0) {
+        alert(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0.\nIsi QTY KCL sebelum kirim PO.`);
+        return;
+      }
+    }
+
+    const items = matched.map(_buildItemPayload);
 
     showSpinner();
     try {

@@ -1045,30 +1045,186 @@ body {
   flex-shrink: 0;
 }
 
-/* --- Body: 2-column layout --- */
-.dsi-body {
-  display: flex;
-  gap: 1.25rem;
-}
-
-.dsi-col-beli {
-  flex: 1;
+/* --- Sections card (unified block for beli + jual) --- */
+.dsi-sections {
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-neutral-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
 }
 
-.dsi-col-jual {
+.dsi-section-lbl {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--clr-neutral-700);
+}
+
+/* --- Harga Beli header row in unified table --- */
+.dsi-price-tbl .dsi-beli-head-row td {
+  text-align: left;
+  padding: 0.4rem 1rem;
+  background: var(--clr-neutral-100);
+  border-bottom: 1px solid var(--clr-neutral-200);
+  white-space: normal;
+}
+
+/* --- Beli detail row: contains beli block with disc table --- */
+.dsi-price-tbl .dsi-beli-detail-row td {
+  padding: 0.6rem 1rem 0.5rem;
+  border-bottom: none;
+}
+
+/* --- Harga Jual header (outside the card, like Harga Beli) --- */
+.dsi-jual-header {
+  padding: 0.5rem 0 0.2rem;
+}
+
+.dsi-jual-card {
+  margin-top: 0;
+}
+
+.dsi-beli-block {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
-  align-content: flex-start;
+  flex-direction: column;
+  gap: var(--sp-2);
 }
 
-.dsi-row {
+.dsi-beli-line {
   display: flex;
   align-items: center;
+  gap: var(--sp-2);
+}
+
+.dsi-beli-label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-700);
+  min-width: 38px;
+}
+
+/* --- Disc pills row under Beli line --- */
+.dsi-disc-pills {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+}
+
+/* --- Netto bar (used inside beli block) --- */
+.dsi-netto-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: linear-gradient(90deg, var(--clr-neutral-200), var(--clr-neutral-100));
+  border: 1px solid var(--clr-neutral-300);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-1) 0.6rem;
+}
+
+/* --- Section label size inside table headers --- */
+.dsi-price-tbl th .dsi-section-lbl,
+.dsi-price-tbl .dsi-beli-head-row .dsi-section-lbl {
+  font-size: var(--fs-xs);
+}
+
+.dsi-price-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0;
+  font-size: var(--fs-base);
+}
+
+/* Override Bootstrap's border-style:solid on table elements to prevent
+   collapsed-border pixel offsets that misalign with the div-based beli section */
+.dsi-price-tbl,
+.dsi-price-tbl thead,
+.dsi-price-tbl tbody,
+.dsi-price-tbl tr,
+.dsi-price-tbl th,
+.dsi-price-tbl td {
+  border-left: none;
+  border-right: none;
+}
+
+.dsi-price-tbl th {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: right;
+  padding: 0.4rem 0.7rem;
+  background: var(--clr-neutral-100);
+  border-bottom: 1px solid var(--clr-neutral-200);
+  white-space: nowrap;
+}
+
+.dsi-price-tbl th.dsi-pt-tier {
+  text-align: left;
+  color: var(--clr-neutral-700);
+}
+
+.dsi-price-tbl td {
+  text-align: right;
+  padding: 0.5rem 0.7rem;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dsi-price-tbl td.dsi-pt-tier {
+  text-align: left;
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-700);
+  font-size: var(--fs-base);
+}
+
+.dsi-price-tbl th:first-child,
+.dsi-price-tbl td:first-child {
+  padding-left: 1rem;
+}
+
+.dsi-price-tbl th:last-child,
+.dsi-price-tbl td:last-child {
+  padding-right: 1rem;
+}
+
+.dsi-price-tbl tbody tr {
+  border-bottom: 1px solid var(--clr-neutral-200);
+}
+
+.dsi-price-tbl tbody tr:last-child {
+  border-bottom: none;
+}
+
+.dsi-price-tbl tr.dsi-pt-bundling td.dsi-pt-tier {
+  color: var(--clr-neutral-700);
+}
+
+.dsi-pt-val {
+  font-weight: var(--fw-bold);
+  color: var(--clr-neutral-800);
+  font-size: var(--fs-md);
+}
+
+.dsi-pt-val.dsi-pt-empty {
+  color: var(--clr-neutral-300);
+  font-weight: var(--fw-normal);
+}
+
+.dsi-pt-margin {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--clr-accent-600);
+  margin-top: 0.15rem;
+}
+
+.dsi-pt-margin.negative {
+  color: var(--clr-danger);
 }
 
 .dsi-lbl {
@@ -1097,22 +1253,14 @@ body {
 }
 
 .dsi-disc {
-  font-size: var(--fs-base);
+  font-size: var(--fs-sm);
   color: var(--clr-neutral-700);
-  font-weight: var(--fw-semibold);
-  background: var(--clr-card-bg);
-  border: 1px solid #b0bec5;
-  border-radius: 5px;
-  padding: 0.1rem 0.5rem;
-}
-
-/* Netto row — grey highlight (flat) */
-.dsi-netto-row {
-  background: var(--clr-neutral-200);
-  border: 1px solid #b0bec5;
+  font-weight: var(--fw-bold);
+  white-space: nowrap;
+  background: var(--clr-neutral-100);
+  border: 1px solid var(--clr-neutral-300);
   border-radius: var(--radius-md);
-  padding: 0.2rem 0.45rem;
-  margin-top: 0.15rem;
+  padding: 0.1rem 0.5rem;
 }
 
 .dsi-netto-val {
@@ -1121,73 +1269,6 @@ body {
   font-size: var(--fs-md);
 }
 
-/* --- Jual price chips (inside STOK SAAT INI) --- */
-.dsi-jual-item {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: var(--clr-card-bg);
-  border: 1px solid #b0bec5;
-  border-radius: var(--radius-md);
-  padding: var(--sp-1) 0.6rem;
-}
-
-.dsi-jual-lbl {
-  font-size: var(--fs-2xs);
-  font-weight: var(--fw-bold);
-  color: var(--clr-neutral-700);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.dsi-jual-val {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-  color: var(--clr-neutral-800);
-}
-
-.dsi-jual-margin {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
-  color: var(--clr-accent-600);
-}
-
-.dsi-jual-margin.negative {
-  color: var(--clr-danger);
-}
-
-/* --- Bundling rows (inside STOK SAAT INI) --- */
-.dsi-bundling {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.4rem;
-  padding-top: 0.4rem;
-  border-top: 1px dashed #b0bec5;
-}
-
-.dsi-bundling-tag {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-bold);
-  color: var(--clr-neutral-700);
-  background: var(--clr-card-bg);
-  border: 1px solid #b0bec5;
-  border-radius: 5px;
-  padding: 0.1rem 0.5rem;
-  white-space: nowrap;
-}
-
-.dsi-bund-pair {
-  font-size: var(--fs-base);
-  color: var(--clr-neutral-700);
-  font-weight: var(--fw-semibold);
-}
-
-.dsi-bund-pair b {
-  color: var(--clr-neutral-800);
-  font-weight: var(--fw-bold);
-}
 
 /* -----------------------------------------------------------------------
    Score colors
@@ -1316,9 +1397,12 @@ body {
     gap: 0.5rem;
   }
 
-  .dsi-body {
-    flex-direction: column;
-    gap: 0.5rem;
+  .dsi-beli-row {
+    flex-wrap: wrap;
+  }
+
+  .dsi-beli-body {
+    padding: 0.4rem 0.5rem;
   }
 
   .dsi-header {
@@ -1326,9 +1410,19 @@ body {
     gap: 0.3rem;
   }
 
-  .dsi-col-jual {
-    gap: 0.3rem;
+  .dsi-price-tbl {
+    font-size: var(--fs-sm);
   }
+
+  .dsi-pt-val {
+    font-size: var(--fs-base);
+  }
+
+  .dsi-price-tbl th,
+  .dsi-price-tbl td {
+    padding: 0.35rem 0.35rem;
+  }
+
 }
 
 /* -----------------------------------------------------------------------

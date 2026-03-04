@@ -715,50 +715,42 @@
     if (parseFloat(m.pctdisc3)) discItems.push({ label: 'D3', val: parseFloat(m.pctdisc3) });
     if (parseFloat(m.pctppn)) discItems.push({ label: 'PPN', val: parseFloat(m.pctppn) });
     const discHTML = discItems.length
-      ? `<span class="dsi-disc">${discItems.map(d => `${d.label} ${d.val}%`).join(' &middot; ')}</span>`
+      ? discItems.map(d => `<span class="dsi-disc">${d.label} <b>${d.val}%</b></span>`).join('')
       : '';
 
     // Netto
     const hasDiscOrPpn = parseFloat(m.pctdisc1) || parseFloat(m.pctdisc2) || parseFloat(m.pctdisc3) || parseFloat(m.pctppn);
     const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
 
-    // Jual prices
-    const jualItems = [
-      { label: 'Jual 1', val: m.hjual },
-      { label: 'Jual 3', val: m.hjual3 },
-      { label: 'Jual 4', val: m.hjual4 },
-      { label: 'Jual 5', val: m.hjual5 },
-      { label: 'Member', val: m.hjual2 },
-    ];
-
-    // Netto per pcs for margin calc (rounded to match displayed value)
+    // Netto per pcs for margin calc
     const dsiNettoPcs = netPrices && packNum ? netPrices.final / packNum
                       : (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
 
-    const jualHTML = jualItems.map(j => {
-      let marginHTML = '';
-      if (parseFloat(j.val) > 0 && dsiNettoPcs) {
-        const mg = j.val - dsiNettoPcs;
-        const isNeg = mg < 0;
-        marginHTML = `<span class="dsi-jual-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
-      }
-      return `<div class="dsi-jual-item"><span class="dsi-jual-lbl">${j.label}</span><span class="dsi-jual-val">${j.val ? formatNumber(j.val) : '—'}</span>${marginHTML}</div>`;
-    }).join('');
-
-    // Bundling
+    // Build price table rows: main + bundlings
     const bundlings = m._bundlings || [];
-    const bundlingHTML = bundlings.map((b, bi) => {
-      const bJual = [
-        { label: 'J1', val: b.hjual1 },
-        { label: 'J3', val: b.hjual3 },
-        { label: 'J4', val: b.hjual4 },
-        { label: 'J5', val: b.hjual5 },
-        { label: 'Mbr', val: b.hjual2 },
-      ];
-      return `<div class="dsi-bundling">
-        <span class="dsi-bundling-tag">Bundling ${bi + 1} (Qty&ge;${b.qty})</span>
-        ${bJual.map(j => `<span class="dsi-bund-pair">${j.label} <b>${j.val ? formatNumber(j.val) : '—'}</b></span>`).join('')}
-      </div>`;
+    const priceHeaders = ['Jual 1', 'Member', 'Jual 3', 'Jual 4', 'Jual 5'];
+    const mainPrices = [m.hjual, m.hjual2, m.hjual3, m.hjual4, m.hjual5];
+    const priceRows = [{ label: 'Satuan', prices: mainPrices, isMain: true }];
+    bundlings.forEach(b => {
+      priceRows.push({ label: `Bundling \u2265${b.qty}`, prices: [b.hjual1, b.hjual2, b.hjual3, b.hjual4, b.hjual5], isMain: false });
+    });
+
+    const numCols = priceHeaders.length + 1;
+    const jualHeaderRow = `<tr class="dsi-jual-head-row"><th class="dsi-pt-tier"><span class="dsi-section-lbl">Tier</span></th>${priceHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+    const jualBodyRows = priceRows.map(row => {
+      const rowCls = row.isMain ? '' : ' class="dsi-pt-bundling"';
+      const cells = row.prices.map(p => {
+        const val = parseFloat(p) || 0;
+        let marginHTML = '';
+        if (val > 0 && dsiNettoPcs) {
+          const mg = val - dsiNettoPcs;
+          const isNeg = mg < 0;
+          marginHTML = `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
+        }
+        const emptyCls = val ? '' : ' dsi-pt-empty';
+        return `<td><span class="dsi-pt-val${emptyCls}">${val ? formatNumber(val) : '—'}</span>${marginHTML}</td>`;
+      }).join('');
+      return `<tr${rowCls}><td class="dsi-pt-tier">${row.label}</td>${cells}</tr>`;
     }).join('');
 
     return `
@@ -772,25 +764,41 @@
           </div>
           <span class="dsi-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
         </div>
-        <div class="dsi-body">
-          <div class="dsi-col-beli">
-            <div class="dsi-row">
-              <span class="dsi-lbl">Beli</span>
-              <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-              <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-            </div>
-            ${discHTML ? `<div class="dsi-row">${discHTML}</div>` : ''}
-            ${netPrices ? `<div class="dsi-row dsi-netto-row">
-              <span class="dsi-lbl">Netto</span>
-              <span class="dsi-val dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-              <span class="dsi-val dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-            </div>` : ''}
-          </div>
-          <div class="dsi-col-jual">
-            ${jualHTML}
-          </div>
+
+        <div class="dsi-sections">
+          <table class="dsi-price-tbl">
+            <tbody>
+              <tr class="dsi-beli-head-row"><td colspan="${numCols}"><span class="dsi-section-lbl">Harga Beli</span></td></tr>
+              <tr class="dsi-beli-detail-row">
+                <td colspan="${numCols}">
+                  <div class="dsi-beli-block">
+                    <div class="dsi-beli-line">
+                      <span class="dsi-beli-label">Beli</span>
+                      <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+                      <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+                    </div>
+                    ${discHTML ? `<div class="dsi-disc-pills">${discHTML}</div>` : ''}
+                    ${netPrices ? `<div class="dsi-netto-bar">
+                      <span class="dsi-lbl">Netto</span>
+                      <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
+                      <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+                    </div>` : ''}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        ${bundlingHTML}
+
+        <div class="dsi-jual-header"><span class="dsi-section-lbl">Harga Jual</span></div>
+        <div class="dsi-sections dsi-jual-card">
+          <table class="dsi-price-tbl dsi-jual-tbl">
+            <tbody>
+              ${jualHeaderRow}
+              ${jualBodyRows}
+            </tbody>
+          </table>
+        </div>
       </div>`;
   }
 

@@ -497,6 +497,7 @@
       hjual5: null,
       bundling1: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
       bundling2: { enabled: false, minQty: 0, hjual1: null, hjual3: null, hjual4: null, hjual5: null, hjual2: null },
+      foc: 0,
       autoAdjustJual: false,
       _refNettoPcs: null,
       _refHjual: null,
@@ -1039,13 +1040,18 @@
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
-                  <tr class="beli-row-shipping" title="Dari input Biaya Kirim di bawah, dibagi rata per item">
-                    <td class="bt-label">B.Kirim</td>
-                    <td colspan="2" class="bt-shipping-val" data-idx="${idx}">—</td>
-                    <td></td>
-                  </tr>
                 </tbody>
               </table>
+              <div class="beli-row-foc">
+                <span class="bt-label">F.O.C</span>
+                <input type="number" class="amt-input edit-foc" data-idx="${idx}"
+                       value="${item.foc || ''}" placeholder="0" min="0" step="1">
+                <span class="bt-unit">Pcs</span>
+              </div>
+              <div class="beli-row-shipping" title="Dari input Biaya Kirim di bawah, dibagi rata per item">
+                <span class="bt-label">B.Kirim</span>
+                <span class="bt-shipping-val" data-idx="${idx}">—</span>
+              </div>
               <div class="dp-netto-row">
                 <span class="dp-label">Netto</span>
                 <span class="dp-netto-val netto-bsr" data-idx="${idx}">—</span><span class="dp-unit dp-unit-bsr">/${satuanBsr}</span>
@@ -1316,6 +1322,15 @@
       el.addEventListener('blur', () => {
         const v = parsePrice(el.value);
         el.value = v ? formatNumber(v) : '';
+      });
+    });
+
+    // F.O.C (bonus pcs) input handler
+    $$('.edit-foc').forEach(el => {
+      el.addEventListener('change', () => {
+        const idx = parseInt(el.dataset.idx);
+        state.items[idx].foc = parseInt(el.value) || 0;
+        _saveStateDebounced();
       });
     });
 
@@ -1745,6 +1760,7 @@
       artno: i.selectedArtno,
       qty: computeQty(i),
       qty_besar: i.qtyBesar || 0,
+      foc: i.foc || 0,
       price_override: i.priceBsr || 0,
       disc1_override: i.disc1,
       disc2_override: i.disc2,

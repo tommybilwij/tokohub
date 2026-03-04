@@ -176,6 +176,7 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'hjual3': float(item['hjual3_override']) if item.get('hjual3_override') is not None else float(stock['hjual3'] or 0),
             'hjual4': float(item['hjual4_override']) if item.get('hjual4_override') is not None else float(stock['hjual4'] or 0),
             'hjual5': float(item['hjual5_override']) if item.get('hjual5_override') is not None else float(stock['hjual5'] or 0),
+            'foc': int(item.get('foc', 0)),
             'amount': float(amount),
             'bundling1': item.get('bundling1'),
             'bundling2': item.get('bundling2'),
@@ -295,8 +296,9 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['amount'])
                 )
 
-                # Atomic balance update: curqty += qty * packing
-                qty_small_unit = Decimal(str(line['qty'])) * Decimal(str(line['packing']))
+                # Atomic balance update: curqty += qty * packing + foc
+                foc = Decimal(str(line.get('foc', 0)))
+                qty_small_unit = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
                 cursor.execute(
                     """UPDATE stlastbal
                        SET curqty = curqty + %s

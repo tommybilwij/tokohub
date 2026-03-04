@@ -21,6 +21,28 @@ class POCreationError(Exception):
     """Raised when PO creation fails."""
 
 
+def _claim_counters():
+    """Atomically claim nextrec counters without holding long locks.
+
+    Uses a separate autocommit connection so the row lock on nextrec
+    is held only for microseconds (single UPDATE), not for the entire
+    PO transaction.  POS can read/write nextrec without waiting.
+
+    Trade-off: if the PO transaction later fails, counters are already
+    incremented — this just leaves a harmless gap in the sequence.
+    """
+    with get_connection(autocommit=True) as conn:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("UPDATE nextrec SET newpo = LAST_INSERT_ID(newpo + 1)")
+        cur.execute("SELECT LAST_INSERT_ID() AS val")
+        becreff = cur.fetchone()['val']
+        cur.execute("UPDATE nextrec SET newpurch = LAST_INSERT_ID(newpurch + 1)")
+        cur.execute("SELECT LAST_INSERT_ID() AS val")
+        fp_becreff = cur.fetchone()['val']
+        cur.close()
+        return becreff, fp_becreff
+
+
 def _generate_po_number(cursor, order_date):
     """Generate PO number: PP{YYMMDD}{5-digit-seq}.
 
@@ -244,17 +266,13 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
     order_date = order_date or date.today()
     preview = preview_po(supplier_id, items, order_date, shipping_cost=shipping_cost)
 
+    # Claim counters atomically BEFORE the main transaction so nextrec
+    # row lock is released in microseconds — POS is never blocked.
+    becreff, fp_becreff = _claim_counters()
+
     with get_connection() as conn:
         cursor = conn.cursor(dictionary=True)
         try:
-            # Read current becreff counters from nextrec
-            cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1")
-            nextrec_row = cursor.fetchone()
-            if not nextrec_row:
-                raise POCreationError("nextrec table is empty")
-            becreff = nextrec_row['newpo']
-            fp_becreff = nextrec_row['newpurch']
-
             # Generate PO and FP numbers
             po_number = _generate_po_number(cursor, order_date)
             fp_number = _generate_fp_number(cursor, order_date)
@@ -407,9 +425,6 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                          bund.get('hjual3') or 0, bund.get('hjual4') or 0,
                          bund.get('hjual5') or 0)
                     )
-
-            # Atomic counter increments
-            cursor.execute("UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1")
 
             conn.commit()
 

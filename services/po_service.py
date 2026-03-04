@@ -324,7 +324,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                         jlhdisc1, jlhdisc2, jlhdisc3,
                         pctppn, jlhppn,
                         hjual, hjual2, hjual3, hjual4, hjual5,
-                        amount,
+                        amount, qtybonus,
                         suppid, whid, nofaktur, becreff, tipetrans,
                         isupdateprice, isupdatepurchprice)
                        VALUES (%s, %s, %s, %s,
@@ -334,7 +334,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                                %s, %s, %s,
                                %s, %s,
                                %s, %s, %s, %s, %s,
-                               %s,
+                               %s, %s,
                                %s, 'LAPANGAN', %s, %s, 1,
                                1, 1)""",
                     (line['artno'], line['artpabrik'], line['artname'], order_date,
@@ -346,7 +346,7 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                      line['pctppn'], line['jlhppn'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
-                     line['amount'],
+                     line['amount'], line.get('foc', 0),
                      supplier_id, fp_number, fp_becreff)
                 )
 

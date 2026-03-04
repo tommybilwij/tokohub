@@ -12,3 +12,4 @@ logs/
 .mariadb-data/
 backups/
 .DS_Store
+.ssl/

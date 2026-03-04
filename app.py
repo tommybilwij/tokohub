@@ -471,7 +471,9 @@ def _ensure_schema():
 
 def main():
     _ensure_schema()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    from services.ssl import ensure_ssl_cert
+    cert_file, key_file = ensure_ssl_cert()
+    app.run(host='0.0.0.0', port=5000, debug=True, ssl_context=(cert_file, key_file))
 
 
 if __name__ == '__main__':

@@ -456,7 +456,7 @@ body {
 .dp-beli {
   border-color: var(--clr-accent-100);
   border-left: 4px solid var(--clr-accent-600);
-  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
+  background: var(--clr-card-bg);
 }
 
 .dp-beli .dp-section-header {
@@ -467,7 +467,7 @@ body {
 .dp-jual {
   border-color: var(--clr-accent-100);
   border-left: 4px solid var(--clr-accent-600);
-  background: linear-gradient(135deg, #fff 60%, #f1f8e9 100%);
+  background: var(--clr-card-bg);
 }
 
 .dp-jual .dp-section-header {

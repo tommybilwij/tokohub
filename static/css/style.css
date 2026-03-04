@@ -1154,9 +1154,11 @@ body {
   white-space: nowrap;
 }
 
-.dsi-price-tbl th.dsi-pt-tier {
+.dsi-price-tbl th.dsi-pt-tier,
+.dsi-price-tbl td.dsi-pt-tier {
   text-align: left;
   color: var(--clr-neutral-700);
+  padding-left: 1rem;
 }
 
 .dsi-price-tbl td {
@@ -1167,15 +1169,13 @@ body {
 }
 
 .dsi-price-tbl td.dsi-pt-tier {
-  text-align: left;
   font-weight: var(--fw-bold);
-  color: var(--clr-neutral-700);
   font-size: var(--fs-base);
 }
 
 .dsi-price-tbl th:first-child,
 .dsi-price-tbl td:first-child {
-  padding-left: 1rem;
+  padding-left: 1rem !important;
 }
 
 .dsi-price-tbl th:last-child,

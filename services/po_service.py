@@ -120,7 +120,11 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             raise POCreationError(f"Stock item not found: {artno}")
 
         qty = Decimal(str(item['qty']))
-        packing = stock['packing'] or Decimal('1')
+        packing_ovr = item.get('packing_override')
+        if packing_ovr and Decimal(str(packing_ovr)) > 0:
+            packing = Decimal(str(packing_ovr))
+        else:
+            packing = stock['packing'] or Decimal('1')
 
         # Use override price if provided, else stock's hbelibsr
         if item.get('price_override') and Decimal(str(item['price_override'])) > 0:
@@ -358,14 +362,14 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                            pctppn = %s,
                            hjual = %s, hjual2 = %s, hjual3 = %s,
                            hjual4 = %s, hjual5 = %s,
-                           satbesar = %s
+                           satbesar = %s, packing = %s
                        WHERE artno = %s""",
                     (line['hbelibsr'], line['hbelikcl'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
                      line['pctppn'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
-                     line['satuanbsr'],
+                     line['satuanbsr'], line['packing'],
                      line['artno'])
                 )
 
@@ -392,6 +396,10 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
             cursor.execute("UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1")
 
             conn.commit()
+
+            # Invalidate stock search cache so next search reflects updated prices/packing
+            from services.stock_search import invalidate_cache
+            invalidate_cache()
 
             result = {
                 'po_number': po_number,

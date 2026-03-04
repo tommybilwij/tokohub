@@ -79,12 +79,7 @@
   }
 
   function computeQty(item) {
-    const big = item.qtyBesar || 0;
-    const small = item.qtyKecil || 0;
-    const pack = item.packing || 1;
-    if (big && small) return big + (small / pack);
-    if (small) return small / pack;
-    return big;
+    return item.qtyBesar || 0;
   }
 
   /**
@@ -703,7 +698,7 @@
     const hbelibsr = item.priceBsr || 0;
     // Use packing (conversion factor, e.g. 20 pcs/CTN) for /Pcs display and margin calc
     const qtyKcl = item.packing || 0;
-    const showPcs = qtyKcl > 0 && (item.qtyKecil || 0) > 0;
+    const showPcs = qtyKcl > 0;
     const showBsr = (item.qtyBesar || 0) > 0;
 
     // H.Beli /Bsr and /Pcs
@@ -848,7 +843,7 @@
             <span class="dsi-artno">${m.artno}</span>
             <span class="dsi-artname">${m.artname || ''}</span>
           </div>
-          <span class="dsi-packing">${packNum || '-'} ${m.satkecil || 'Pcs'} / ${m.satbesar || '-'}</span>
+          <span class="dsi-packing">${parseInt(item.packing) || packNum || '-'} ${m.satkecil || 'Pcs'} / ${item.satuanBsr || m.satbesar || '-'}</span>
         </div>
 
         <div class="dsi-beli-header"><span class="dsi-section-lbl">Harga Beli</span></div>
@@ -1194,6 +1189,7 @@
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
         state.items[idx].qtyKecil = parseFloat(el.value) || 0;
+        state.items[idx].packing = state.items[idx].qtyKecil || state.items[idx].packing;
         _recalcFromTotal(idx);
       });
     });
@@ -1203,6 +1199,7 @@
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx);
         state.items[idx].qtyKecil = (state.items[idx].qtyKecil || 0) + 1;
+        state.items[idx].packing = state.items[idx].qtyKecil;
         const input = btn.parentElement.querySelector('.edit-qty-kecil');
         input.value = state.items[idx].qtyKecil;
         _recalcFromTotal(idx);
@@ -1214,6 +1211,7 @@
         const current = state.items[idx].qtyKecil || 0;
         if (current <= 0) return;
         state.items[idx].qtyKecil = current - 1;
+        state.items[idx].packing = state.items[idx].qtyKecil || state.items[idx].packing;
         const input = btn.parentElement.querySelector('.edit-qty-kecil');
         input.value = state.items[idx].qtyKecil;
         _recalcFromTotal(idx);
@@ -1772,6 +1770,7 @@
       hjual4_override: i.hjual4,
       hjual5_override: i.hjual5,
       satuan_bsr: i.satuanBsr,
+      packing_override: i.qtyKecil || i.packing || 0,
     };
     const b1 = _buildBundlingPayload(i.bundling1);
     const b2 = _buildBundlingPayload(i.bundling2);

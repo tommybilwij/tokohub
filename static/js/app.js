@@ -1755,6 +1755,7 @@
       hjual3_override: i.hjual3,
       hjual4_override: i.hjual4,
       hjual5_override: i.hjual5,
+      satuan_bsr: i.satuanBsr,
     };
     const b1 = _buildBundlingPayload(i.bundling1);
     const b2 = _buildBundlingPayload(i.bundling2);

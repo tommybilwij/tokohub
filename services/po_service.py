@@ -157,7 +157,7 @@ def preview_po(supplier_id, items, order_date=None, shipping_cost=0):
             'qty': float(qty),
             'qty_besar': int(item.get('qty_besar', qty)),
             'packing': float(packing),
-            'satuanbsr': stock['satbesar'] or '',
+            'satuanbsr': item.get('satuan_bsr') or stock['satbesar'] or '',
             'satuankcl': stock['satkecil'] or '',
             'hbelibsr': float(hbelibsr),
             'hbelikcl': float(hbelikcl),
@@ -355,13 +355,15 @@ def commit_po(supplier_id, items, order_date=None, userid=None, shipping_cost=0)
                            pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
                            pctppn = %s,
                            hjual = %s, hjual2 = %s, hjual3 = %s,
-                           hjual4 = %s, hjual5 = %s
+                           hjual4 = %s, hjual5 = %s,
+                           satbesar = %s
                        WHERE artno = %s""",
                     (line['hbelibsr'], line['hbelikcl'],
                      line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
                      line['pctppn'],
                      line['hjual'], line['hjual2'], line['hjual3'],
                      line['hjual4'], line['hjual5'],
+                     line['satuanbsr'],
                      line['artno'])
                 )
 

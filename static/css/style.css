@@ -440,8 +440,8 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 0.6rem;
-  padding-bottom: 0.4rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.55rem;
   border-bottom: 2px solid var(--clr-accent-100);
 }
 
@@ -460,6 +460,9 @@ body {
 }
 
 .dp-beli .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   color: var(--clr-accent-800);
   border-bottom-color: var(--clr-accent-100);
 }
@@ -471,6 +474,9 @@ body {
 }
 
 .dp-jual .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   color: var(--clr-accent-800);
   border-bottom-color: var(--clr-accent-100);
 }
@@ -740,16 +746,18 @@ body {
 .dp-bundling-section {
   grid-column: 1 / -1;
   background: var(--clr-card-bg);
-  border: 1px dashed var(--clr-accent-100);
-  border-left: 3px solid var(--clr-accent-300);
+  border: 1px solid var(--clr-accent-100);
+  border-left: 4px solid var(--clr-accent-600);
   border-radius: var(--radius-xl);
-  padding: 0.65rem 0.85rem;
+  padding: 0.75rem 1rem;
 }
 
 .dp-bundling-section .dp-section-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.55rem;
   border-bottom: 2px solid var(--clr-accent-100);
   color: var(--clr-accent-800);
 }
@@ -870,8 +878,6 @@ body {
   font-weight: var(--fw-bold);
   color: var(--clr-accent-800);
   margin: 0;
-  margin-left: auto;
-  float: right;
   background: var(--clr-accent-50);
   border: 1px solid var(--clr-accent-100);
   border-radius: var(--radius-md);
@@ -890,7 +896,6 @@ body {
   align-items: center;
   gap: 0.4rem;
   margin-left: auto;
-  float: right;
 }
 
 

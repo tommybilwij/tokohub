@@ -608,34 +608,22 @@
     return `<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>${rowsHTML}</tbody></table>`;
   }
 
-  // Render a bundling group (1 or 2) for the detail panel
-  function _renderBundlingGroup(idx, tier, b, item) {
+  // Render bundling group inline (no per-section buttons, used in 3-column jual row)
+  function _renderBundlingGroupInline(idx, tier, b, item) {
     const checked = b.enabled ? 'checked' : '';
     const disabled = b.enabled ? '' : 'disabled';
     const vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
-    const showBtns = b.enabled && item.status === 'auto' && item._refHjual;
     return `
-      <div class="dp-bundling-section">
+      <div class="dp-section dp-jual dp-bundling-inline">
         <div class="dp-section-header">
           <label class="bundling-toggle">
             <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${tier}" ${checked}>
-            Harga Jual (Bundling ${tier})
+            Bundling ${tier}
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
                    value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${disabled}> <span style="text-transform:none">Pcs</span>
           </span>
-          ${showBtns ? `<span class="auto-adjust-group">
-            <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" data-tier="${tier}" title="Bulatkan ke ratusan">
-              <i class="bi bi-chevron-bar-up"></i> Bulatan 100
-            </button>
-            <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct" data-idx="${idx}" data-tier="${tier}">
-              <i class="bi bi-percent"></i> Ikuti Margin %
-            </button>
-            <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}" data-tier="${tier}">
-              <i class="bi bi-arrow-repeat"></i> Ikuti Margin
-            </button>
-          </span>` : ''}
         </div>
         <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
           ${_renderJualTable(idx, tier, vals)}
@@ -1063,7 +1051,7 @@
         <td colspan="8">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
-            <!-- Left: Harga Beli -->
+            <!-- Row 1: Harga Beli (full width) -->
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
@@ -1136,26 +1124,30 @@
                 <span class="dp-netto-val netto-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
             </div>
-            <!-- Right: Harga Jual -->
-            <div class="dp-section dp-jual">
-              <div class="dp-section-header">Harga Jual (Satuan)${(item.status === 'auto' && item._refHjual)
-                ? ` <span class="auto-adjust-group">
-                       <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
-                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
-                       </button>
-                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct" data-idx="${idx}">
-                         <i class="bi bi-percent"></i> Ikuti Margin %
-                       </button>
-                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
-                         <i class="bi bi-arrow-repeat"></i> Ikuti Margin
-                       </button>
-                     </span>`
-                : ''}</div>
-              ${_renderJualTable(idx, null, mainJualVals)}
+            <!-- Row 2: Harga Jual — shared action buttons + 3 columns -->
+            ${(item.status === 'auto' && item._refHjual)
+              ? `<div class="dp-jual-actions">
+                   <span class="auto-adjust-group">
+                     <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
+                       <i class="bi bi-chevron-bar-up"></i> Bulatan 100
+                     </button>
+                     <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct-all" data-idx="${idx}">
+                       <i class="bi bi-percent"></i> Ikuti Margin %
+                     </button>
+                     <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-all" data-idx="${idx}">
+                       <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+                     </button>
+                   </span>
+                 </div>`
+              : ''}
+            <div class="dp-jual-row">
+              <div class="dp-section dp-jual">
+                <div class="dp-section-header">Satuan</div>
+                ${_renderJualTable(idx, null, mainJualVals)}
+              </div>
+              ${_renderBundlingGroupInline(idx, 1, item.bundling1, item)}
+              ${_renderBundlingGroupInline(idx, 2, item.bundling2, item)}
             </div>
-            <!-- Full-width: Bundling -->
-            ${_renderBundlingGroup(idx, 1, item.bundling1, item)}
-            ${_renderBundlingGroup(idx, 2, item.bundling2, item)}
           </div>
         </td>
       `;
@@ -1507,47 +1499,54 @@
       });
     });
 
-    // Ikuti H.Beli button — one-time adjust jual to match existing margins
-    // Round up jual prices to nearest 100
-    $$('.btn-round-hundred').forEach(btn => {
+    // Bulatan 100 — apply to ALL tiers (main + bundling 1 + bundling 2)
+    $$('.btn-round-hundred-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
         const item = state.items[idx];
-        const target = tier ? item[`bundling${tier}`] : item;
-        const tierKey = tier || 'main';
-        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          if (target[f] > 0) target[f] = Math.ceil(target[f] / 100) * 100;
-        });
-        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
-          if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
+        [null, '1', '2'].forEach(tier => {
+          const target = tier ? item[`bundling${tier}`] : item;
+          if (tier && !target.enabled) return;
+          const tierKey = tier || 'main';
+          ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+            if (target[f] > 0) target[f] = Math.ceil(target[f] / 100) * 100;
+          });
+          ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+            const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
+            if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
+          });
         });
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });
     });
 
-    // Ikuti Margin % — apply same margin percentage from STOK SAAT INI
-    $$('.btn-auto-adjust-jual-pct').forEach(btn => {
+    // Ikuti Margin % — apply to ALL tiers
+    $$('.btn-auto-adjust-jual-pct-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier;
-        _autoAdjustJualPct(idx, tier);
+        const item = state.items[idx];
+        [undefined, '1', '2'].forEach(tier => {
+          if (tier && !item[`bundling${tier}`].enabled) return;
+          _autoAdjustJualPct(idx, tier);
+        });
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });
     });
 
-    // Ikuti Margin — apply same absolute margin from STOK SAAT INI
-    $$('.btn-auto-adjust-jual').forEach(btn => {
+    // Ikuti Margin — apply to ALL tiers
+    $$('.btn-auto-adjust-jual-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier;
-        _autoAdjustJual(idx, tier);
+        const item = state.items[idx];
+        [undefined, '1', '2'].forEach(tier => {
+          if (tier && !item[`bundling${tier}`].enabled) return;
+          _autoAdjustJual(idx, tier);
+        });
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });

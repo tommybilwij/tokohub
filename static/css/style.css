@@ -419,8 +419,8 @@ body {
    Detail Panel — Grid Layout (Phase 4: more spacing)
    ----------------------------------------------------------------------- */
 .dp-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
 }
@@ -465,6 +465,30 @@ body {
   gap: 0.75rem;
   color: var(--clr-accent-800);
   border-bottom-color: var(--clr-accent-100);
+}
+
+/* Jual row: 3-column layout (Satuan | Bundling 1 | Bundling 2) */
+.dp-jual-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* Shared action buttons bar above jual columns */
+.dp-jual-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--clr-accent-50);
+  border: 1px solid var(--clr-accent-100);
+  border-radius: var(--radius-xl);
+}
+
+.dp-jual-actions .auto-adjust-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .dp-jual {
@@ -757,12 +781,17 @@ body {
    Bundling sections — Phase 4: dashed border, lighter accent
    ----------------------------------------------------------------------- */
 .dp-bundling-section {
-  grid-column: 1 / -1;
   background: var(--clr-card-bg);
   border: 1px solid var(--clr-accent-100);
   border-left: 4px solid var(--clr-accent-600);
   border-radius: var(--radius-xl);
   padding: 0.75rem 1rem;
+}
+
+/* Inline bundling within jual row */
+.dp-bundling-inline {
+  display: flex;
+  flex-direction: column;
 }
 
 .dp-bundling-section .dp-section-header {
@@ -985,7 +1014,6 @@ body {
    Stock Info Banner — "STOK SAAT INI" (Phase 4: flat bg)
    ----------------------------------------------------------------------- */
 .dp-stock-info {
-  grid-column: 1 / -1;
   background: var(--clr-neutral-50);
   border: 1px solid var(--clr-neutral-300);
   border-left: 4px solid var(--clr-neutral-500);
@@ -1392,7 +1420,7 @@ body {
    Responsive — Phase 6: tablet breakpoint at 1200px
    ----------------------------------------------------------------------- */
 @media (max-width: 1200px) {
-  .dp-grid {
+  .dp-jual-row {
     grid-template-columns: 1fr;
   }
 }
@@ -1404,9 +1432,12 @@ body {
   }
 
   .dp-grid {
-    grid-template-columns: 1fr;
     padding: 0.5rem 0.75rem;
     gap: 0.5rem;
+  }
+
+  .dp-jual-row {
+    grid-template-columns: 1fr;
   }
 
   .dsi-beli-row {

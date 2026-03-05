@@ -40,7 +40,9 @@
             <button type="submit" class="btn btn-primary btn-sm">
               <i class="bi bi-save"></i> Simpan
             </button>
-            <small class="text-muted fst-italic">Perlu restart untuk diterapkan</small>
+            <button type="button" class="btn btn-warning btn-sm btn-save-restart" data-form="formDb">
+              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            </button>
           </div>
         </form>
       </div>
@@ -126,7 +128,9 @@
             <button type="submit" class="btn btn-primary btn-sm">
               <i class="bi bi-save"></i> Simpan
             </button>
-            <small class="text-muted fst-italic">Perlu restart untuk diterapkan</small>
+            <button type="button" class="btn btn-warning btn-sm btn-save-restart" data-form="formServer">
+              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            </button>
           </div>
         </form>
       </div>
@@ -236,6 +240,37 @@
     return data;
   }
 
+  // Save settings (returns promise)
+  function saveForm(form) {
+    const payload = collectForm(form);
+    return fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json());
+  }
+
+  // Trigger server restart, then poll until it's back up and reload page
+  function restartServer() {
+    fetch('/api/restart', { method: 'POST' }).catch(() => {});
+    window.showToast && showToast('Server sedang restart...', 'warning');
+    setTimeout(() => pollUntilReady(), 1500);
+  }
+
+  function pollUntilReady(attempts) {
+    attempts = attempts || 0;
+    fetch('/health').then(r => {
+      if (r.ok) location.reload();
+      else throw new Error();
+    }).catch(() => {
+      if (attempts < 20) {
+        setTimeout(() => pollUntilReady(attempts + 1), 1000);
+      } else {
+        window.showToast && showToast('Server tidak merespons, coba refresh manual', 'danger');
+      }
+    });
+  }
+
   // Attach save handler to each form
   document.querySelectorAll('form[id^="form"]').forEach(form => {
     form.addEventListener('submit', function(e) {
@@ -243,13 +278,7 @@
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
 
-      const payload = collectForm(form);
-      fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-        .then(r => r.json())
+      saveForm(form)
         .then(res => {
           if (res.ok) {
             window.showToast && showToast('Pengaturan disimpan!', 'success');
@@ -261,6 +290,29 @@
           window.showToast && showToast('Error: ' + err.message, 'danger');
         })
         .finally(() => { btn.disabled = false; });
+    });
+  });
+
+  // Attach save & restart handler
+  document.querySelectorAll('.btn-save-restart').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const formId = btn.dataset.form;
+      const form = document.getElementById(formId);
+      btn.disabled = true;
+
+      saveForm(form)
+        .then(res => {
+          if (res.ok) {
+            restartServer();
+          } else {
+            window.showToast && showToast('Gagal simpan: ' + (res.error || 'Unknown'), 'danger');
+            btn.disabled = false;
+          }
+        })
+        .catch(err => {
+          window.showToast && showToast('Error: ' + err.message, 'danger');
+          btn.disabled = false;
+        });
     });
   });
 })();

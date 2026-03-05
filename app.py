@@ -153,6 +153,20 @@ def api_settings_post():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/restart', methods=['POST'])
+def api_restart():
+    """Restart the server process. Works in both dev (uv run) and Tauri sidecar mode."""
+    import threading
+
+    def _restart():
+        import time
+        time.sleep(0.5)  # let the response flush
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    threading.Thread(target=_restart, daemon=True).start()
+    return jsonify({'ok': True})
+
+
 # ---------------------------------------------------------------------------
 # API: Health check (used by Tauri to detect Flask readiness)
 # ---------------------------------------------------------------------------

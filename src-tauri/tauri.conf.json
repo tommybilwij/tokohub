@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicbarker/tauri/refs/heads/v2/crates/tauri-schema-generator/schemas/config.schema.json",
   "productName": "TokoHub",
   "version": "0.1.0",
-  "identifier": "com.tokohub.app",
+  "identifier": "com.tokohub.desktop",
   "build": {
     "frontendDist": "./frontend-dist"
   },

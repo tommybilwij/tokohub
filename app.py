@@ -96,7 +96,7 @@ async def _ensure_schema(pool):
         await execute_modify(pool, sql)
         logger.info("stock_alias table ensured")
     except Exception as e:
-        logger.warning("Could not ensure stock_alias table: %s", e)
+        logger.warning("Could not ensure stock_alias table: %s", e, exc_info=True)
 
 
 def _parse_args():

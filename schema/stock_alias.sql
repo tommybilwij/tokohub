@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS stock_alias (
   PRIMARY KEY (id),
   UNIQUE KEY alias_name_idx (alias_name),
   KEY artno_idx (artno)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;

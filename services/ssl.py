@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 if getattr(__import__('sys'), 'frozen', False):
     # Frozen PyInstaller: _MEIPASS is read-only, use user data dir instead
-    _DEFAULT_CERT_DIR = Path.home() / '.stock-entry' / '.ssl'
+    _DEFAULT_CERT_DIR = Path.home() / '.tokohub' / '.ssl'
 else:
     _DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / '.ssl'
 _CERT_FILENAME = 'cert.pem'
@@ -36,7 +36,7 @@ def _get_local_ip() -> str | None:
 def generate_self_signed_cert(
     cert_dir: Path | str = _DEFAULT_CERT_DIR,
     days_valid: int = 365,
-    mdns_hostname: str = 'tokosegar',
+    mdns_hostname: str = 'tokohub',
 ) -> tuple[str, str]:
     """Generate a self-signed cert with SANs for localhost + LAN IP.
 
@@ -107,7 +107,7 @@ def _cert_is_valid(cert_path: Path, min_remaining_days: int = 30) -> bool:
 
 def ensure_ssl_cert(
     cert_dir: Path | str = _DEFAULT_CERT_DIR,
-    mdns_hostname: str = 'tokosegar',
+    mdns_hostname: str = 'tokohub',
 ) -> tuple[str, str]:
     """Return (cert_path, key_path), generating if missing or expiring within 30 days."""
     cert_dir = Path(cert_dir)

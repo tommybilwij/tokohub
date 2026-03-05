@@ -995,7 +995,7 @@ wheels = [
 ]
 
 [[package]]
-name = "stock-entry-myposse"
+name = "tokohub"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

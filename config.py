@@ -13,7 +13,7 @@ _BASE_DIR = Path(__file__).parent
 
 # Determine .envrc location: frozen builds use a stable user-writable path
 if getattr(sys, 'frozen', False):
-    _ENVRC_PATH = Path.home() / '.stock-entry' / '.envrc'
+    _ENVRC_PATH = Path.home() / '.tokohub' / '.envrc'
 else:
     _ENVRC_PATH = _BASE_DIR / '.envrc'
 
@@ -98,7 +98,10 @@ class Settings(BaseSettings):
 
     # LAN mode
     lan_mode: bool = True
-    mdns_hostname: str = 'tokosegar'
+    mdns_hostname: str = 'tokohub'
+
+    # Branding
+    store_name: str = ''
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -178,6 +181,7 @@ _KEY_TO_ENV = {
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
+    'store_name': 'STORE_NAME',
 }
 
 

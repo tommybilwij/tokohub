@@ -1,4 +1,4 @@
-"""Flask application for Stock Receipt Entry."""
+"""Flask application for TokoHub."""
 
 import io
 import csv
@@ -39,6 +39,11 @@ os.makedirs(settings.upload_folder, exist_ok=True)
 
 _lan_active: bool = False
 _https_port: int | None = None
+
+
+@app.context_processor
+def inject_branding():
+    return {'store_name': settings.store_name}
 
 
 def _allowed_file(filename):
@@ -130,6 +135,7 @@ def api_settings_get():
         'server_host': _s.server_host,
         'lan_mode': _s.lan_mode,
         'mdns_hostname': _s.mdns_hostname,
+        'store_name': _s.store_name,
     })
 
 
@@ -627,7 +633,7 @@ def _ensure_schema():
 
 
 def _parse_args():
-    parser = argparse.ArgumentParser(description='Stock Entry Server')
+    parser = argparse.ArgumentParser(description='TokoHub Server')
     parser.add_argument('--port', type=int, default=settings.server_port)
     parser.add_argument('--host', type=str, default=settings.server_host)
     parser.add_argument('--lan', action='store_true', default=settings.lan_mode)
@@ -701,7 +707,7 @@ def main():
                     mdns_host = f'{settings.mdns_hostname}.local'
                     svc = ServiceInfo(
                         "_https._tcp.local.",
-                        "Stock Entry._https._tcp.local.",
+                        "TokoHub._https._tcp.local.",
                         addresses=[_socket.inet_aton(local_ip)],
                         port=https_port,
                         server=f"{mdns_host}.",

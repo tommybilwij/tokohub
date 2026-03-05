@@ -108,6 +108,10 @@
         <h5 class="card-title"><i class="bi bi-hdd-network"></i> Server</h5>
         <form id="formServer" class="row g-2">
           <div class="col-md-4">
+            <label class="form-label">Nama Toko</label>
+            <input type="text" class="form-control form-control-sm" name="store_name" placeholder="Toko Segar">
+          </div>
+          <div class="col-md-4">
             <label class="form-label">Host</label>
             <input type="text" class="form-control form-control-sm" name="server_host">
           </div>
@@ -124,7 +128,7 @@
           <div class="col-md-4" id="mdnsHostnameGroup" style="display:none;">
             <label class="form-label">Hostname mDNS</label>
             <div class="input-group input-group-sm">
-              <input type="text" class="form-control form-control-sm" name="mdns_hostname" id="mdnsHostnameInput" placeholder="tokosegar">
+              <input type="text" class="form-control form-control-sm" name="mdns_hostname" id="mdnsHostnameInput" placeholder="tokohub">
               <span class="input-group-text">.local</span>
             </div>
           </div>
@@ -190,6 +194,7 @@
       setVal('formFuzzy', 'fuzzy_min_score', cfg.fuzzy_min_score);
 
       // Server
+      setVal('formServer', 'store_name', cfg.store_name);
       setVal('formServer', 'server_host', cfg.server_host);
       setVal('formServer', 'server_port', cfg.server_port);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;

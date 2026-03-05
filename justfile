@@ -1,4 +1,4 @@
-# Stock Entry MyPosse
+# TokoHub
 
 set dotenv-load
 set dotenv-filename := ".envrc"
@@ -142,13 +142,13 @@ build-sidecar:
     echo "Copying sidecar to src-tauri/binaries/..."
     mkdir -p src-tauri/binaries
     # Copy exe + _internal as Tauri resources (not externalBin)
-    if [ -f dist/stock-entry-server/stock-entry-server.exe ]; then
-        cp dist/stock-entry-server/stock-entry-server.exe src-tauri/binaries/stock-entry-server.exe
+    if [ -f dist/tokohub-server/tokohub-server.exe ]; then
+        cp dist/tokohub-server/tokohub-server.exe src-tauri/binaries/tokohub-server.exe
     else
-        cp dist/stock-entry-server/stock-entry-server src-tauri/binaries/stock-entry-server
+        cp dist/tokohub-server/tokohub-server src-tauri/binaries/tokohub-server
     fi
     rm -rf src-tauri/binaries/_internal
-    cp -r dist/stock-entry-server/_internal src-tauri/binaries/_internal
+    cp -r dist/tokohub-server/_internal src-tauri/binaries/_internal
     echo "Sidecar ready: src-tauri/binaries/"
 
 # Build the Tauri desktop app

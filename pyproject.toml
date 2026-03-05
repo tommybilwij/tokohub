@@ -1,7 +1,7 @@
 [project]
-name = "stock-entry-myposse"
+name = "tokohub"
 version = "0.1.0"
-description = "Stock receipt entry app with fuzzy matching for MyPosse POS"
+description = "TokoHub — stock receipt entry app with fuzzy matching"
 requires-python = ">=3.11"
 dependencies = [
     "flask>=3.0",

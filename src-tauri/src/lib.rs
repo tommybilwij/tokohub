@@ -19,11 +19,11 @@ struct SidecarState {
     child: Option<Child>,
 }
 
-/// Read ~/.stock-entry/.envrc and parse `export KEY=value` lines into a HashMap.
+/// Read ~/.tokohub/.envrc and parse `export KEY=value` lines into a HashMap.
 fn load_envrc() -> HashMap<String, String> {
     let mut envs = HashMap::new();
     let envrc_path = dirs::home_dir()
-        .map(|h| h.join(".stock-entry").join(".envrc"));
+        .map(|h| h.join(".tokohub").join(".envrc"));
     if let Some(path) = envrc_path {
         if let Ok(content) = std::fs::read_to_string(&path) {
             for line in content.lines() {
@@ -54,9 +54,9 @@ fn spawn_sidecar(app: &tauri::App) {
         .expect("failed to get resource dir");
 
     let sidecar_name = if cfg!(target_os = "windows") {
-        "stock-entry-server.exe"
+        "tokohub-server.exe"
     } else {
-        "stock-entry-server"
+        "tokohub-server"
     };
     let sidecar_path = resource_dir.join("binaries").join(sidecar_name);
 
@@ -67,14 +67,14 @@ fn spawn_sidecar(app: &tauri::App) {
         return;
     }
 
-    // Load env vars from ~/.stock-entry/.envrc and pass to sidecar
+    // Load env vars from ~/.tokohub/.envrc and pass to sidecar
     let envrc_vars = load_envrc();
 
     let child = match Command::new(&sidecar_path)
         .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"])
         .envs(&envrc_vars)
-        .stdout(std::fs::File::create(std::env::temp_dir().join("stock-entry-sidecar.log")).unwrap())
-        .stderr(std::fs::File::create(std::env::temp_dir().join("stock-entry-sidecar.err")).unwrap())
+        .stdout(std::fs::File::create(std::env::temp_dir().join("tokohub-sidecar.log")).unwrap())
+        .stderr(std::fs::File::create(std::env::temp_dir().join("tokohub-sidecar.err")).unwrap())
         .spawn()
     {
         Ok(child) => child,

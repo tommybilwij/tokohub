@@ -1,5 +1,5 @@
 /**
- * Stock Entry App - Frontend Logic
+ * TokoHub - Frontend Logic
  * Vanilla JS, no build step.
  */
 

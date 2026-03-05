@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicbarker/tauri/refs/heads/v2/crates/tauri-schema-generator/schemas/config.schema.json",
-  "productName": "Stock Entry - Toko Segar",
+  "productName": "TokoHub",
   "version": "0.1.0",
-  "identifier": "com.tokosegar.stock-entry",
+  "identifier": "com.tokohub.app",
   "build": {
     "frontendDist": "./frontend-dist"
   },
@@ -11,7 +11,7 @@
       {
         "label": "main",
         "url": "http://127.0.0.1:5000",
-        "title": "Stock Entry - Toko Segar",
+        "title": "TokoHub",
         "width": 1280,
         "height": 800,
         "visible": true,
@@ -29,7 +29,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "binaries/stock-entry-server*",
+      "binaries/tokohub-server*",
       "binaries/_internal"
     ],
     "targets": ["app", "dmg", "msi", "nsis"],

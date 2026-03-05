@@ -224,9 +224,9 @@
   }
 
   function requireHeaderFields() {
-    if (!dom.userSelect.value) { alert('Pilih user terlebih dahulu.'); dom.userSelect.focus(); return false; }
-    if (!dom.vendorSelect.value) { alert('Pilih supplier terlebih dahulu.'); dom.vendorSelect.focus(); return false; }
-    if (!dom.orderDate.value) { alert('Isi tanggal terlebih dahulu.'); dom.orderDate.focus(); return false; }
+    if (!dom.userSelect.value) { showToast('Pilih user terlebih dahulu.', 'warning'); dom.userSelect.focus(); return false; }
+    if (!dom.vendorSelect.value) { showToast('Pilih supplier terlebih dahulu.', 'warning'); dom.vendorSelect.focus(); return false; }
+    if (!dom.orderDate.value) { showToast('Isi tanggal terlebih dahulu.', 'warning'); dom.orderDate.focus(); return false; }
     return true;
   }
 
@@ -241,6 +241,46 @@
   function hideSpinner() {
     const el = $('#globalSpinner');
     if (el) el.remove();
+  }
+
+  // Promise-based confirm dialog (works in Tauri WebView unlike native confirm())
+  function showConfirm(message) {
+    return new Promise((resolve) => {
+      let modal = document.getElementById('appConfirmModal');
+      if (!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+          <div class="modal fade" id="appConfirmModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+              <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                  <i class="bi bi-exclamation-triangle-fill text-warning fs-1 mb-3 d-block"></i>
+                  <p id="appConfirmMsg" class="mb-0"></p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                  <button type="button" class="btn btn-secondary" id="appConfirmNo">Batal</button>
+                  <button type="button" class="btn btn-primary" id="appConfirmYes">Ya, Lanjut</button>
+                </div>
+              </div>
+            </div>
+          </div>`);
+        modal = document.getElementById('appConfirmModal');
+      }
+      document.getElementById('appConfirmMsg').textContent = message;
+      const bsModal = new bootstrap.Modal(modal, { backdrop: 'static' });
+      const yes = document.getElementById('appConfirmYes');
+      const no = document.getElementById('appConfirmNo');
+      function cleanup(result) {
+        yes.removeEventListener('click', onYes);
+        no.removeEventListener('click', onNo);
+        bsModal.hide();
+        resolve(result);
+      }
+      function onYes() { cleanup(true); }
+      function onNo() { cleanup(false); }
+      yes.addEventListener('click', onYes);
+      no.addEventListener('click', onNo);
+      bsModal.show();
+    });
   }
 
   // Show a Bootstrap toast notification (expose globally for other pages)
@@ -1681,7 +1721,7 @@
   async function uploadPhoto() {
     if (!requireHeaderFields()) return;
     const file = dom.photoInput.files[0];
-    if (!file) { alert('Pilih foto terlebih dahulu.'); return; }
+    if (!file) { showToast('Pilih foto terlebih dahulu.', 'warning'); return; }
 
     const formData = new FormData();
     formData.append('photo', file);
@@ -1715,7 +1755,7 @@
   async function uploadCSV() {
     if (!requireHeaderFields()) return;
     const file = dom.csvInput.files[0];
-    if (!file) { alert('Pilih file CSV/Excel terlebih dahulu.'); return; }
+    if (!file) { showToast('Pilih file CSV/Excel terlebih dahulu.', 'warning'); return; }
 
     const formData = new FormData();
     formData.append('file', file);
@@ -1731,7 +1771,7 @@
       // Auto-match all added items
       await _doMatch();
     } catch (e) {
-      alert('Import gagal: ' + e.message);
+      showToast('Import gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }
@@ -1788,7 +1828,7 @@
       .filter((i) => i.selectedArtno)
       .map(_buildItemPayload);
 
-    if (!items.length) { alert('Tidak ada item yang sudah di-match.'); return; }
+    if (!items.length) { showToast('Tidak ada item yang sudah di-match.', 'warning'); return; }
 
     showSpinner();
     try {
@@ -1805,7 +1845,7 @@
       renderPOPreview(data);
       new bootstrap.Modal(dom.poPreviewModal).show();
     } catch (e) {
-      alert('Preview gagal: ' + e.message);
+      showToast('Preview gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }
@@ -1862,7 +1902,7 @@
   // PO Commit
   // -----------------------------------------------------------------------
   async function commitPO() {
-    if (!confirm('Buat Purchase Order dan update stok?\nAksi ini tidak bisa dibatalkan.')) return;
+    if (!await showConfirm('Buat Purchase Order dan update stok? Aksi ini tidak bisa dibatalkan.')) return;
 
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
@@ -1872,7 +1912,7 @@
     // Block if any item has QTY KCL = 0
     for (const it of matched) {
       if (!it.qtyKecil || it.qtyKecil <= 0) {
-        alert(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0.\nIsi QTY KCL sebelum kirim PO.`);
+        showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim PO.`, 'danger');
         return;
       }
     }
@@ -1918,7 +1958,7 @@
         new bootstrap.Modal(dom.poSuccessModal).show();
       }, 300);
     } catch (e) {
-      alert('Commit PO gagal: ' + e.message);
+      showToast('Commit PO gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }

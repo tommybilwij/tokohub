@@ -15,7 +15,10 @@
         "width": 1280,
         "height": 800,
         "visible": true,
-        "resizable": true
+        "resizable": true,
+        "minimizable": true,
+        "maximizable": true,
+        "fullscreen": false
       }
     ]
   },

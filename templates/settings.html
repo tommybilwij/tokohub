@@ -144,15 +144,23 @@
         </p>
         {% if lan_mode %}
         <div class="mb-2">
-          <label class="form-label fw-semibold">URL Akses</label>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control" id="lanUrl" readonly
-                   value="https://{{ local_ip }}:{{ server_port }}">
-            <button class="btn btn-outline-primary" type="button" onclick="copyUrl()">
+          <label class="form-label fw-semibold">URL Akses (HTTP)</label>
+          <div class="input-group input-group-sm mb-2">
+            <input type="text" class="form-control" id="lanUrlHttp" readonly
+                   value="http://{{ local_ip }}:{{ server_port }}">
+            <button class="btn btn-outline-primary" type="button" onclick="copyUrl('lanUrlHttp')">
               <i class="bi bi-clipboard"></i> Salin
             </button>
           </div>
-          <div class="form-text">Buka URL ini dari perangkat lain di WiFi yang sama.</div>
+          <label class="form-label fw-semibold">URL Akses (HTTPS — untuk kamera)</label>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" id="lanUrlHttps" readonly
+                   value="https://{{ local_ip }}:{{ server_port + 1 }}">
+            <button class="btn btn-outline-primary" type="button" onclick="copyUrl('lanUrlHttps')">
+              <i class="bi bi-clipboard"></i> Salin
+            </button>
+          </div>
+          <div class="form-text">Gunakan HTTPS untuk akses kamera/scanner dari perangkat lain.</div>
         </div>
         {% endif %}
         <table class="table table-sm mb-0">
@@ -244,22 +252,44 @@
     }).then(r => r.json());
   }
 
+  function showRestartOverlay() {
+    let overlay = document.getElementById('restartOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'restartOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(255,255,255,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;';
+      overlay.innerHTML = '<div class="spinner-border text-warning" style="width:3rem;height:3rem;" role="status"></div>'
+        + '<div class="fw-semibold text-secondary">Server sedang restart...</div>';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+  }
+
+  function hideRestartOverlay() {
+    const overlay = document.getElementById('restartOverlay');
+    if (overlay) overlay.remove();
+  }
+
   // Trigger server restart, then poll until it's back up and reload page
   function restartServer() {
+    showRestartOverlay();
     fetch('/api/restart', { method: 'POST' }).catch(() => {});
-    window.showToast && showToast('Server sedang restart...', 'warning');
     setTimeout(() => pollUntilReady(), 1500);
   }
 
   function pollUntilReady(attempts) {
     attempts = attempts || 0;
     fetch('/health').then(r => {
-      if (r.ok) location.reload();
+      if (r.ok) {
+        hideRestartOverlay();
+        location.reload();
+      }
       else throw new Error();
     }).catch(() => {
       if (attempts < 20) {
         setTimeout(() => pollUntilReady(attempts + 1), 1000);
       } else {
+        hideRestartOverlay();
         window.showToast && showToast('Server tidak merespons, coba refresh manual', 'danger');
       }
     });
@@ -295,8 +325,8 @@
   });
 })();
 
-function copyUrl() {
-  const input = document.getElementById('lanUrl');
+function copyUrl(id) {
+  const input = document.getElementById(id);
   navigator.clipboard.writeText(input.value).then(() => {
     window.showToast && showToast('URL disalin!', 'success');
   });

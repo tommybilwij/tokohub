@@ -162,6 +162,7 @@ def api_restart():
 
     def _restart():
         import time
+        import resource
         time.sleep(0.5)  # let the response flush
         if is_running_from_reloader():
             # In debug mode: kill the parent reloader, then execv replaces this child
@@ -169,7 +170,15 @@ def api_restart():
                 os.kill(os.getppid(), signal.SIGTERM)
             except ProcessLookupError:
                 pass
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        # Close all fds except stdin/stdout/stderr to release the listening socket
+        # before exec, preventing "Address already in use" on restart.
+        soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+        os.closerange(3, soft)
+        is_frozen = getattr(sys, 'frozen', False)
+        if is_frozen:
+            os.execv(sys.executable, sys.argv)
+        else:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
 
     threading.Thread(target=_restart, daemon=True).start()
     return jsonify({'ok': True})

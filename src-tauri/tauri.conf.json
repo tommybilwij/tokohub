@@ -29,10 +29,10 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "binaries/stock-entry-server",
+      "binaries/stock-entry-server*",
       "binaries/_internal"
     ],
-    "targets": ["app"],
+    "targets": ["app", "msi", "nsis"],
     "macOS": {
       "entitlements": null,
       "signingIdentity": null,

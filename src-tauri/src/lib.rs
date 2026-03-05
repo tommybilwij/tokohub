@@ -46,14 +46,19 @@ fn load_envrc() -> HashMap<String, String> {
 }
 
 fn spawn_sidecar(app: &tauri::App) {
-    // The sidecar lives in Contents/Resources/binaries/ (not Contents/MacOS/)
-    // to avoid PyInstaller's .app bundle path detection breaking things.
+    // The sidecar lives in Contents/Resources/binaries/ (macOS) or
+    // alongside the exe in binaries/ (Windows).
     let resource_dir = app
         .path()
         .resource_dir()
         .expect("failed to get resource dir");
 
-    let sidecar_path = resource_dir.join("binaries").join("stock-entry-server");
+    let sidecar_name = if cfg!(target_os = "windows") {
+        "stock-entry-server.exe"
+    } else {
+        "stock-entry-server"
+    };
+    let sidecar_path = resource_dir.join("binaries").join(sidecar_name);
 
     log::info!("Spawning sidecar: {:?}", sidecar_path);
 
@@ -68,8 +73,8 @@ fn spawn_sidecar(app: &tauri::App) {
     let child = match Command::new(&sidecar_path)
         .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"])
         .envs(&envrc_vars)
-        .stdout(std::fs::File::create("/tmp/stock-entry-sidecar.log").unwrap())
-        .stderr(std::fs::File::create("/tmp/stock-entry-sidecar.err").unwrap())
+        .stdout(std::fs::File::create(std::env::temp_dir().join("stock-entry-sidecar.log")).unwrap())
+        .stderr(std::fs::File::create(std::env::temp_dir().join("stock-entry-sidecar.err")).unwrap())
         .spawn()
     {
         Ok(child) => child,

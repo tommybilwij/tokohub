@@ -142,7 +142,11 @@ build-sidecar:
     echo "Copying sidecar to src-tauri/binaries/..."
     mkdir -p src-tauri/binaries
     # Copy exe + _internal as Tauri resources (not externalBin)
-    cp dist/stock-entry-server/stock-entry-server src-tauri/binaries/stock-entry-server
+    if [ -f dist/stock-entry-server/stock-entry-server.exe ]; then
+        cp dist/stock-entry-server/stock-entry-server.exe src-tauri/binaries/stock-entry-server.exe
+    else
+        cp dist/stock-entry-server/stock-entry-server src-tauri/binaries/stock-entry-server
+    fi
     rm -rf src-tauri/binaries/_internal
     cp -r dist/stock-entry-server/_internal src-tauri/binaries/_internal
     echo "Sidecar ready: src-tauri/binaries/"
@@ -179,8 +183,14 @@ fix-macos-bundle:
     done
     echo "macOS bundle fixed"
 
-# Full build: sidecar + Tauri app + macOS fix
-build-app: build-sidecar build-tauri fix-macos-bundle
+# Full build: sidecar + Tauri app + platform-specific fixes
+build-app: build-sidecar build-tauri
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "$(uname -s)" in
+        Darwin) just fix-macos-bundle ;;
+        *)      echo "No post-build fixes needed on this platform" ;;
+    esac
 
 # Dev mode: build sidecar then run Tauri in dev mode
 dev-tauri: build-sidecar

@@ -230,7 +230,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
         'lines': lines,
         'grand_total': float(grand_total),
         'line_count': len(lines),
-        'shipping_cost': float(shipping),
+        'shipping_cost': float(sum(Decimal(str(item.get('shipping_cost') or 0)) for item in items) or header_shipping),
     }
 
 

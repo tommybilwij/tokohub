@@ -474,7 +474,7 @@
         if (!requireHeaderFields()) return;
         dom.searchResults.classList.add('d-none');
         addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
-                null, null, null, null);
+                parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
         dom.itemNameInput.value = '';
         dom.itemNameInput.focus();
       });
@@ -1594,7 +1594,10 @@
         if (m.artpabrik && !item.barcode) item.barcode = m.artpabrik;
         if (m.satbesar) item.satuanBsr = m.satbesar;
         if (m.packing) { item.packing = m.packing; item.qtyKecil = m.packing; }
-        // disc/ppn NOT auto-populated — user enters manually
+        if (item.disc1 == null) item.disc1 = parseFloat(m.pctdisc1) || null;
+        if (item.disc2 == null) item.disc2 = parseFloat(m.pctdisc2) || null;
+        if (item.disc3 == null) item.disc3 = parseFloat(m.pctdisc3) || null;
+        if (item.ppn == null) item.ppn = parseFloat(m.pctppn) || null;
         // Auto-populate harga jual from match
         if (!parseFloat(item.hjual1)) item.hjual1 = parseFloat(m.hjual) || null;
         if (!parseFloat(item.hjual2)) item.hjual2 = parseFloat(m.hjual2) || null;
@@ -1723,7 +1726,10 @@
     if (match.artpabrik) item.barcode = match.artpabrik;
     if (match.satbesar) item.satuanBsr = match.satbesar;
     if (match.packing) { item.packing = match.packing; item.qtyKecil = match.packing; }
-    // disc/ppn NOT auto-populated — user enters manually
+    item.disc1 = parseFloat(match.pctdisc1) || null;
+    item.disc2 = parseFloat(match.pctdisc2) || null;
+    item.disc3 = parseFloat(match.pctdisc3) || null;
+    item.ppn = parseFloat(match.pctppn) || null;
     item.hjual1 = parseFloat(match.hjual) || null;
     item.hjual2 = parseFloat(match.hjual2) || null;
     item.hjual3 = parseFloat(match.hjual3) || null;

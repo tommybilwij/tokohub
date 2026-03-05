@@ -243,7 +243,8 @@
     if (el) el.remove();
   }
 
-  // Show a Bootstrap toast notification
+  // Show a Bootstrap toast notification (expose globally for other pages)
+  window.showToast = showToast;
   function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     if (!container) return;

@@ -13,3 +13,9 @@ logs/
 backups/
 .DS_Store
 .ssl/
+
+# Tauri / PyInstaller build artifacts
+src-tauri/target/
+src-tauri/binaries/
+dist/
+build/

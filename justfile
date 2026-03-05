@@ -1,6 +1,7 @@
-# Stock Entry MyPosse
+# TokoHub
 
 set dotenv-load
+set dotenv-filename := ".envrc"
 
 db_host := env("DB_HOST", "127.0.0.1")
 db_port := env("DB_PORT", "3388")
@@ -21,9 +22,13 @@ install:
 run:
     uv run python app.py
 
+# Kill leftover process on the server port
+kill-port:
+    -lsof -ti :${SERVER_PORT:-5000} | xargs kill 2>/dev/null || true
+
 # Run on a specific port
 run-port port="5000":
-    uv run flask run --host 0.0.0.0 --port {{port}} --debug
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload
 
 # Initialize local MariaDB data directory
 db-init:
@@ -123,6 +128,81 @@ check-stock:
 # Full setup: install deps, start db, import data, run migrations
 setup: install db-import migrate
     @echo "Setup complete! Run 'just run' to start the app."
+
+# ---------------------------------------------------------------------------
+# Tauri / PyInstaller build
+# ---------------------------------------------------------------------------
+
+# Build the PyInstaller sidecar and copy to src-tauri/binaries/
+build-sidecar:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Building PyInstaller sidecar..."
+    uv run --group dev pyinstaller pyinstaller.spec --noconfirm --clean
+    echo "Copying sidecar to src-tauri/binaries/..."
+    mkdir -p src-tauri/binaries
+    # Copy exe + _internal as Tauri resources (not externalBin)
+    if [ -f dist/tokohub-server/tokohub-server.exe ]; then
+        cp dist/tokohub-server/tokohub-server.exe src-tauri/binaries/tokohub-server.exe
+    else
+        cp dist/tokohub-server/tokohub-server src-tauri/binaries/tokohub-server
+    fi
+    rm -rf src-tauri/binaries/_internal
+    cp -r dist/tokohub-server/_internal src-tauri/binaries/_internal
+    echo "Sidecar ready: src-tauri/binaries/"
+
+# Build the Tauri desktop app
+build-tauri:
+    cargo tauri build
+
+# Fix macOS .app bundle so PyInstaller sidecar works.
+# PyInstaller bootloader detects Contents/MacOS/ and looks for resources in
+# Contents/Resources/ and libpython in Contents/Frameworks/.
+fix-macos-bundle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    APP=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
+    if [ -z "$APP" ]; then echo "No .app bundle found"; exit 1; fi
+    INTERNAL_SRC="$APP/Contents/Resources/binaries/_internal"
+    RESOURCES_DIR="$APP/Contents/Resources"
+    FRAMEWORKS_DIR="$APP/Contents/Frameworks"
+
+    # 1. Copy _internal contents into Contents/Resources/ (where PyInstaller looks in .app)
+    echo "Copying PyInstaller runtime to Contents/Resources/..."
+    cp -Rn "$INTERNAL_SRC"/* "$RESOURCES_DIR/" 2>/dev/null || true
+
+    # 2. Copy libpython into Frameworks/ (PyInstaller bootloader looks here in .app)
+    mkdir -p "$FRAMEWORKS_DIR"
+    for dylib in "$INTERNAL_SRC"/libpython*.dylib; do
+        [ -f "$dylib" ] || continue
+        fname=$(basename "$dylib")
+        if [ ! -e "$FRAMEWORKS_DIR/$fname" ]; then
+            cp "$dylib" "$FRAMEWORKS_DIR/$fname"
+            echo "Copied Frameworks/$fname"
+        fi
+    done
+    echo "macOS bundle fixed"
+
+# Full build: sidecar + Tauri app + platform-specific fixes
+build-app: build-sidecar build-tauri
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "$(uname -s)" in
+        Darwin) just fix-macos-bundle ;;
+        *)      echo "No post-build fixes needed on this platform" ;;
+    esac
+
+# Dev mode: build sidecar then run Tauri in dev mode
+dev-tauri: build-sidecar
+    cargo tauri dev
+
+# Clean all build artifacts
+clean-build:
+    rm -rf dist/ build/ src-tauri/binaries/ src-tauri/target/
+
+# ---------------------------------------------------------------------------
+# Database management
+# ---------------------------------------------------------------------------
 
 # Clean up local MariaDB data directory
 db-clean: db-stop

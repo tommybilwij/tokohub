@@ -14,7 +14,11 @@ from cryptography.x509.oid import NameOID
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / '.ssl'
+if getattr(__import__('sys'), 'frozen', False):
+    # Frozen PyInstaller: _MEIPASS is read-only, use user data dir instead
+    _DEFAULT_CERT_DIR = Path.home() / '.tokohub' / '.ssl'
+else:
+    _DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / '.ssl'
 _CERT_FILENAME = 'cert.pem'
 _KEY_FILENAME = 'key.pem'
 
@@ -32,6 +36,7 @@ def _get_local_ip() -> str | None:
 def generate_self_signed_cert(
     cert_dir: Path | str = _DEFAULT_CERT_DIR,
     days_valid: int = 365,
+    mdns_hostname: str = 'tokohub',
 ) -> tuple[str, str]:
     """Generate a self-signed cert with SANs for localhost + LAN IP.
 
@@ -47,6 +52,7 @@ def generate_self_signed_cert(
 
     san_entries: list[x509.GeneralName] = [
         x509.DNSName('localhost'),
+        x509.DNSName(f'{mdns_hostname}.local'),
         x509.IPAddress(ipaddress.IPv4Address('127.0.0.1')),
     ]
     local_ip = _get_local_ip()
@@ -82,13 +88,33 @@ def generate_self_signed_cert(
     return str(cert_path), str(key_path)
 
 
-def ensure_ssl_cert(cert_dir: Path | str = _DEFAULT_CERT_DIR) -> tuple[str, str]:
-    """Return (cert_path, key_path), generating if missing."""
+def _cert_is_valid(cert_path: Path, min_remaining_days: int = 30) -> bool:
+    """Check if an existing certificate is still valid for at least min_remaining_days."""
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        remaining = cert.not_valid_after_utc - datetime.now(timezone.utc)
+        if remaining.total_seconds() <= 0:
+            logger.warning("SSL cert has expired")
+            return False
+        if remaining.days < min_remaining_days:
+            logger.warning("SSL cert expires in %d days, will regenerate", remaining.days)
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("Could not read SSL cert for expiry check: %s", exc)
+        return False
+
+
+def ensure_ssl_cert(
+    cert_dir: Path | str = _DEFAULT_CERT_DIR,
+    mdns_hostname: str = 'tokohub',
+) -> tuple[str, str]:
+    """Return (cert_path, key_path), generating if missing or expiring within 30 days."""
     cert_dir = Path(cert_dir)
     cert_path = cert_dir / _CERT_FILENAME
     key_path = cert_dir / _KEY_FILENAME
 
-    if cert_path.exists() and key_path.exists():
+    if cert_path.exists() and key_path.exists() and _cert_is_valid(cert_path):
         return str(cert_path), str(key_path)
 
-    return generate_self_signed_cert(cert_dir)
+    return generate_self_signed_cert(cert_dir, mdns_hostname=mdns_hostname)

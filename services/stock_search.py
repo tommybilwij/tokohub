@@ -1,4 +1,4 @@
-"""Fuzzy matching engine for stock items."""
+"""Fuzzy matching engine for stock items (async)."""
 
 import re
 import time
@@ -8,7 +8,6 @@ from rapidfuzz import fuzz
 
 from config import settings
 from services.db import execute_query, execute_single
-from services.alias_service import find_by_alias
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +44,14 @@ def _extract_sizes(text):
     return {(num, unit.upper()) for num, unit in matches}
 
 
-def _load_stock_cache():
+async def _load_stock_cache(pool):
     """Refresh the in-memory stock list if stale."""
     now = time.time()
     if _stock_cache['items'] and (now - _stock_cache['timestamp']) < settings.fuzzy_cache_ttl:
         return _stock_cache['items']
 
-    rows = execute_query(
+    rows = await execute_query(
+        pool,
         """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                   packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5
@@ -99,12 +99,13 @@ def _compute_score(query_normalized, query_sizes, candidate):
     return round(composite, 1)
 
 
-def _fetch_bundlings(artno_list):
+async def _fetch_bundlings(pool, artno_list):
     """Fetch bundling (itempaket) data for a list of artnos."""
     if not artno_list:
         return {}
     placeholders = ','.join(['%s'] * len(artno_list))
-    rows = execute_query(
+    rows = await execute_query(
+        pool,
         f"""SELECT artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5
             FROM itempaket
             WHERE artno IN ({placeholders})
@@ -124,11 +125,12 @@ def _fetch_bundlings(artno_list):
     return result
 
 
-def search_stock(query, top_n=None, min_score=None, score_against=None):
+async def search_stock(pool, query, top_n=None, min_score=None, score_against=None):
     """
     Multi-pass search for stock items.
 
     Args:
+        pool: aiomysql connection pool
         query: Search text
         top_n: Max results
         min_score: Minimum fuzzy score
@@ -138,6 +140,8 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
     Returns list of dicts: [{artno, artname, score, match_type, ...}]
     Match types: 'alias', 'barcode', 'fuzzy'
     """
+    from services.alias_service import find_by_alias
+
     top_n = top_n or settings.fuzzy_top_n
     min_score = min_score if min_score is not None else settings.fuzzy_min_score
     query = query.strip()
@@ -147,9 +151,10 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
     pinned = []
 
     # Pass 1: Alias lookup
-    alias_artno = find_by_alias(query)
+    alias_artno = await find_by_alias(pool, query)
     if alias_artno:
-        stock = execute_single(
+        stock = await execute_single(
+            pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                       packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5
@@ -163,7 +168,8 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
 
     # Pass 2: Barcode match (numeric strings, or any string that looks like a barcode/artpabrik)
     if re.match(r'^\d{4,}$', query) or re.match(r'^[A-Z0-9-]{4,}$', query, re.IGNORECASE):
-        stock = execute_single(
+        stock = await execute_single(
+            pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                       packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5
@@ -177,7 +183,7 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
 
     # Pass 3: Fuzzy match against cached items
     pinned_artnos = {p['artno'] for p in pinned}
-    items = _load_stock_cache()
+    items = await _load_stock_cache(pool)
     query_normalized = _normalize_text(query)
     query_sizes = _extract_sizes(query)
 
@@ -203,7 +209,7 @@ def search_stock(query, top_n=None, min_score=None, score_against=None):
 
     # Attach bundling data from itempaket
     artno_list = [r['artno'] for r in results]
-    bundling_map = _fetch_bundlings(artno_list)
+    bundling_map = await _fetch_bundlings(pool, artno_list)
     for r in results:
         r['_bundlings'] = bundling_map.get(r['artno'], [])
 

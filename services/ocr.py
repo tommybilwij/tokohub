@@ -32,13 +32,13 @@ If you cannot determine packing, default to 1. If you cannot determine price, de
 """
 
 
-def extract_lines(image_path):
+async def extract_lines(image_path):
     """Run GPT-4o vision on a receipt image and parse structured lines.
 
     Returns list of dicts: [{name, qty, price, raw_line}]
     """
     try:
-        raw = vision_completion(image_path, _EXTRACT_PROMPT, temperature=0)
+        raw = await vision_completion(image_path, _EXTRACT_PROMPT, temperature=0)
     except Exception:
         logger.exception("LLM vision call failed for %s", image_path)
         return []

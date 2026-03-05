@@ -40,6 +40,8 @@ os.makedirs(settings.upload_folder, exist_ok=True)
 _lan_active: bool = False
 _https_port: int | None = None
 _setup_done: bool = False
+_http_server = None
+_https_server = None
 
 _SETUP_PASSTHROUGH = ('/setup', '/api/setup', '/api/settings', '/health', '/static')
 
@@ -221,8 +223,12 @@ def api_restart():
                 os.kill(os.getppid(), signal.SIGTERM)
             except ProcessLookupError:
                 pass
-        # Close all fds except stdin/stdout/stderr to release the listening socket
+        # Gracefully close server sockets so the OS releases the port
         # before exec, preventing "Address already in use" on restart.
+        if _https_server:
+            _https_server.server_close()
+        if _http_server:
+            _http_server.server_close()
         soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
         os.closerange(3, soft)
         is_frozen = getattr(sys, 'frozen', False)
@@ -684,7 +690,7 @@ def _parse_args():
 
 
 def main():
-    global _lan_active, _https_port
+    global _lan_active, _https_port, _http_server, _https_server
 
     args = _parse_args()
     _ensure_schema()
@@ -741,6 +747,7 @@ def main():
                     logger.info("Cannot bind port %d (%s), trying next", try_port, e)
             if https_port:
                 _https_port = https_port
+                _https_server = https_server
                 threading.Thread(target=https_server.serve_forever, daemon=True).start()
                 logger.info("HTTPS LAN server on port %d", https_port)
                 # Register mDNS so devices can reach us at <hostname>.local
@@ -764,7 +771,13 @@ def main():
         except Exception:
             logger.warning("Could not start HTTPS LAN server", exc_info=True)
 
-    app.run(host=host, port=port, debug=use_debug, ssl_context=ssl_context)
+    if is_frozen:
+        from werkzeug.serving import make_server
+        _http_server = make_server(host, port, app, threaded=True)
+        logger.info("Serving on %s:%d", host, port)
+        _http_server.serve_forever()
+    else:
+        app.run(host=host, port=port, debug=use_debug, ssl_context=ssl_context)
 
 
 if __name__ == '__main__':

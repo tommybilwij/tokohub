@@ -628,10 +628,6 @@ body {
   border-top: 1px dashed var(--clr-accent-100);
 }
 
-.beli-row-shipping {
-  cursor: help;
-}
-
 .beli-row-foc .bt-label,
 .beli-row-shipping .bt-label {
   font-weight: var(--fw-semibold);
@@ -647,10 +643,9 @@ body {
   font-size: var(--fs-base);
 }
 
-.beli-row-shipping .bt-shipping-val {
-  flex: 1;
-  text-align: center;
-  font-weight: var(--fw-semibold);
+.beli-row-shipping .edit-bkirim {
+  width: 100px;
+  margin: 0 8px;
 }
 
 .dp-netto-val {

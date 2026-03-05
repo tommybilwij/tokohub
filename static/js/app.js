@@ -29,7 +29,7 @@
     orderDate:       $('#orderDate'),
     itemNameInput:   $('#itemNameInput'),
     btnAddItem:      $('#btnAddItem'),
-    shippingCostInput: $('#shippingCostInput'),
+    shippingCostInput: null, // removed — now per-item
     searchResults:   $('#searchResults'),
     itemTableBody:   $('#itemTableBody'),
     itemCount:       $('#itemCount'),
@@ -118,7 +118,6 @@
           user: dom.userSelect ? dom.userSelect.value : '',
           vendor: dom.vendorSelect ? dom.vendorSelect.value : '',
           orderDate: dom.orderDate ? dom.orderDate.value : '',
-          shippingCost: dom.shippingCostInput ? dom.shippingCostInput.value : '',
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -142,6 +141,7 @@
         item.disc2 = parseFloat(item.disc2) || null;
         item.disc3 = parseFloat(item.disc3) || null;
         item.ppn = parseFloat(item.ppn) || null;
+        item.bkirim = parseFloat(item.bkirim) || 0;
         // Sanitize hjual — NaN from old buggy auto-adjust
         ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
           if (item[f] != null && isNaN(item[f])) item[f] = null;
@@ -196,10 +196,6 @@
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
         if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
-        if (draft.header.shippingCost && dom.shippingCostInput) {
-          const sc = parsePrice(draft.header.shippingCost);
-          dom.shippingCostInput.value = sc ? formatNumber(sc) : '0.00';
-        }
       }
 
       return true;
@@ -385,11 +381,14 @@
     dom.vendorSelect.addEventListener('change', _saveStateDebounced);
     dom.orderDate.addEventListener('change', _saveStateDebounced);
 
-    // Shipping cost: format on blur + recalc all items
-    dom.shippingCostInput.addEventListener('change', () => {
-      const val = parsePrice(dom.shippingCostInput.value);
-      dom.shippingCostInput.value = val ? formatNumber(val) : '0.00';
-      state.items.forEach((_, idx) => _updateComputedPrices(idx));
+    // Per-item shipping cost: delegate change events
+    document.addEventListener('change', (e) => {
+      if (!e.target.matches('.edit-bkirim')) return;
+      const idx = parseInt(e.target.dataset.idx);
+      const val = parsePrice(e.target.value);
+      e.target.value = val ? formatNumber(val) : '';
+      state.items[idx].bkirim = val || 0;
+      _updateComputedPrices(idx);
       _saveStateDebounced();
     });
 
@@ -579,7 +578,6 @@
   function clearAllItems() {
     if (state.items.length === 0) return;
     state.items = [];
-    dom.shippingCostInput.value = '0.00';
     renderItemTable();
     showToast('Semua item dihapus', 'info');
   }
@@ -675,15 +673,10 @@
       };
     }
 
-    // Current netto per pcs (including shipping)
+    // Current netto per pcs (including per-item shipping)
     const hbelibsr = item.priceBsr || 0;
     const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
-    const totalShipping = parsePrice(dom.shippingCostInput.value);
-    let shippingForItem = 0;
-    if (totalShipping > 0) {
-      const itemCount = state.items.length;
-      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
-    }
+    const shippingForItem = item.bkirim || 0;
     const finalBsr = net.final + shippingForItem;
     const qtyKcl = item.packing || 1;
     const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
@@ -757,15 +750,8 @@
       if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
     });
 
-    // Shipping cost divided equally per item
-    const totalShipping = parsePrice(dom.shippingCostInput.value);
-    let shippingForItem = 0;
-    if (totalShipping > 0) {
-      const itemCount = state.items.length;
-      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
-    }
-    const shippingValEl = document.querySelector(`.bt-shipping-val[data-idx="${idx}"]`);
-    if (shippingValEl) shippingValEl.textContent = shippingForItem ? formatNumber(shippingForItem) : '—';
+    // Per-item shipping cost
+    const shippingForItem = item.bkirim || 0;
 
     // Netto /Bsr and /Pcs (final = netto + ppn + shipping for this item)
     const finalBsr = net.final + shippingForItem;
@@ -1082,9 +1068,10 @@
                        value="${item.foc || ''}" placeholder="0" min="0" step="1">
                 <span class="bt-unit">Pcs</span>
               </div>
-              <div class="beli-row-shipping" title="Dari input Biaya Kirim di bawah, dibagi rata per item">
+              <div class="beli-row-shipping">
                 <span class="bt-label">B.Kirim</span>
-                <span class="bt-shipping-val" data-idx="${idx}">—</span>
+                <input type="text" class="amt-input edit-bkirim" data-idx="${idx}"
+                       value="${item.bkirim ? formatNumber(item.bkirim) : ''}" placeholder="0" inputmode="decimal">
               </div>
               <div class="dp-netto-row">
                 <span class="dp-label">Netto</span>
@@ -1810,6 +1797,7 @@
       hjual5_override: i.hjual5,
       satuan_bsr: i.satuanBsr,
       packing_override: i.qtyKecil || i.packing || 0,
+      shipping_cost: i.bkirim || 0,
     };
     const b1 = _buildBundlingPayload(i.bundling1);
     const b2 = _buildBundlingPayload(i.bundling2);
@@ -1823,7 +1811,6 @@
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
 
-    const shippingCost = parsePrice(dom.shippingCostInput.value);
     const items = state.items
       .filter((i) => i.selectedArtno)
       .map(_buildItemPayload);
@@ -1838,7 +1825,6 @@
           supplier_id: supplierId,
           items,
           order_date: dom.orderDate.value,
-          shipping_cost: shippingCost,
         },
       });
 
@@ -1906,7 +1892,6 @@
 
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
-    const shippingCost = parsePrice(dom.shippingCostInput.value);
     const matched = state.items.filter((i) => i.selectedArtno);
 
     // Block if any item has QTY KCL = 0
@@ -1928,7 +1913,6 @@
           userid: userId,
           items,
           order_date: dom.orderDate.value,
-          shipping_cost: shippingCost,
         },
       });
 

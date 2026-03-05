@@ -604,7 +604,7 @@ body {
 
 /* Inputs inside beli-table */
 .beli-table .pct-input {
-  width: 78px;
+  width: 90px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);
@@ -616,7 +616,7 @@ body {
 }
 
 .beli-table .amt-input {
-  width: 82px;
+  width: 120px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);
@@ -629,7 +629,7 @@ body {
 }
 
 .beli-table .amt-total {
-  width: 100px;
+  width: 140px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);

@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     server_host: str = '127.0.0.1'
 
     # LAN mode
-    lan_mode: bool = False
+    lan_mode: bool = True
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)

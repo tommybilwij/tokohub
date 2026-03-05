@@ -128,9 +128,6 @@ setup: install db-import migrate
 # Tauri / PyInstaller build
 # ---------------------------------------------------------------------------
 
-# Get the Rust target triple for sidecar naming
-_target-triple := `rustc --print host-tuple 2>/dev/null || rustc -vV | grep '^host:' | cut -d' ' -f2`
-
 # Build the PyInstaller sidecar and copy to src-tauri/binaries/
 build-sidecar:
     #!/usr/bin/env bash
@@ -139,24 +136,46 @@ build-sidecar:
     uv run --group dev pyinstaller pyinstaller.spec --noconfirm --clean
     echo "Copying sidecar to src-tauri/binaries/..."
     mkdir -p src-tauri/binaries
-    TRIPLE="{{_target-triple}}"
-    # Copy the executable with target-triple naming
-    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-        cp dist/stock-entry-server/stock-entry-server.exe "src-tauri/binaries/stock-entry-server-${TRIPLE}.exe"
-    else
-        cp dist/stock-entry-server/stock-entry-server "src-tauri/binaries/stock-entry-server-${TRIPLE}"
-    fi
-    # Copy _internal directory for PyInstaller runtime
+    # Copy exe + _internal as Tauri resources (not externalBin)
+    cp dist/stock-entry-server/stock-entry-server src-tauri/binaries/stock-entry-server
     rm -rf src-tauri/binaries/_internal
     cp -r dist/stock-entry-server/_internal src-tauri/binaries/_internal
-    echo "Sidecar ready: src-tauri/binaries/stock-entry-server-${TRIPLE}"
+    echo "Sidecar ready: src-tauri/binaries/"
 
 # Build the Tauri desktop app
 build-tauri:
     cargo tauri build
 
-# Full build: sidecar + Tauri app
-build-app: build-sidecar build-tauri
+# Fix macOS .app bundle so PyInstaller sidecar works.
+# PyInstaller bootloader detects Contents/MacOS/ and looks for resources in
+# Contents/Resources/ and libpython in Contents/Frameworks/.
+fix-macos-bundle:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    APP=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
+    if [ -z "$APP" ]; then echo "No .app bundle found"; exit 1; fi
+    INTERNAL_SRC="$APP/Contents/Resources/binaries/_internal"
+    RESOURCES_DIR="$APP/Contents/Resources"
+    FRAMEWORKS_DIR="$APP/Contents/Frameworks"
+
+    # 1. Copy _internal contents into Contents/Resources/ (where PyInstaller looks in .app)
+    echo "Copying PyInstaller runtime to Contents/Resources/..."
+    cp -Rn "$INTERNAL_SRC"/* "$RESOURCES_DIR/" 2>/dev/null || true
+
+    # 2. Copy libpython into Frameworks/ (PyInstaller bootloader looks here in .app)
+    mkdir -p "$FRAMEWORKS_DIR"
+    for dylib in "$INTERNAL_SRC"/libpython*.dylib; do
+        [ -f "$dylib" ] || continue
+        fname=$(basename "$dylib")
+        if [ ! -e "$FRAMEWORKS_DIR/$fname" ]; then
+            cp "$dylib" "$FRAMEWORKS_DIR/$fname"
+            echo "Copied Frameworks/$fname"
+        fi
+    done
+    echo "macOS bundle fixed"
+
+# Full build: sidecar + Tauri app + macOS fix
+build-app: build-sidecar build-tauri fix-macos-bundle
 
 # Dev mode: build sidecar then run Tauri in dev mode
 dev-tauri: build-sidecar

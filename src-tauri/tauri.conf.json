@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.tokosegar.stock-entry",
   "build": {
-    "frontendDist": false
+    "frontendDist": "./frontend-dist"
   },
   "app": {
     "windows": [
@@ -28,19 +28,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/stock-entry-server"
+    "resources": [
+      "binaries/stock-entry-server",
+      "binaries/_internal"
     ],
-    "resources": {
-      "binaries/_internal/**": "_internal/"
-    },
-    "targets": "all"
-  },
-  "plugins": {
-    "shell": {
-      "scope": {
-        "sidecar": true
-      }
-    }
+    "targets": ["app"]
   }
 }

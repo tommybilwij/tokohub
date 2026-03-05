@@ -1,10 +1,9 @@
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::Manager;
 use tauri::RunEvent;
-use tauri_plugin_shell::ShellExt;
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 const PORT: u16 = 5000;
 const HEALTH_URL: &str = "http://127.0.0.1:5000/health";
@@ -12,73 +11,44 @@ const HEALTH_POLL_MS: u64 = 500;
 const HEALTH_TIMEOUT_S: u64 = 30;
 
 struct SidecarState {
-    child: Option<CommandChild>,
-}
-
-/// On macOS, PyInstaller --onedir needs `_internal/` adjacent to the exe.
-/// Tauri puts externalBin in Contents/MacOS/ and resources in Contents/Resources/.
-/// Create a symlink: Contents/MacOS/_internal → Contents/Resources/_internal
-#[cfg(target_os = "macos")]
-fn fix_macos_internal_dir(app: &tauri::App) {
-    use std::fs;
-    use std::os::unix::fs as unix_fs;
-
-    let resource_dir = app.path().resource_dir().ok();
-    if let Some(res_dir) = resource_dir {
-        let internal_src = res_dir.join("_internal");
-        if internal_src.exists() {
-            // The exe lives in Contents/MacOS/
-            if let Some(macos_dir) = res_dir.parent() {
-                let macos_internal = macos_dir.join("MacOS").join("_internal");
-                if !macos_internal.exists() {
-                    if let Err(e) = unix_fs::symlink(&internal_src, &macos_internal) {
-                        log::warn!("Failed to symlink _internal: {}", e);
-                    } else {
-                        log::info!("Symlinked _internal for PyInstaller");
-                    }
-                }
-            }
-        }
-    }
+    child: Option<Child>,
 }
 
 fn spawn_sidecar(app: &tauri::App) {
-    #[cfg(target_os = "macos")]
-    fix_macos_internal_dir(app);
+    // The sidecar lives in Contents/Resources/binaries/ (not Contents/MacOS/)
+    // to avoid PyInstaller's .app bundle path detection breaking things.
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .expect("failed to get resource dir");
 
-    let shell = app.shell();
-    let cmd = shell
-        .sidecar("stock-entry-server")
-        .expect("failed to create sidecar command")
-        .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"]);
+    let sidecar_path = resource_dir.join("binaries").join("stock-entry-server");
 
-    let (mut rx, child) = cmd.spawn().expect("failed to spawn sidecar");
+    log::info!("Spawning sidecar: {:?}", sidecar_path);
 
-    // Store child handle for cleanup
-    let state = app.state::<Mutex<SidecarState>>();
-    {
-        let mut s = state.lock().unwrap();
-        s.child = Some(child);
+    if !sidecar_path.exists() {
+        log::error!("Sidecar not found at {:?}", sidecar_path);
+        return;
     }
 
-    // Forward sidecar stdout/stderr to logs
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => {
-                    log::info!("[flask] {}", String::from_utf8_lossy(&line));
-                }
-                CommandEvent::Stderr(line) => {
-                    log::warn!("[flask] {}", String::from_utf8_lossy(&line));
-                }
-                CommandEvent::Terminated(payload) => {
-                    log::info!("[flask] terminated: {:?}", payload);
-                    break;
-                }
-                _ => {}
-            }
+    let child = match Command::new(&sidecar_path)
+        .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(e) => {
+            log::error!("Failed to spawn sidecar: {}", e);
+            return;
         }
-    });
+    };
+
+    log::info!("Sidecar started (pid {})", child.id());
+
+    let state = app.state::<Mutex<SidecarState>>();
+    let mut s = state.lock().unwrap();
+    s.child = Some(child);
 }
 
 fn poll_health_and_show(app_handle: tauri::AppHandle) {
@@ -112,9 +82,10 @@ fn poll_health_and_show(app_handle: tauri::AppHandle) {
 fn kill_sidecar(app: &tauri::AppHandle) {
     let state = app.state::<Mutex<SidecarState>>();
     let mut s = state.lock().unwrap();
-    if let Some(child) = s.child.take() {
-        log::info!("Killing Flask sidecar");
+    if let Some(mut child) = s.child.take() {
+        log::info!("Killing Flask sidecar (pid {})", child.id());
         let _ = child.kill();
+        let _ = child.wait();
     }
 }
 
@@ -122,7 +93,6 @@ pub fn run() {
     env_logger::init();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(SidecarState { child: None }))
         .setup(|app| {
             spawn_sidecar(app);

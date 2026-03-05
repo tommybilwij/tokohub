@@ -1128,14 +1128,14 @@
             <div class="dp-section dp-jual-wrapper">
               <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
                 ? ` <span class="auto-adjust-group">
-                       <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
-                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
-                       </button>
                        <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct-all" data-idx="${idx}">
                          <i class="bi bi-percent"></i> Ikuti Margin %
                        </button>
                        <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-all" data-idx="${idx}">
                          <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+                       </button>
+                       <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
+                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
                        </button>
                      </span>`
                 : ''}</div>

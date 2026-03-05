@@ -155,12 +155,20 @@ def api_settings_post():
 
 @app.route('/api/restart', methods=['POST'])
 def api_restart():
-    """Restart the server process. Works in both dev (uv run) and Tauri sidecar mode."""
+    """Restart the server process. Works in both dev and Tauri sidecar mode."""
+    import signal
     import threading
+    from werkzeug.serving import is_running_from_reloader
 
     def _restart():
         import time
         time.sleep(0.5)  # let the response flush
+        if is_running_from_reloader():
+            # In debug mode: kill the parent reloader, then execv replaces this child
+            try:
+                os.kill(os.getppid(), signal.SIGTERM)
+            except ProcessLookupError:
+                pass
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     threading.Thread(target=_restart, daemon=True).start()

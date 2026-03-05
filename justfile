@@ -1,6 +1,7 @@
 # Stock Entry MyPosse
 
 set dotenv-load
+set dotenv-filename := ".envrc"
 
 db_host := env("DB_HOST", "127.0.0.1")
 db_port := env("DB_PORT", "3388")
@@ -17,10 +18,13 @@ default:
 install:
     uv sync
 
-# Kill any leftover process on the server port and run the dev server
+# Run the dev server
 run:
-    -lsof -ti :${SERVER_PORT:-5000} | xargs kill 2>/dev/null || true
     uv run python app.py
+
+# Kill leftover process on the server port
+kill-port:
+    -lsof -ti :${SERVER_PORT:-5000} | xargs kill 2>/dev/null || true
 
 # Run on a specific port
 run-port port="5000":

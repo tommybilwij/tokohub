@@ -36,11 +36,8 @@
             <label class="form-label">Pool Size</label>
             <input type="number" class="form-control form-control-sm" name="db.pool_size" min="1" max="50">
           </div>
-          <div class="col-12 d-flex align-items-center gap-2 mt-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-save"></i> Simpan
-            </button>
-            <button type="button" class="btn btn-warning btn-sm btn-save-restart" data-form="formDb">
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formDb">
               <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
             </button>
           </div>
@@ -124,11 +121,8 @@
               <label class="form-check-label" for="lanModeCheck">LAN Mode</label>
             </div>
           </div>
-          <div class="col-12 d-flex align-items-center gap-2 mt-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-save"></i> Simpan
-            </button>
-            <button type="button" class="btn btn-warning btn-sm btn-save-restart" data-form="formServer">
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formServer">
               <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
             </button>
           </div>
@@ -271,17 +265,24 @@
     });
   }
 
+  const restartForms = new Set(['formDb', 'formServer']);
+
   // Attach save handler to each form
   document.querySelectorAll('form[id^="form"]').forEach(form => {
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
+      const needsRestart = restartForms.has(form.id);
 
       saveForm(form)
         .then(res => {
           if (res.ok) {
-            window.showToast && showToast('Pengaturan disimpan!', 'success');
+            if (needsRestart) {
+              restartServer();
+            } else {
+              window.showToast && showToast('Pengaturan disimpan!', 'success');
+            }
           } else {
             window.showToast && showToast('Gagal: ' + (res.error || 'Unknown'), 'danger');
           }
@@ -289,30 +290,7 @@
         .catch(err => {
           window.showToast && showToast('Error: ' + err.message, 'danger');
         })
-        .finally(() => { btn.disabled = false; });
-    });
-  });
-
-  // Attach save & restart handler
-  document.querySelectorAll('.btn-save-restart').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const formId = btn.dataset.form;
-      const form = document.getElementById(formId);
-      btn.disabled = true;
-
-      saveForm(form)
-        .then(res => {
-          if (res.ok) {
-            restartServer();
-          } else {
-            window.showToast && showToast('Gagal simpan: ' + (res.error || 'Unknown'), 'danger');
-            btn.disabled = false;
-          }
-        })
-        .catch(err => {
-          window.showToast && showToast('Error: ' + err.message, 'danger');
-          btn.disabled = false;
-        });
+        .finally(() => { if (!needsRestart) btn.disabled = false; });
     });
   });
 })();

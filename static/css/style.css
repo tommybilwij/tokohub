@@ -503,7 +503,7 @@ body {
   align-items: center;
   gap: 0.5rem;
   /* Match bundling header height (checkbox + qty input) */
-  min-height: 28px;
+  min-height: 38px;
 }
 
 /* -----------------------------------------------------------------------

@@ -9,7 +9,7 @@ import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, redirect, Response
 from werkzeug.utils import secure_filename
 
 # Resolve base directory (supports PyInstaller frozen builds)
@@ -56,6 +56,11 @@ def _allowed_file(filename):
 
 @app.route('/')
 def index():
+    return redirect('/scanner')
+
+
+@app.route('/entry')
+def entry_page():
     return render_template('receipt_form.html')
 
 

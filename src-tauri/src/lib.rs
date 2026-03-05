@@ -34,7 +34,10 @@ fn load_envrc() -> HashMap<String, String> {
                 // Strip optional "export " prefix
                 let kv = trimmed.strip_prefix("export ").unwrap_or(trimmed);
                 if let Some((key, value)) = kv.split_once('=') {
-                    envs.insert(key.trim().to_string(), value.trim().to_string());
+                    let v = value.trim();
+                    let v = v.strip_prefix('"').unwrap_or(v);
+                    let v = v.strip_suffix('"').unwrap_or(v);
+                    envs.insert(key.trim().to_string(), v.to_string());
                 }
             }
             log::info!("Loaded {} env vars from {:?}", envs.len(), path);

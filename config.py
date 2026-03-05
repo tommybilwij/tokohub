@@ -221,7 +221,7 @@ def save_to_envrc(data: dict) -> None:
         matched = False
         for env_var, value in env_updates.items():
             if stripped.startswith(f'export {env_var}=') or stripped.startswith(f'{env_var}='):
-                new_lines.append(f'export {env_var}={value}')
+                new_lines.append(f'export {env_var}="{value}"')
                 handled.add(env_var)
                 matched = True
                 break
@@ -231,7 +231,7 @@ def save_to_envrc(data: dict) -> None:
     # Append any new keys not already in the file
     for env_var, value in env_updates.items():
         if env_var not in handled:
-            new_lines.append(f'export {env_var}={value}')
+            new_lines.append(f'export {env_var}="{value}"')
 
     envrc_path.write_text('\n'.join(new_lines) + '\n', encoding='utf-8')
 

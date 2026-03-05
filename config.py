@@ -13,7 +13,7 @@ _BASE_DIR = Path(__file__).parent
 
 # Determine .envrc location: frozen builds use a stable user-writable path
 if getattr(sys, 'frozen', False):
-    _USER_DATA_DIR = Path.home() / 'tohohub'
+    _USER_DATA_DIR = Path.home() / '.tokohub'
     _ENVRC_PATH =  _USER_DATA_DIR / '.envrc'
 else:
     _USER_DATA_DIR = _BASE_DIR

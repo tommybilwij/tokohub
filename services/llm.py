@@ -1,25 +1,25 @@
-"""Reusable Azure OpenAI client."""
+"""Reusable async Azure OpenAI client."""
 
 import base64
 import logging
 import mimetypes
 from pathlib import Path
 
-from openai import AzureOpenAI
+from openai import AsyncAzureOpenAI
 
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: AzureOpenAI | None = None
+_client: AsyncAzureOpenAI | None = None
 
 
-def _get_client() -> AzureOpenAI:
-    """Lazy-init singleton Azure OpenAI client."""
+def _get_client() -> AsyncAzureOpenAI:
+    """Lazy-init singleton async Azure OpenAI client."""
     global _client
     if _client is None:
         cfg = settings.openai
-        _client = AzureOpenAI(
+        _client = AsyncAzureOpenAI(
             azure_endpoint=cfg.api_base,
             api_key=cfg.api_key,
             api_version=cfg.api_version,
@@ -27,12 +27,12 @@ def _get_client() -> AzureOpenAI:
     return _client
 
 
-def chat_completion(messages: list[dict], **kwargs) -> str:
+async def chat_completion(messages: list[dict], **kwargs) -> str:
     """Send a chat completion request and return the assistant message content."""
     client = _get_client()
     deployment = kwargs.pop('deployment', None) or settings.openai.deployment_id
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=deployment,
         messages=messages,
         **kwargs,
@@ -44,7 +44,7 @@ def chat_completion(messages: list[dict], **kwargs) -> str:
     return result
 
 
-def vision_completion(image_path: str | Path, prompt: str, **kwargs) -> str:
+async def vision_completion(image_path: str | Path, prompt: str, **kwargs) -> str:
     """Encode an image to base64 and send as a GPT-4o vision request."""
     image_path = Path(image_path)
     mime_type = mimetypes.guess_type(str(image_path))[0] or 'image/jpeg'
@@ -67,4 +67,4 @@ def vision_completion(image_path: str | Path, prompt: str, **kwargs) -> str:
             ],
         },
     ]
-    return chat_completion(messages, **kwargs)
+    return await chat_completion(messages, **kwargs)

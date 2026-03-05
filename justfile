@@ -28,7 +28,7 @@ kill-port:
 
 # Run on a specific port
 run-port port="5000":
-    uv run flask run --host 0.0.0.0 --port {{port}} --debug
+    uv run uvicorn app:app --host 0.0.0.0 --port {{port}} --reload
 
 # Initialize local MariaDB data directory
 db-init:

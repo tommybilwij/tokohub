@@ -1,74 +1,69 @@
-"""Database connection pool for MariaDB/MySQL."""
+"""Async database pool for MariaDB/MySQL using aiomysql."""
 
 import logging
-from contextlib import contextmanager
 
-from mysql.connector import pooling
+import aiomysql
 
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_pool = None
+_pool: aiomysql.Pool | None = None
 
 
-def get_pool():
-    """Return the singleton connection pool, creating it on first call."""
+async def create_pool():
+    """Create the global connection pool."""
     global _pool
-    if _pool is None:
-        db_config = settings.db.to_connector_kwargs()
-        _pool = pooling.MySQLConnectionPool(**db_config)
-        logger.info("Database connection pool created (%s connections)", settings.db.pool_size)
+    cfg = settings.db
+    _pool = await aiomysql.create_pool(
+        host=cfg.host,
+        port=cfg.port,
+        user=cfg.user,
+        password=cfg.password,
+        db=cfg.name,
+        charset=cfg.charset,
+        minsize=2,
+        maxsize=cfg.pool_size,
+        autocommit=False,
+    )
+    logger.info("Database connection pool created (%s connections)", cfg.pool_size)
+
+
+async def close_pool():
+    """Close the global connection pool."""
+    global _pool
+    if _pool:
+        _pool.close()
+        await _pool.wait_closed()
+        _pool = None
+        logger.info("Database connection pool closed")
+
+
+def get_pool() -> aiomysql.Pool:
+    """Return the singleton connection pool."""
     return _pool
 
 
-@contextmanager
-def get_connection():
-    """Yield a connection from the pool, returning it on exit.
-
-    Autocommit is disabled so that callers can use proper transactions
-    (commit/rollback).  The helper ``get_cursor`` already commits on
-    success and rolls back on failure.
-    """
-    conn = get_pool().get_connection()
-    conn.autocommit = False
-    try:
-        yield conn
-    finally:
-        conn.close()
+async def execute_query(pool, sql, params=None):
+    """Run a SELECT and return all rows as dicts."""
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(sql, params or ())
+            return await cur.fetchall()
 
 
-@contextmanager
-def get_cursor(dictionary=True):
-    """Yield a cursor with auto-close. Results are dicts by default."""
-    with get_connection() as conn:
-        cursor = conn.cursor(dictionary=dictionary)
-        try:
-            yield cursor
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            cursor.close()
-
-
-def execute_query(sql, params=None, dictionary=True):
-    """Run a SELECT and return all rows."""
-    with get_cursor(dictionary=dictionary) as cur:
-        cur.execute(sql, params or ())
-        return cur.fetchall()
-
-
-def execute_single(sql, params=None, dictionary=True):
+async def execute_single(pool, sql, params=None):
     """Run a SELECT and return the first row or None."""
-    with get_cursor(dictionary=dictionary) as cur:
-        cur.execute(sql, params or ())
-        return cur.fetchone()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(sql, params or ())
+            return await cur.fetchone()
 
 
-def execute_modify(sql, params=None):
+async def execute_modify(pool, sql, params=None):
     """Run an INSERT/UPDATE/DELETE and return rows affected."""
-    with get_cursor() as cur:
-        cur.execute(sql, params or ())
-        return cur.rowcount
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(sql, params or ())
+            await conn.commit()
+            return cur.rowcount

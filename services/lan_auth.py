@@ -4,8 +4,6 @@ import ipaddress
 import logging
 import socket
 
-from flask import Flask, request, abort
-
 logger = logging.getLogger(__name__)
 
 _PRIVATE_NETWORKS = [
@@ -29,31 +27,10 @@ def get_local_ip() -> str:
         return '127.0.0.1'
 
 
-def _is_private_ip(ip_str: str) -> bool:
+def is_private_ip(ip_str: str) -> bool:
+    """Check if an IP address belongs to a private network."""
     try:
         addr = ipaddress.ip_address(ip_str)
         return any(addr in net for net in _PRIVATE_NETWORKS)
     except ValueError:
         return False
-
-
-def setup_lan_auth(app: Flask):
-    """Register before_request hook that only allows private network IPs."""
-
-    @app.before_request
-    def _lan_auth_check():
-        remote = request.remote_addr or ''
-
-        # Localhost always allowed (Tauri WebView)
-        if remote in _LOCALHOST:
-            return None
-
-        # Health endpoint always open (Tauri polling)
-        if request.path == '/health':
-            return None
-
-        # Remote clients: must be on private network
-        if not _is_private_ip(remote):
-            abort(403)
-
-        return None

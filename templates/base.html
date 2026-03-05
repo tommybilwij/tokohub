@@ -23,31 +23,31 @@
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav me-auto">
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/scanner' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path == '/scanner' %}active{% endif %}"
                href="/scanner">
               <i class="bi bi-upc-scan"></i> Scanner
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/entry' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path == '/entry' %}active{% endif %}"
                href="/entry">
               <i class="bi bi-receipt"></i> Entry Barang
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/history' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path == '/history' %}active{% endif %}"
                href="/history">
               <i class="bi bi-clock-history"></i> Riwayat PO
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/sales-history' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path == '/sales-history' %}active{% endif %}"
                href="/sales-history">
               <i class="bi bi-graph-up"></i> Penjualan
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link {% if request.path == '/settings' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}"
                href="/settings">
               <i class="bi bi-gear"></i> Settings
             </a>

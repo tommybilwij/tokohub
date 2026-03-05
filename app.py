@@ -39,6 +39,15 @@ os.makedirs(settings.upload_folder, exist_ok=True)
 
 _lan_active: bool = False
 _https_port: int | None = None
+_setup_done: bool = False
+
+_SETUP_PASSTHROUGH = ('/setup', '/api/setup', '/api/settings', '/health', '/static')
+
+
+@app.before_request
+def _require_setup():
+    if not _setup_done and not any(request.path.startswith(p) for p in _SETUP_PASSTHROUGH):
+        return redirect('/setup')
 
 
 @app.context_processor
@@ -57,6 +66,35 @@ def _allowed_file(filename):
 @app.route('/')
 def index():
     return redirect('/scanner')
+
+
+@app.route('/setup')
+def setup_page():
+    return render_template('setup.html')
+
+
+@app.route('/api/setup', methods=['POST'])
+def api_setup():
+    global _setup_done
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Strip masked password fields (user didn't change them)
+    if 'db' in data and 'password' in data['db']:
+        if data['db']['password'] == '' or '*' in data['db']['password']:
+            del data['db']['password']
+    if 'openai' in data and 'api_key' in data['openai']:
+        if data['openai']['api_key'] == '' or '*' in data['openai']['api_key']:
+            del data['openai']['api_key']
+
+    try:
+        save_to_envrc(data)
+        _setup_done = True
+        return jsonify({'ok': True})
+    except Exception as e:
+        logger.exception("Failed to save setup")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/entry')

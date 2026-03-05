@@ -2,9 +2,10 @@ name: Build Desktop App
 
 on:
   push:
-    branches: [feature/tauri, main]
-  pull_request:
-    branches: [main]
+    branches: [feature/tauri]
+    # branches: [feature/tauri, main]
+  # pull_request:
+  #   branches: [main]
   workflow_dispatch:
 
 jobs:

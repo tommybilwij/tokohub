@@ -175,3 +175,12 @@ async def commit_po(data: POCommitRequest, db: aiomysql.Pool = Depends(get_db)):
     except Exception as e:
         logger.exception("PO commit failed")
         return JSONResponse({'error': str(e)}, status_code=500)
+
+
+@router.get('/api/po/{po_number}')
+async def get_po(po_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.po_service import get_po_detail
+    result = await get_po_detail(db, po_number)
+    if not result:
+        return JSONResponse({'error': 'PO not found'}, status_code=404)
+    return result

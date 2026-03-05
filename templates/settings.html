@@ -121,6 +121,13 @@
               <label class="form-check-label" for="lanModeCheck">LAN Mode</label>
             </div>
           </div>
+          <div class="col-md-4" id="mdnsHostnameGroup" style="display:none;">
+            <label class="form-label">Hostname mDNS</label>
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control form-control-sm" name="mdns_hostname" id="mdnsHostnameInput" placeholder="tokosegar">
+              <span class="input-group-text">.local</span>
+            </div>
+          </div>
           <div class="col-12 mt-2">
             <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formServer">
               <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
@@ -186,7 +193,17 @@
       setVal('formServer', 'server_host', cfg.server_host);
       setVal('formServer', 'server_port', cfg.server_port);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;
+      setVal('formServer', 'mdns_hostname', cfg.mdns_hostname);
+      toggleMdnsHostname(cfg.lan_mode);
     });
+
+  // Toggle mDNS hostname field based on LAN mode
+  function toggleMdnsHostname(checked) {
+    document.getElementById('mdnsHostnameGroup').style.display = checked ? '' : 'none';
+  }
+  document.getElementById('lanModeCheck').addEventListener('change', function() {
+    toggleMdnsHostname(this.checked);
+  });
 
   // Populate LAN URLs from live status
   const lanContainer = document.getElementById('lanUrlsContainer');

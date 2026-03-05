@@ -36,6 +36,7 @@ def _get_local_ip() -> str | None:
 def generate_self_signed_cert(
     cert_dir: Path | str = _DEFAULT_CERT_DIR,
     days_valid: int = 365,
+    mdns_hostname: str = 'tokosegar',
 ) -> tuple[str, str]:
     """Generate a self-signed cert with SANs for localhost + LAN IP.
 
@@ -51,7 +52,7 @@ def generate_self_signed_cert(
 
     san_entries: list[x509.GeneralName] = [
         x509.DNSName('localhost'),
-        x509.DNSName('tokosegar.local'),
+        x509.DNSName(f'{mdns_hostname}.local'),
         x509.IPAddress(ipaddress.IPv4Address('127.0.0.1')),
     ]
     local_ip = _get_local_ip()
@@ -104,7 +105,10 @@ def _cert_is_valid(cert_path: Path, min_remaining_days: int = 30) -> bool:
         return False
 
 
-def ensure_ssl_cert(cert_dir: Path | str = _DEFAULT_CERT_DIR) -> tuple[str, str]:
+def ensure_ssl_cert(
+    cert_dir: Path | str = _DEFAULT_CERT_DIR,
+    mdns_hostname: str = 'tokosegar',
+) -> tuple[str, str]:
     """Return (cert_path, key_path), generating if missing or expiring within 30 days."""
     cert_dir = Path(cert_dir)
     cert_path = cert_dir / _CERT_FILENAME
@@ -113,4 +117,4 @@ def ensure_ssl_cert(cert_dir: Path | str = _DEFAULT_CERT_DIR) -> tuple[str, str]
     if cert_path.exists() and key_path.exists() and _cert_is_valid(cert_path):
         return str(cert_path), str(key_path)
 
-    return generate_self_signed_cert(cert_dir)
+    return generate_self_signed_cert(cert_dir, mdns_hostname=mdns_hostname)

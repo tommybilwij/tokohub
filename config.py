@@ -98,6 +98,7 @@ class Settings(BaseSettings):
 
     # LAN mode
     lan_mode: bool = True
+    mdns_hostname: str = 'tokosegar'
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -176,6 +177,7 @@ _KEY_TO_ENV = {
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',
+    'mdns_hostname': 'MDNS_HOSTNAME',
 }
 
 

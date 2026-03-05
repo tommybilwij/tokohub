@@ -129,6 +129,7 @@ def api_settings_get():
         'server_port': _s.server_port,
         'server_host': _s.server_host,
         'lan_mode': _s.lan_mode,
+        'mdns_hostname': _s.mdns_hostname,
     })
 
 
@@ -199,11 +200,12 @@ def api_lan_status():
     from services.lan_auth import get_local_ip
     ip = get_local_ip()
     https_url = ''
+    mdns_host = f'{settings.mdns_hostname}.local'
     if _lan_active and _https_port:
         if _https_port == 443:
-            https_url = 'https://tokosegar.local'
+            https_url = f'https://{mdns_host}'
         else:
-            https_url = f'https://tokosegar.local:{_https_port}'
+            https_url = f'https://{mdns_host}:{_https_port}'
     return jsonify({
         'lan_mode': _lan_active,
         'local_ip': ip,
@@ -660,7 +662,7 @@ def main():
     if not is_frozen:
         try:
             from services.ssl import ensure_ssl_cert
-            cert_file, key_file = ensure_ssl_cert()
+            cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
             ssl_context = (cert_file, key_file)
         except Exception:
             logger.info("SSL not available, running HTTP only")
@@ -673,7 +675,7 @@ def main():
             import threading
             from werkzeug.serving import make_server
             from services.ssl import ensure_ssl_cert
-            cert_file, key_file = ensure_ssl_cert()
+            cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
             https_port = None
             for try_port in (443, port + 1):
                 try:
@@ -692,20 +694,21 @@ def main():
                 _https_port = https_port
                 threading.Thread(target=https_server.serve_forever, daemon=True).start()
                 logger.info("HTTPS LAN server on port %d", https_port)
-                # Register mDNS so devices can reach us at tokosegar.local
+                # Register mDNS so devices can reach us at <hostname>.local
                 try:
                     import socket as _socket
                     from zeroconf import ServiceInfo, Zeroconf
+                    mdns_host = f'{settings.mdns_hostname}.local'
                     svc = ServiceInfo(
                         "_https._tcp.local.",
                         "Stock Entry._https._tcp.local.",
                         addresses=[_socket.inet_aton(local_ip)],
                         port=https_port,
-                        server="tokosegar.local.",
+                        server=f"{mdns_host}.",
                     )
                     zc = Zeroconf()
                     zc.register_service(svc)
-                    url_display = "https://tokosegar.local" if https_port == 443 else f"https://tokosegar.local:{https_port}"
+                    url_display = f"https://{mdns_host}" if https_port == 443 else f"https://{mdns_host}:{https_port}"
                     logger.info("mDNS registered: %s", url_display)
                 except Exception:
                     logger.warning("Could not register mDNS service", exc_info=True)

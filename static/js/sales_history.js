@@ -14,6 +14,8 @@
   var elBody      = document.getElementById('shTableBody');
   var elCount     = document.getElementById('shResultCount');
   var elBtnExport = document.getElementById('shBtnExport');
+  var elBtnExportPdf = document.getElementById('shBtnExportPdf');
+  var elDeptFilter = document.getElementById('shDeptFilter');
   var elTotalItems = document.getElementById('shTotalItems');
   var elTotalQty   = document.getElementById('shTotalQty');
   var elTotalSales = document.getElementById('shTotalSales');
@@ -24,6 +26,18 @@
   var rows = [];
   var sortCol = 'total_amount';
   var sortAsc = false;
+
+  // Load departments
+  fetch('/api/sales/departments')
+    .then(function (res) { return res.json(); })
+    .then(function (depts) {
+      depts.forEach(function (d) {
+        var opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.id + ' - ' + d.name;
+        elDeptFilter.appendChild(opt);
+      });
+    });
 
   // -----------------------------------------------------------------------
   // Helpers
@@ -112,6 +126,10 @@
     fetchData();
   });
 
+  elDeptFilter.addEventListener('change', function () {
+    if (elFrom.value && elTo.value) fetchData();
+  });
+
   // -----------------------------------------------------------------------
   // Fetch data
   // -----------------------------------------------------------------------
@@ -125,7 +143,10 @@
     elEmpty.classList.add('d-none');
     elSummary.classList.add('d-none');
 
-    fetch('/api/sales/history?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to))
+    var dept = elDeptFilter.value;
+    var url = '/api/sales/history?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    if (dept) url += '&dept=' + encodeURIComponent(dept);
+    fetch(url)
       .then(function (res) { return res.json(); })
       .then(function (data) {
         elLoading.classList.add('d-none');
@@ -219,7 +240,69 @@
     var from = elFrom.value;
     var to = elTo.value;
     if (!from || !to) return;
-    window.location.href = '/api/sales/export?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    var url = '/api/sales/export?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    var dept = elDeptFilter.value;
+    if (dept) url += '&dept=' + encodeURIComponent(dept);
+    window.location.href = url;
+  });
+
+  // -----------------------------------------------------------------------
+  // Export PDF
+  // -----------------------------------------------------------------------
+  elBtnExportPdf.addEventListener('click', function () {
+    if (!rows.length) return;
+
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    var from = elFrom.value.replace('T', ' ');
+    var to = elTo.value.replace('T', ' ');
+    var deptText = elDeptFilter.value ? ('Dept ' + elDeptFilter.options[elDeptFilter.selectedIndex].textContent) : 'Semua Dept';
+    doc.setFontSize(14);
+    doc.text('Histori Penjualan', 14, 15);
+    doc.setFontSize(9);
+    doc.text('Periode: ' + from + '  s/d  ' + to + '   |   ' + deptText, 14, 21);
+
+    var sorted = rows.slice().sort(function (a, b) {
+      var va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+    var totalQty = 0, totalAmount = 0;
+    var tableRows = sorted.map(function (r, i) {
+      totalQty += Number(r.total_qty) || 0;
+      totalAmount += Number(r.total_amount) || 0;
+      return [i + 1, r.deptid || '', r.artname || '', r.barcode || '', fmt(r.hjual), fmtInt(r.total_qty), fmt(r.total_amount)];
+    });
+    tableRows.push(['', '', '', '', 'TOTAL', fmtInt(totalQty), fmt(totalAmount)]);
+
+    doc.autoTable({
+      startY: 25,
+      head: [['#', 'Dept', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total']],
+      body: tableRows,
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      headStyles: { fillColor: [40, 167, 69] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10 },
+        1: { halign: 'center', cellWidth: 14 },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+      },
+      didParseCell: function (data) {
+        if (data.row.index === tableRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+
+    var f = elFrom.value.replace('T', '_').replace(/:/g, '');
+    var t = elTo.value.replace('T', '_').replace(/:/g, '');
+    doc.save('penjualan_' + f + '_' + t + '.pdf');
   });
 
   // -----------------------------------------------------------------------

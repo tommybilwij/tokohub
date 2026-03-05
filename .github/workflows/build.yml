@@ -14,10 +14,10 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            target: universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
             label: macOS
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
+            rust-targets: x86_64-pc-windows-msvc
             label: Windows
 
     name: Build (${{ matrix.label }})
@@ -41,11 +41,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-
-      - name: Add aarch64 Rust target (macOS universal)
-        if: runner.os == 'macOS'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          targets: ${{ matrix.rust-targets }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2

@@ -1,13 +1,26 @@
 """Application settings — loaded from profiles/application.yml, overridden by env vars / .env."""
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
 
 _BASE_DIR = Path(__file__).parent
+
+# Determine .envrc location: frozen builds use a stable user-writable path
+if getattr(sys, 'frozen', False):
+    _ENVRC_PATH = Path.home() / '.stock-entry' / '.envrc'
+else:
+    _ENVRC_PATH = _BASE_DIR / '.envrc'
+
+# Load .envrc into os.environ BEFORE constructing any settings.
+# This is critical for frozen/Tauri builds where the shell doesn't source .envrc.
+# DatabaseSettings / OpenAISettings read from os.environ (env_prefix), not env_file.
+load_dotenv(_ENVRC_PATH, override=False)
 
 
 def _get_yaml_config_path(file_name: str = "application.yml") -> Path:
@@ -62,7 +75,7 @@ class OpenAISettings(BaseSettings):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file='.envrc',
+        env_file=str(_ENVRC_PATH),
         extra='ignore',
         env_nested_delimiter='__',
         env_file_encoding='utf-8',
@@ -168,7 +181,8 @@ _KEY_TO_ENV = {
 
 def save_to_envrc(data: dict) -> None:
     """Persist config values to .envrc and update the running process env + settings."""
-    envrc_path = _BASE_DIR / '.envrc'
+    envrc_path = _ENVRC_PATH
+    envrc_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Build env-var updates from the flat dotted keys
     env_updates: dict[str, str] = {}

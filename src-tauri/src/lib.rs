@@ -1,17 +1,48 @@
-use std::process::{Child, Command, Stdio};
+use std::collections::HashMap;
+use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::Manager;
 use tauri::RunEvent;
+use tauri::Url;
 
 const PORT: u16 = 5000;
-const HEALTH_URL: &str = "http://127.0.0.1:5000/health";
+const HEALTH_URL_HTTP: &str = "http://127.0.0.1:5000/health";
+const HEALTH_URL_HTTPS: &str = "https://127.0.0.1:5000/health";
+const APP_URL_HTTP: &str = "http://127.0.0.1:5000";
+const APP_URL_HTTPS: &str = "https://127.0.0.1:5000";
 const HEALTH_POLL_MS: u64 = 500;
 const HEALTH_TIMEOUT_S: u64 = 30;
 
 struct SidecarState {
     child: Option<Child>,
+}
+
+/// Read ~/.stock-entry/.envrc and parse `export KEY=value` lines into a HashMap.
+fn load_envrc() -> HashMap<String, String> {
+    let mut envs = HashMap::new();
+    let envrc_path = dirs::home_dir()
+        .map(|h| h.join(".stock-entry").join(".envrc"));
+    if let Some(path) = envrc_path {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() || trimmed.starts_with('#') {
+                    continue;
+                }
+                // Strip optional "export " prefix
+                let kv = trimmed.strip_prefix("export ").unwrap_or(trimmed);
+                if let Some((key, value)) = kv.split_once('=') {
+                    envs.insert(key.trim().to_string(), value.trim().to_string());
+                }
+            }
+            log::info!("Loaded {} env vars from {:?}", envs.len(), path);
+        } else {
+            log::warn!("No .envrc found at {:?}", path);
+        }
+    }
+    envs
 }
 
 fn spawn_sidecar(app: &tauri::App) {
@@ -31,10 +62,14 @@ fn spawn_sidecar(app: &tauri::App) {
         return;
     }
 
+    // Load env vars from ~/.stock-entry/.envrc and pass to sidecar
+    let envrc_vars = load_envrc();
+
     let child = match Command::new(&sidecar_path)
         .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .envs(&envrc_vars)
+        .stdout(std::fs::File::create("/tmp/stock-entry-sidecar.log").unwrap())
+        .stderr(std::fs::File::create("/tmp/stock-entry-sidecar.err").unwrap())
         .spawn()
     {
         Ok(child) => child,
@@ -53,7 +88,10 @@ fn spawn_sidecar(app: &tauri::App) {
 
 fn poll_health_and_show(app_handle: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .expect("failed to build HTTP client");
         let deadline =
             tokio::time::Instant::now() + Duration::from_secs(HEALTH_TIMEOUT_S);
 
@@ -63,15 +101,22 @@ fn poll_health_and_show(app_handle: tauri::AppHandle) {
                 break;
             }
 
-            match client.get(HEALTH_URL).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    log::info!("Flask is ready, showing window");
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
+            // Try HTTP first (frozen/PyInstaller), then HTTPS (dev with SSL)
+            // Try HTTP first (sidecar default), then HTTPS as fallback
+            let urls = [(HEALTH_URL_HTTP, APP_URL_HTTP), (HEALTH_URL_HTTPS, APP_URL_HTTPS)];
+            for (health_url, app_url) in urls {
+                match client.get(health_url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        log::info!("Flask is ready on {}, showing window", health_url);
+                        if let Some(webview) = app_handle.get_webview_window("main") {
+                            // Navigate to the app URL now that Flask is ready
+                            let _ = webview.navigate(Url::parse(app_url).unwrap());
+                            let _ = webview.show();
+                        }
+                        return;
                     }
-                    return;
+                    _ => {}
                 }
-                _ => {}
             }
 
             tokio::time::sleep(Duration::from_millis(HEALTH_POLL_MS)).await;

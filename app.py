@@ -585,16 +585,25 @@ def api_po_detail(po_number):
 # ---------------------------------------------------------------------------
 
 def _ensure_schema():
-    """Create stock_alias table if it doesn't exist."""
-    try:
-        from services.db import execute_modify
-        schema_path = _BASE_DIR / 'schema' / 'stock_alias.sql'
-        with open(schema_path) as f:
-            sql = f.read()
-        execute_modify(sql)
-        logger.info("stock_alias table ensured")
-    except Exception as e:
-        logger.warning("Could not create stock_alias table (may already exist): %s", e)
+    """Create stock_alias table if it doesn't exist. Non-blocking with timeout."""
+    import threading
+
+    def _run():
+        try:
+            from services.db import execute_modify
+            schema_path = _BASE_DIR / 'schema' / 'stock_alias.sql'
+            with open(schema_path) as f:
+                sql = f.read()
+            execute_modify(sql)
+            logger.info("stock_alias table ensured")
+        except Exception as e:
+            logger.warning("Could not ensure stock_alias table: %s", e)
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=5)
+    if t.is_alive():
+        logger.warning("DB schema check timed out (5s) — Flask will start anyway")
 
 
 def _parse_args():

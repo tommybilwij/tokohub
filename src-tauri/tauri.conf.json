@@ -14,7 +14,7 @@
         "title": "Stock Entry - Toko Segar",
         "width": 1280,
         "height": 800,
-        "visible": false,
+        "visible": true,
         "resizable": true
       }
     ]

@@ -14,7 +14,11 @@ from cryptography.x509.oid import NameOID
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / '.ssl'
+if getattr(__import__('sys'), 'frozen', False):
+    # Frozen PyInstaller: _MEIPASS is read-only, use user data dir instead
+    _DEFAULT_CERT_DIR = Path.home() / '.stock-entry' / '.ssl'
+else:
+    _DEFAULT_CERT_DIR = Path(__file__).resolve().parent.parent / '.ssl'
 _CERT_FILENAME = 'cert.pem'
 _KEY_FILENAME = 'key.pem'
 

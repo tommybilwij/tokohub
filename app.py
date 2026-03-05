@@ -18,7 +18,7 @@ if getattr(sys, 'frozen', False):
 else:
     _BASE_DIR = Path(__file__).parent
 
-from config import settings, save_to_envrc, reload_settings
+from config import settings, save_to_envrc, reload_settings, _ENVRC_PATH
 
 # Configure logging
 logging.basicConfig(
@@ -39,7 +39,7 @@ os.makedirs(settings.upload_folder, exist_ok=True)
 
 _lan_active: bool = False
 _https_port: int | None = None
-_setup_done: bool = False
+_setup_done: bool = _ENVRC_PATH.exists()
 _http_server = None
 _https_server = None
 

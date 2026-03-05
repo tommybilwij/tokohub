@@ -662,11 +662,12 @@ def main():
             from werkzeug.serving import make_server
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert()
-            import ssl as _ssl
-            ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
-            ctx.load_cert_chain(cert_file, key_file)
             https_port = port + 1
-            https_server = make_server('0.0.0.0', https_port, app, ssl_context=ctx)
+            https_server = make_server(
+                '0.0.0.0', https_port, app,
+                threaded=True,
+                ssl_context=(cert_file, key_file),
+            )
             threading.Thread(target=https_server.serve_forever, daemon=True).start()
             logger.info("HTTPS LAN server on port %d (for mobile camera access)",
                         https_port)

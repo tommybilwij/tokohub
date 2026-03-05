@@ -467,6 +467,21 @@ body {
   border-bottom-color: var(--clr-accent-100);
 }
 
+/* Harga Jual wrapper — same style as dp-beli */
+.dp-jual-wrapper {
+  border-color: var(--clr-accent-100);
+  border-left: 4px solid var(--clr-accent-600);
+  background: var(--clr-card-bg);
+}
+
+.dp-jual-wrapper > .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--clr-accent-800);
+  border-bottom-color: var(--clr-accent-100);
+}
+
 /* Jual row: 3-column layout (Satuan | Bundling 1 | Bundling 2) */
 .dp-jual-row {
   display: grid;
@@ -474,35 +489,19 @@ body {
   gap: 0.75rem;
 }
 
-/* Shared action buttons bar above jual columns */
-.dp-jual-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
-  background: var(--clr-accent-50);
-  border: 1px solid var(--clr-accent-100);
-  border-radius: var(--radius-xl);
-}
-
-.dp-jual-actions .auto-adjust-group {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.dp-jual {
-  border-color: var(--clr-accent-100);
-  border-left: 4px solid var(--clr-accent-600);
-  background: var(--clr-card-bg);
-}
-
-.dp-jual .dp-section-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+/* Column headers inside jual row */
+.dp-jual-col-header {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--clr-accent-800);
-  border-bottom-color: var(--clr-accent-100);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--clr-accent-100);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* -----------------------------------------------------------------------
@@ -786,12 +785,6 @@ body {
   border-left: 4px solid var(--clr-accent-600);
   border-radius: var(--radius-xl);
   padding: 0.75rem 1rem;
-}
-
-/* Inline bundling within jual row */
-.dp-bundling-inline {
-  display: flex;
-  flex-direction: column;
 }
 
 .dp-bundling-section .dp-section-header {

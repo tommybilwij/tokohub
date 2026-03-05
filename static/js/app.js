@@ -614,8 +614,8 @@
     const disabled = b.enabled ? '' : 'disabled';
     const vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
     return `
-      <div class="dp-section dp-jual dp-bundling-inline">
-        <div class="dp-section-header">
+      <div class="dp-jual-col dp-bundling-inline">
+        <div class="dp-jual-col-header">
           <label class="bundling-toggle">
             <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${tier}" ${checked}>
             Bundling ${tier}
@@ -1124,29 +1124,29 @@
                 <span class="dp-netto-val netto-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
             </div>
-            <!-- Row 2: Harga Jual — shared action buttons + 3 columns -->
-            ${(item.status === 'auto' && item._refHjual)
-              ? `<div class="dp-jual-actions">
-                   <span class="auto-adjust-group">
-                     <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
-                       <i class="bi bi-chevron-bar-up"></i> Bulatan 100
-                     </button>
-                     <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct-all" data-idx="${idx}">
-                       <i class="bi bi-percent"></i> Ikuti Margin %
-                     </button>
-                     <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-all" data-idx="${idx}">
-                       <i class="bi bi-arrow-repeat"></i> Ikuti Margin
-                     </button>
-                   </span>
-                 </div>`
-              : ''}
-            <div class="dp-jual-row">
-              <div class="dp-section dp-jual">
-                <div class="dp-section-header">Satuan</div>
-                ${_renderJualTable(idx, null, mainJualVals)}
+            <!-- Row 2: Harga Jual wrapper -->
+            <div class="dp-section dp-jual-wrapper">
+              <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
+                ? ` <span class="auto-adjust-group">
+                       <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
+                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
+                       </button>
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct-all" data-idx="${idx}">
+                         <i class="bi bi-percent"></i> Ikuti Margin %
+                       </button>
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-all" data-idx="${idx}">
+                         <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+                       </button>
+                     </span>`
+                : ''}</div>
+              <div class="dp-jual-row">
+                <div class="dp-jual-col">
+                  <div class="dp-jual-col-header">Satuan</div>
+                  ${_renderJualTable(idx, null, mainJualVals)}
+                </div>
+                ${_renderBundlingGroupInline(idx, 1, item.bundling1, item)}
+                ${_renderBundlingGroupInline(idx, 2, item.bundling2, item)}
               </div>
-              ${_renderBundlingGroupInline(idx, 1, item.bundling1, item)}
-              ${_renderBundlingGroupInline(idx, 2, item.bundling2, item)}
             </div>
           </div>
         </td>

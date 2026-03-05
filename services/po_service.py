@@ -8,10 +8,13 @@ read and write concurrently without blocking each other.
 import json
 import os
 import logging
+import warnings
 from datetime import date, datetime
 from decimal import Decimal, ROUND_DOWN
 
 import aiomysql
+
+warnings.filterwarnings('ignore', message='Data truncated', module='aiomysql')
 
 from config import settings
 from services.db import execute_query, execute_single
@@ -224,10 +227,16 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
 
 
 async def commit_po(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
-    """Create PO in database without locking.
+    """Create PO in two phases to minimise lock contention with MyPosse POS.
 
-    Each write is an atomic single-row operation, so MyPosse POS
-    can continue reading and writing concurrently.
+    Phase 1 (single transaction):
+        INSERT headers/lines/history, UPDATE stlastbal + nextrec, COMMIT.
+        Only new-row INSERTs and brief end-of-txn UPDATEs — minimal locks.
+
+    Phase 2 (individual auto-committed updates):
+        UPDATE stock prices and DELETE/INSERT itempaket bundling per item.
+        Each is a separate ~1ms transaction so MyPosse is never blocked.
+        If any fail, the PO is already safely committed.
 
     Args:
         pool: aiomysql connection pool
@@ -248,8 +257,8 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
-                # Read current counters (no lock — just a SELECT).
-                await cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1")
+                # Lock nextrec row to serialise concurrent PO creation.
+                await cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1 FOR UPDATE")
                 nextrec = await cursor.fetchone()
                 if not nextrec:
                     raise POCreationError("nextrec table is empty")
@@ -355,45 +364,7 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
                          supplier_id, fp_number, fp_becreff)
                     )
 
-                    # Update stock prices
-                    await cursor.execute(
-                        """UPDATE stock
-                           SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
-                               pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                               jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
-                               pctppn = %s, jlhppn = %s,
-                               hjual = %s, hjual2 = %s, hjual3 = %s,
-                               hjual4 = %s, hjual5 = %s,
-                               satbesar = %s, packing = %s
-                           WHERE artno = %s""",
-                        (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
-                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                         line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
-                         line['pctppn'], line['jlhppn_kcl'],
-                         line['hjual'], line['hjual2'], line['hjual3'],
-                         line['hjual4'], line['hjual5'],
-                         line['satuanbsr'], line['packing'],
-                         line['artno'])
-                    )
-
-                    # Update bundling (itempaket): PK is (artno, subartno)
-                    bundlings = [b for b in [line.get('bundling1'), line.get('bundling2')]
-                                 if b and b.get('min_qty')]
-                    await cursor.execute(
-                        "DELETE FROM itempaket WHERE artno = %s",
-                        (line['artno'],)
-                    )
-                    for i_bund, bund in enumerate(bundlings, start=1):
-                        await cursor.execute(
-                            """INSERT INTO itempaket
-                               (artno, subartno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                            (line['artno'], str(i_bund),
-                             int(bund['min_qty']),
-                             bund.get('hjual1') or 0, bund.get('hjual2') or 0,
-                             bund.get('hjual3') or 0, bund.get('hjual4') or 0,
-                             bund.get('hjual5') or 0)
-                        )
+                # --- stock price + bundling updates are DEFERRED to Phase 2 ---
 
                 # Batch stock balance updates LAST, right before commit.
                 for line in preview['lines']:
@@ -419,31 +390,87 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
 
                 await conn.commit()
 
-                # Invalidate stock search cache so next search reflects updated prices/packing
-                from services.stock_search import invalidate_cache
-                invalidate_cache()
-
-                result = {
-                    'po_number': po_number,
-                    'fp_number': fp_number,
-                    'becreff': becreff,
-                    'fp_becreff': fp_becreff,
-                    'supplier_id': supplier_id,
-                    'order_date': order_date.isoformat(),
-                    'grand_total': preview['grand_total'],
-                    'line_count': preview['line_count'],
-                    'lines': preview['lines'],
-                }
-
-                _write_audit_log(po_number, result)
-                logger.info("PO created: %s / FP %s (becreff=%d, fp_becreff=%d, total=%.2f)",
-                            po_number, fp_number, becreff, fp_becreff, preview['grand_total'])
-                return result
-
             except Exception:
                 await conn.rollback()
-                logger.exception("PO creation failed")
+                logger.exception("PO creation failed (Phase 1)")
                 raise
+
+    # ------------------------------------------------------------------
+    # Phase 2 — Deferred updates (separate auto-committed connections).
+    # Each UPDATE/DELETE+INSERT is its own tiny transaction (~1ms lock).
+    # If any fail, the PO is already safely committed.
+    # ------------------------------------------------------------------
+    from services.db import execute_modify
+    for line in preview['lines']:
+        try:
+            await execute_modify(
+                pool,
+                """UPDATE stock
+                   SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                       pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                       jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                       pctppn = %s, jlhppn = %s,
+                       hjual = %s, hjual2 = %s, hjual3 = %s,
+                       hjual4 = %s, hjual5 = %s,
+                       satbesar = %s, packing = %s
+                   WHERE artno = %s""",
+                (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                 line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                 line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                 line['pctppn'], line['jlhppn_kcl'],
+                 line['hjual'], line['hjual2'], line['hjual3'],
+                 line['hjual4'], line['hjual5'],
+                 line['satuanbsr'], line['packing'],
+                 line['artno']),
+            )
+        except Exception:
+            logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
+
+        # Update bundling (itempaket): DELETE + INSERT in one connection
+        bundlings = [b for b in [line.get('bundling1'), line.get('bundling2')]
+                     if b and b.get('min_qty')]
+        try:
+            async with pool.acquire() as bconn:
+                async with bconn.cursor() as bcur:
+                    await bcur.execute(
+                        "DELETE FROM itempaket WHERE artno = %s",
+                        (line['artno'],)
+                    )
+                    for i_bund, bund in enumerate(bundlings, start=1):
+                        await bcur.execute(
+                            """INSERT INTO itempaket
+                               (artno, subartno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                            (line['artno'], str(i_bund),
+                             int(bund['min_qty']),
+                             bund.get('hjual1') or 0, bund.get('hjual2') or 0,
+                             bund.get('hjual3') or 0, bund.get('hjual4') or 0,
+                             bund.get('hjual5') or 0)
+                        )
+                    await bconn.commit()
+        except Exception:
+            logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
+
+    # Invalidate stock search cache so next search reflects updated prices/packing
+    from services.stock_search import invalidate_cache
+    invalidate_cache()
+
+    result = {
+        'po_number': po_number,
+        'fp_number': fp_number,
+        'becreff': becreff,
+        'fp_becreff': fp_becreff,
+        'supplier_id': supplier_id,
+        'order_date': order_date.isoformat(),
+        'grand_total': preview['grand_total'],
+        'line_count': preview['line_count'],
+        'lines': preview['lines'],
+    }
+
+    _write_audit_log(po_number, result)
+    logger.info("PO created: %s / FP %s (becreff=%d, fp_becreff=%d, total=%.2f)",
+                po_number, fp_number, becreff, fp_becreff, preview['grand_total'])
+    return result
 
 
 async def get_po_history(pool, page=1, per_page=20):

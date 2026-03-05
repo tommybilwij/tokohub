@@ -32,6 +32,12 @@
       "binaries/stock-entry-server",
       "binaries/_internal"
     ],
-    "targets": ["app"]
+    "targets": ["app"],
+    "macOS": {
+      "entitlements": null,
+      "signingIdentity": null,
+      "providerShortName": null,
+      "infoPlist": "Info.plist"
+    }
   }
 }

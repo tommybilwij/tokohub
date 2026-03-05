@@ -629,6 +629,9 @@
             <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" data-tier="${tier}" title="Bulatkan ke ratusan">
               <i class="bi bi-chevron-bar-up"></i> Bulatan 100
             </button>
+            <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct" data-idx="${idx}" data-tier="${tier}">
+              <i class="bi bi-percent"></i> Ikuti Margin %
+            </button>
             <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}" data-tier="${tier}">
               <i class="bi bi-arrow-repeat"></i> Ikuti Margin
             </button>
@@ -687,14 +690,66 @@
     const tierKey = tier || 'main';
 
     // Apply same absolute margin (rupiah) from reference to current netto
+    _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, 'absolute');
+  }
+
+  function _autoAdjustJualPct(idx, tier) {
+    const item = state.items[idx];
+    if (!item.matches || !item.matches.length) return;
+    const m = item.matches[0];
+
+    const dbBeli = parseFloat(m.hbelibsr) || 0;
+    const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+    const dbPacking = parseInt(m.packing) || 1;
+    const refNettoPcs = dbNet.final / dbPacking;
+    if (!refNettoPcs) return;
+
+    let refHjual;
+    if (tier) {
+      const bundlings = m._bundlings || [];
+      const bIdx = parseInt(tier) - 1;
+      const db = bundlings[bIdx];
+      if (!db) return;
+      refHjual = {
+        hjual1: parseFloat(db.hjual1) || 0, hjual2: parseFloat(db.hjual2) || 0,
+        hjual3: parseFloat(db.hjual3) || 0, hjual4: parseFloat(db.hjual4) || 0,
+        hjual5: parseFloat(db.hjual5) || 0
+      };
+    } else {
+      refHjual = {
+        hjual1: parseFloat(m.hjual) || 0, hjual2: parseFloat(m.hjual2) || 0,
+        hjual3: parseFloat(m.hjual3) || 0, hjual4: parseFloat(m.hjual4) || 0,
+        hjual5: parseFloat(m.hjual5) || 0
+      };
+    }
+
+    const hbelibsr = item.priceBsr || 0;
+    const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+    const shippingForItem = item.bkirim || 0;
+    const finalBsr = net.final + shippingForItem;
+    const qtyKcl = item.packing || 1;
+    const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
+    if (!currentNettoPcs) return;
+
+    const target = tier ? item[`bundling${tier}`] : item;
+    const tierKey = tier || 'main';
+
+    _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, 'percent');
+  }
+
+  function _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, mode) {
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
       const refVal = refHjual[f];
       if (refVal > 0) {
-        const margin = refVal - refNettoPcs;
-        target[f] = currentNettoPcs + margin;
+        if (mode === 'percent') {
+          const pct = (refVal - refNettoPcs) / refNettoPcs;
+          target[f] = currentNettoPcs * (1 + pct);
+        } else {
+          const margin = refVal - refNettoPcs;
+          target[f] = currentNettoPcs + margin;
+        }
       }
     });
-    // Update jual input values in DOM
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
       const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
       if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
@@ -1086,6 +1141,9 @@
                        <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
                          <i class="bi bi-chevron-bar-up"></i> Bulatan 100
                        </button>
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct" data-idx="${idx}">
+                         <i class="bi bi-percent"></i> Ikuti Margin %
+                       </button>
                        <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
                          <i class="bi bi-arrow-repeat"></i> Ikuti Margin
                        </button>
@@ -1469,12 +1527,24 @@
       });
     });
 
+    // Ikuti Margin % — apply same margin percentage from STOK SAAT INI
+    $$('.btn-auto-adjust-jual-pct').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = +btn.dataset.idx;
+        const tier = btn.dataset.tier;
+        _autoAdjustJualPct(idx, tier);
+        _updateComputedPrices(idx);
+        _saveStateDebounced();
+      });
+    });
+
     // Ikuti Margin — apply same absolute margin from STOK SAAT INI
     $$('.btn-auto-adjust-jual').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
+        const tier = btn.dataset.tier;
         _autoAdjustJual(idx, tier);
         _updateComputedPrices(idx);
         _saveStateDebounced();

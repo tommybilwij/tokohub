@@ -51,6 +51,7 @@ def generate_self_signed_cert(
 
     san_entries: list[x509.GeneralName] = [
         x509.DNSName('localhost'),
+        x509.DNSName('tokosegar.local'),
         x509.IPAddress(ipaddress.IPv4Address('127.0.0.1')),
     ]
     local_ip = _get_local_ip()

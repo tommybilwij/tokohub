@@ -143,25 +143,7 @@
           {% endif %}
         </p>
         {% if lan_mode %}
-        <div class="mb-2">
-          <label class="form-label fw-semibold">URL Akses (HTTP)</label>
-          <div class="input-group input-group-sm mb-2">
-            <input type="text" class="form-control" id="lanUrlHttp" readonly
-                   value="http://{{ local_ip }}:{{ server_port }}">
-            <button class="btn btn-outline-primary" type="button" onclick="copyUrl('lanUrlHttp')">
-              <i class="bi bi-clipboard"></i> Salin
-            </button>
-          </div>
-          <label class="form-label fw-semibold">URL Akses (HTTPS — untuk kamera)</label>
-          <div class="input-group input-group-sm">
-            <input type="text" class="form-control" id="lanUrlHttps" readonly
-                   value="https://{{ local_ip }}:{{ server_port + 1 }}">
-            <button class="btn btn-outline-primary" type="button" onclick="copyUrl('lanUrlHttps')">
-              <i class="bi bi-clipboard"></i> Salin
-            </button>
-          </div>
-          <div class="form-text">Gunakan HTTPS untuk akses kamera/scanner dari perangkat lain.</div>
-        </div>
+        <div class="mb-2" id="lanUrlsContainer"></div>
         {% endif %}
         <table class="table table-sm mb-0">
           <tr><td class="fw-semibold" style="width:120px">IP Lokal</td><td>{{ local_ip }}</td></tr>
@@ -205,6 +187,37 @@
       setVal('formServer', 'server_port', cfg.server_port);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;
     });
+
+  // Populate LAN URLs from live status
+  const lanContainer = document.getElementById('lanUrlsContainer');
+  if (lanContainer) {
+    fetch('/api/lan/status').then(r => r.json()).then(s => {
+      let html = '';
+      if (s.url) {
+        html += '<label class="form-label fw-semibold">URL Akses (HTTP)</label>'
+          + '<div class="input-group input-group-sm mb-2">'
+          + '<input type="text" class="form-control" id="lanUrlHttp" readonly value="' + s.url + '">'
+          + '<button class="btn btn-outline-primary" type="button" onclick="copyUrl(\'lanUrlHttp\')"><i class="bi bi-clipboard"></i> Salin</button>'
+          + '</div>';
+      }
+      if (s.https_url) {
+        html += '<label class="form-label fw-semibold">URL Akses (HTTPS — untuk kamera)</label>'
+          + '<div class="input-group input-group-sm mb-1">'
+          + '<input type="text" class="form-control" id="lanUrlHttps" readonly value="' + s.https_url + '">'
+          + '<button class="btn btn-outline-primary" type="button" onclick="copyUrl(\'lanUrlHttps\')"><i class="bi bi-clipboard"></i> Salin</button>'
+          + '</div>';
+        if (s.https_port && s.https_port !== 443) {
+          const ipUrl = 'https://' + s.local_ip + ':' + s.https_port;
+          html += '<div class="input-group input-group-sm">'
+            + '<input type="text" class="form-control" id="lanUrlHttpsIp" readonly value="' + ipUrl + '">'
+            + '<button class="btn btn-outline-primary" type="button" onclick="copyUrl(\'lanUrlHttpsIp\')"><i class="bi bi-clipboard"></i> Salin</button>'
+            + '</div>';
+        }
+        html += '<div class="form-text">Gunakan HTTPS untuk akses kamera/scanner dari perangkat lain.</div>';
+      }
+      lanContainer.innerHTML = html;
+    });
+  }
 
   function setVal(formId, name, value) {
     const el = document.querySelector(`#${formId} [name="${name}"]`);

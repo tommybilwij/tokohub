@@ -38,6 +38,7 @@ app.config['MAX_CONTENT_LENGTH'] = settings.max_content_length
 os.makedirs(settings.upload_folder, exist_ok=True)
 
 _lan_active: bool = False
+_https_port: int | None = None
 
 
 def _allowed_file(filename):
@@ -197,11 +198,19 @@ def health():
 def api_lan_status():
     from services.lan_auth import get_local_ip
     ip = get_local_ip()
+    https_url = ''
+    if _lan_active and _https_port:
+        if _https_port == 443:
+            https_url = 'https://tokosegar.local'
+        else:
+            https_url = f'https://tokosegar.local:{_https_port}'
     return jsonify({
         'lan_mode': _lan_active,
         'local_ip': ip,
         'port': settings.server_port,
+        'https_port': _https_port,
         'url': f'http://{ip}:{settings.server_port}' if _lan_active else '',
+        'https_url': https_url,
     })
 
 
@@ -624,7 +633,7 @@ def _parse_args():
 
 
 def main():
-    global _lan_active
+    global _lan_active, _https_port
 
     args = _parse_args()
     _ensure_schema()
@@ -638,8 +647,10 @@ def main():
         from services.lan_auth import setup_lan_auth, get_local_ip
         setup_lan_auth(app)
         _lan_active = True
+        local_ip = get_local_ip()
         logger.info("LAN mode enabled — access from: http://%s:%d",
-                     get_local_ip(), port)
+                     local_ip, port)
+
 
     # When running as frozen PyInstaller binary, disable debug & reloader
     is_frozen = getattr(sys, 'frozen', False)
@@ -654,23 +665,50 @@ def main():
         except Exception:
             logger.info("SSL not available, running HTTP only")
 
-    # LAN + frozen: start an extra HTTPS server on port+1 for mobile devices
+    # LAN + frozen: start an extra HTTPS server for mobile devices
     # (mobile browsers need HTTPS for camera access / secure context)
+    # Try port 443 first (no port needed in URL), fall back to port+1.
     if _lan_active and is_frozen:
         try:
             import threading
             from werkzeug.serving import make_server
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert()
-            https_port = port + 1
-            https_server = make_server(
-                '0.0.0.0', https_port, app,
-                threaded=True,
-                ssl_context=(cert_file, key_file),
-            )
-            threading.Thread(target=https_server.serve_forever, daemon=True).start()
-            logger.info("HTTPS LAN server on port %d (for mobile camera access)",
-                        https_port)
+            https_port = None
+            for try_port in (443, port + 1):
+                try:
+                    https_server = make_server(
+                        '0.0.0.0', try_port, app,
+                        threaded=True,
+                        ssl_context=(cert_file, key_file),
+                    )
+                    https_port = try_port
+                    break
+                except PermissionError:
+                    logger.info("Cannot bind port %d (needs root), trying next", try_port)
+                except OSError as e:
+                    logger.info("Cannot bind port %d (%s), trying next", try_port, e)
+            if https_port:
+                _https_port = https_port
+                threading.Thread(target=https_server.serve_forever, daemon=True).start()
+                logger.info("HTTPS LAN server on port %d", https_port)
+                # Register mDNS so devices can reach us at tokosegar.local
+                try:
+                    import socket as _socket
+                    from zeroconf import ServiceInfo, Zeroconf
+                    svc = ServiceInfo(
+                        "_https._tcp.local.",
+                        "Stock Entry._https._tcp.local.",
+                        addresses=[_socket.inet_aton(local_ip)],
+                        port=https_port,
+                        server="tokosegar.local.",
+                    )
+                    zc = Zeroconf()
+                    zc.register_service(svc)
+                    url_display = "https://tokosegar.local" if https_port == 443 else f"https://tokosegar.local:{https_port}"
+                    logger.info("mDNS registered: %s", url_display)
+                except Exception:
+                    logger.warning("Could not register mDNS service", exc_info=True)
         except Exception:
             logger.warning("Could not start HTTPS LAN server", exc_info=True)
 

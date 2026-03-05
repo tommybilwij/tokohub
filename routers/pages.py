@@ -72,9 +72,8 @@ async def sales_history_page(request: Request, templates: Jinja2Templates = Depe
 
 @router.get('/settings')
 async def settings_page(request: Request, templates: Jinja2Templates = Depends(get_templates)):
-    from app import _lan_active
     return templates.TemplateResponse(request, 'settings.html', {
-        'lan_mode': _lan_active,
+        'lan_mode': settings.lan_mode,
         'local_ip': get_local_ip(),
         'server_port': settings.server_port,
     })

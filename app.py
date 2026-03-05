@@ -29,10 +29,6 @@ logger = logging.getLogger(__name__)
 
 os.makedirs(settings.upload_folder, exist_ok=True)
 
-_lan_active: bool = False
-_https_port: int | None = None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown: create and close DB pool."""
@@ -54,6 +50,8 @@ templates = Jinja2Templates(directory=str(_BASE_DIR / 'templates'))
 templates.env.globals['url_for'] = lambda name, filename='': f'/static/{filename}'
 templates.env.globals['store_name'] = settings.store_name
 app.state.templates = templates
+app.state.lan_active = False
+app.state.https_port = None
 
 # Middleware (order matters: last added = outermost)
 from middleware import SetupGateMiddleware
@@ -95,7 +93,6 @@ def _parse_args():
 
 def main():
     import uvicorn
-    global _lan_active, _https_port
 
     args = _parse_args()
 
@@ -107,7 +104,7 @@ def main():
         host = '0.0.0.0'
         from middleware import LANAuthMiddleware
         app.add_middleware(LANAuthMiddleware)
-        _lan_active = True
+        app.state.lan_active = True
         from services.lan_auth import get_local_ip
         local_ip = get_local_ip()
         logger.info("LAN mode enabled — access from: http://%s:%d", local_ip, port)
@@ -125,7 +122,7 @@ def main():
             logger.info("SSL not available, running HTTP only")
 
     # LAN + frozen: start HTTP + HTTPS via asyncio.gather
-    if _lan_active and is_frozen:
+    if app.state.lan_active and is_frozen:
         try:
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
@@ -143,7 +140,7 @@ def main():
                     logger.info("Cannot bind port %d (%s), trying next", try_port, e)
 
             if https_port:
-                _https_port = https_port
+                app.state.https_port = https_port
 
                 # Register mDNS
                 try:

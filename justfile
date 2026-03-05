@@ -17,8 +17,9 @@ default:
 install:
     uv sync
 
-# Run the dev server
+# Kill any leftover process on the server port and run the dev server
 run:
+    -lsof -ti :${SERVER_PORT:-5000} | xargs kill 2>/dev/null || true
     uv run python app.py
 
 # Run on a specific port

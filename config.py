@@ -140,3 +140,94 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+# ---------------------------------------------------------------------------
+# Env-var ↔ config key mapping
+# ---------------------------------------------------------------------------
+
+_KEY_TO_ENV = {
+    'db.host': 'DB_HOST',
+    'db.port': 'DB_PORT',
+    'db.user': 'DB_USER',
+    'db.password': 'DB_PASSWORD',
+    'db.name': 'DB_NAME',
+    'db.pool_size': 'DB_POOL_SIZE',
+    'openai.api_base': 'OPENAI_API_BASE',
+    'openai.api_key': 'OPENAI_API_KEY',
+    'openai.deployment_id': 'OPENAI_DEPLOYMENT_ID',
+    'openai.api_version': 'OPENAI_API_VERSION',
+    'fuzzy_cache_ttl': 'FUZZY_CACHE_TTL',
+    'fuzzy_top_n': 'FUZZY_TOP_N',
+    'fuzzy_min_score': 'FUZZY_MIN_SCORE',
+    'server_port': 'SERVER_PORT',
+    'server_host': 'SERVER_HOST',
+    'lan_mode': 'LAN_MODE',
+}
+
+
+def save_to_envrc(data: dict) -> None:
+    """Persist config values to .envrc and update the running process env + settings."""
+    envrc_path = _BASE_DIR / '.envrc'
+
+    # Build env-var updates from the flat dotted keys
+    env_updates: dict[str, str] = {}
+    for dotted_key, env_var in _KEY_TO_ENV.items():
+        parts = dotted_key.split('.')
+        # Navigate into data dict
+        val = data
+        for p in parts:
+            if isinstance(val, dict):
+                val = val.get(p, _SENTINEL)
+            else:
+                val = _SENTINEL
+                break
+        if val is not _SENTINEL:
+            env_updates[env_var] = str(val)
+
+    if not env_updates:
+        return
+
+    # Read existing .envrc lines
+    lines: list[str] = []
+    if envrc_path.exists():
+        lines = envrc_path.read_text(encoding='utf-8').splitlines()
+
+    # Update or append each env var
+    handled: set[str] = set()
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        matched = False
+        for env_var, value in env_updates.items():
+            if stripped.startswith(f'export {env_var}=') or stripped.startswith(f'{env_var}='):
+                new_lines.append(f'export {env_var}={value}')
+                handled.add(env_var)
+                matched = True
+                break
+        if not matched:
+            new_lines.append(line)
+
+    # Append any new keys not already in the file
+    for env_var, value in env_updates.items():
+        if env_var not in handled:
+            new_lines.append(f'export {env_var}={value}')
+
+    envrc_path.write_text('\n'.join(new_lines) + '\n', encoding='utf-8')
+
+    # Update os.environ so the running process picks up changes immediately
+    for env_var, value in env_updates.items():
+        os.environ[env_var] = value
+
+    # Reload the settings singleton
+    reload_settings()
+
+
+def reload_settings() -> None:
+    """Clear cached settings and rebuild the singleton."""
+    global settings
+    get_settings.cache_clear()
+    settings = get_settings()
+
+
+_SENTINEL = object()

@@ -18,7 +18,7 @@ if getattr(sys, 'frozen', False):
 else:
     _BASE_DIR = Path(__file__).parent
 
-from config import settings
+from config import settings, save_to_envrc, reload_settings
 
 # Configure logging
 logging.basicConfig(
@@ -91,6 +91,66 @@ def settings_page():
                            lan_mode=_lan_active,
                            local_ip=get_local_ip(),
                            server_port=settings.server_port)
+
+
+# ---------------------------------------------------------------------------
+# API: Settings (read / write)
+# ---------------------------------------------------------------------------
+
+def _mask(value: str, visible: int = 4) -> str:
+    """Mask a secret, showing only the last `visible` chars."""
+    if not value or len(value) <= visible:
+        return value
+    return '*' * (len(value) - visible) + value[-visible:]
+
+
+@app.route('/api/settings')
+def api_settings_get():
+    from config import settings as _s
+    return jsonify({
+        'db': {
+            'host': _s.db.host,
+            'port': _s.db.port,
+            'user': _s.db.user,
+            'password': _mask(_s.db.password),
+            'name': _s.db.name,
+            'pool_size': _s.db.pool_size,
+        },
+        'openai': {
+            'api_base': _s.openai.api_base,
+            'api_key': _mask(_s.openai.api_key),
+            'deployment_id': _s.openai.deployment_id,
+            'api_version': _s.openai.api_version,
+        },
+        'fuzzy_cache_ttl': _s.fuzzy_cache_ttl,
+        'fuzzy_top_n': _s.fuzzy_top_n,
+        'fuzzy_min_score': _s.fuzzy_min_score,
+        'server_port': _s.server_port,
+        'server_host': _s.server_host,
+        'lan_mode': _s.lan_mode,
+    })
+
+
+@app.route('/api/settings', methods=['POST'])
+def api_settings_post():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Strip out masked password fields (user didn't change them)
+    if 'db' in data and 'password' in data['db']:
+        if data['db']['password'] == '' or '*' in data['db']['password']:
+            del data['db']['password']
+    if 'openai' in data and 'api_key' in data['openai']:
+        if data['openai']['api_key'] == '' or '*' in data['openai']['api_key']:
+            del data['openai']['api_key']
+
+    try:
+        save_to_envrc(data)
+        return jsonify({'ok': True})
+    except Exception as e:
+        logger.exception("Failed to save settings")
+        return jsonify({'error': str(e)}), 500
 
 
 # ---------------------------------------------------------------------------

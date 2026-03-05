@@ -3,12 +3,139 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-6">
+  <div class="col-lg-7">
     <h4 class="mb-4"><i class="bi bi-gear"></i> Pengaturan</h4>
 
+    <!-- Database -->
     <div class="card mb-3">
       <div class="card-body">
-        <h5 class="card-title">Mode LAN</h5>
+        <h5 class="card-title"><i class="bi bi-database"></i> Database</h5>
+        <form id="formDb" class="row g-2">
+          <div class="col-md-8">
+            <label class="form-label">Host</label>
+            <input type="text" class="form-control form-control-sm" name="db.host">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Port</label>
+            <input type="number" class="form-control form-control-sm" name="db.port">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">User</label>
+            <input type="text" class="form-control form-control-sm" name="db.user">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control form-control-sm" name="db.password"
+                   placeholder="••••••••">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Database</label>
+            <input type="text" class="form-control form-control-sm" name="db.name">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Pool Size</label>
+            <input type="number" class="form-control form-control-sm" name="db.pool_size" min="1" max="50">
+          </div>
+          <div class="col-12 d-flex align-items-center gap-2 mt-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-save"></i> Simpan
+            </button>
+            <small class="text-muted fst-italic">Perlu restart untuk diterapkan</small>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Azure OpenAI -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-robot"></i> Azure OpenAI</h5>
+        <form id="formOpenai" class="row g-2">
+          <div class="col-12">
+            <label class="form-label">API Base URL</label>
+            <input type="text" class="form-control form-control-sm" name="openai.api_base">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control form-control-sm" name="openai.api_key"
+                   placeholder="••••••••">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Deployment ID</label>
+            <input type="text" class="form-control form-control-sm" name="openai.deployment_id">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">API Version</label>
+            <input type="text" class="form-control form-control-sm" name="openai.api_version">
+          </div>
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-save"></i> Simpan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Fuzzy Matching -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-search"></i> Fuzzy Matching</h5>
+        <form id="formFuzzy" class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Cache TTL (detik)</label>
+            <input type="number" class="form-control form-control-sm" name="fuzzy_cache_ttl" min="0">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Top N</label>
+            <input type="number" class="form-control form-control-sm" name="fuzzy_top_n" min="1" max="50">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Min Score</label>
+            <input type="number" class="form-control form-control-sm" name="fuzzy_min_score" min="0" max="100">
+          </div>
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-save"></i> Simpan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Server -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-hdd-network"></i> Server</h5>
+        <form id="formServer" class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Host</label>
+            <input type="text" class="form-control form-control-sm" name="server_host">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Port</label>
+            <input type="number" class="form-control form-control-sm" name="server_port" min="1" max="65535">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="lanModeCheck" name="lan_mode">
+              <label class="form-check-label" for="lanModeCheck">LAN Mode</label>
+            </div>
+          </div>
+          <div class="col-12 d-flex align-items-center gap-2 mt-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-save"></i> Simpan
+            </button>
+            <small class="text-muted fst-italic">Perlu restart untuk diterapkan</small>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- LAN Info (read-only) -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-wifi"></i> Info LAN</h5>
         <p class="mb-2">
           Status:
           {% if lan_mode %}
@@ -17,11 +144,10 @@
             <span class="badge bg-secondary">Nonaktif</span>
           {% endif %}
         </p>
-
         {% if lan_mode %}
-        <div class="mb-3">
+        <div class="mb-2">
           <label class="form-label fw-semibold">URL Akses</label>
-          <div class="input-group">
+          <div class="input-group input-group-sm">
             <input type="text" class="form-control" id="lanUrl" readonly
                    value="http://{{ local_ip }}:{{ server_port }}">
             <button class="btn btn-outline-primary" type="button" onclick="copyUrl()">
@@ -30,29 +156,115 @@
           </div>
           <div class="form-text">Buka URL ini dari perangkat lain di WiFi yang sama.</div>
         </div>
-        {% else %}
-        <p class="text-muted">
-          Jalankan server dengan flag <code>--lan</code> untuk mengaktifkan akses dari perangkat lain di jaringan lokal.
-        </p>
         {% endif %}
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Info Server</h5>
         <table class="table table-sm mb-0">
+          <tr><td class="fw-semibold" style="width:120px">IP Lokal</td><td>{{ local_ip }}</td></tr>
           <tr><td class="fw-semibold">Port</td><td>{{ server_port }}</td></tr>
-          <tr><td class="fw-semibold">IP Lokal</td><td>{{ local_ip }}</td></tr>
         </table>
       </div>
     </div>
+
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+(function() {
+  // Load current settings and populate forms
+  fetch('/api/settings')
+    .then(r => r.json())
+    .then(cfg => {
+      // DB
+      setVal('formDb', 'db.host', cfg.db.host);
+      setVal('formDb', 'db.port', cfg.db.port);
+      setVal('formDb', 'db.user', cfg.db.user);
+      setVal('formDb', 'db.name', cfg.db.name);
+      setVal('formDb', 'db.pool_size', cfg.db.pool_size);
+      // password field left empty (placeholder dots shown)
+
+      // OpenAI
+      setVal('formOpenai', 'openai.api_base', cfg.openai.api_base);
+      setVal('formOpenai', 'openai.deployment_id', cfg.openai.deployment_id);
+      setVal('formOpenai', 'openai.api_version', cfg.openai.api_version);
+      // api_key field left empty
+
+      // Fuzzy
+      setVal('formFuzzy', 'fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
+      setVal('formFuzzy', 'fuzzy_top_n', cfg.fuzzy_top_n);
+      setVal('formFuzzy', 'fuzzy_min_score', cfg.fuzzy_min_score);
+
+      // Server
+      setVal('formServer', 'server_host', cfg.server_host);
+      setVal('formServer', 'server_port', cfg.server_port);
+      document.getElementById('lanModeCheck').checked = cfg.lan_mode;
+    });
+
+  function setVal(formId, name, value) {
+    const el = document.querySelector(`#${formId} [name="${name}"]`);
+    if (el) el.value = value;
+  }
+
+  // Collect form fields into a nested object
+  function collectForm(form) {
+    const data = {};
+    form.querySelectorAll('input').forEach(input => {
+      const name = input.name;
+      if (!name) return;
+
+      let val;
+      if (input.type === 'checkbox') {
+        val = input.checked;
+      } else if (input.type === 'password') {
+        // Only send password if user typed something
+        if (!input.value) return;
+        val = input.value;
+      } else if (input.type === 'number') {
+        val = input.value === '' ? '' : Number(input.value);
+      } else {
+        val = input.value;
+      }
+
+      const parts = name.split('.');
+      if (parts.length === 2) {
+        if (!data[parts[0]]) data[parts[0]] = {};
+        data[parts[0]][parts[1]] = val;
+      } else {
+        data[name] = val;
+      }
+    });
+    return data;
+  }
+
+  // Attach save handler to each form
+  document.querySelectorAll('form[id^="form"]').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+
+      const payload = collectForm(form);
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res.ok) {
+            window.showToast && showToast('Pengaturan disimpan!', 'success');
+          } else {
+            window.showToast && showToast('Gagal: ' + (res.error || 'Unknown'), 'danger');
+          }
+        })
+        .catch(err => {
+          window.showToast && showToast('Error: ' + err.message, 'danger');
+        })
+        .finally(() => { btn.disabled = false; });
+    });
+  });
+})();
+
 function copyUrl() {
   const input = document.getElementById('lanUrl');
   navigator.clipboard.writeText(input.value).then(() => {

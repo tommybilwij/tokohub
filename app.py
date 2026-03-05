@@ -226,9 +226,9 @@ def api_restart():
         # Gracefully close server sockets so the OS releases the port
         # before exec, preventing "Address already in use" on restart.
         if _https_server:
-            _https_server.server_close()
+            _https_server.server_close()  # werkzeug HTTPS
         if _http_server:
-            _http_server.server_close()
+            _http_server.close()  # waitress HTTP
         soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
         os.closerange(3, soft)
         is_frozen = getattr(sys, 'frozen', False)
@@ -772,10 +772,10 @@ def main():
             logger.warning("Could not start HTTPS LAN server", exc_info=True)
 
     if is_frozen:
-        from werkzeug.serving import make_server
-        _http_server = make_server(host, port, app, threaded=True)
-        logger.info("Serving on %s:%d", host, port)
-        _http_server.serve_forever()
+        from waitress import create_server
+        _http_server = create_server(app, host=host, port=port, threads=8)
+        logger.info("Serving on %s:%d (waitress)", host, port)
+        _http_server.run()
     else:
         app.run(host=host, port=port, debug=use_debug, ssl_context=ssl_context)
 

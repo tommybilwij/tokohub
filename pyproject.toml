@@ -15,6 +15,7 @@ dependencies = [
     "pyyaml>=6.0",
     "cryptography>=46.0.5",
     "zeroconf>=0.148.0",
+    "waitress>=3.0",
 ]
 
 [dependency-groups]

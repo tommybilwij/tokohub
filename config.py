@@ -36,7 +36,7 @@ class DatabaseSettings(BaseSettings):
     password: str = ''
     name: str = 'myposse'
     charset: str = 'latin1'
-    pool_size: int = 5
+    pool_size: int = 10
 
     @classmethod
     def settings_customise_sources(

@@ -473,7 +473,7 @@
       el.addEventListener('click', () => {
         if (!requireHeaderFields()) return;
         dom.searchResults.classList.add('d-none');
-        addItem(item.artname, item.artpabrik || '', 1, 0, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
+        addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
                 null, null, null, null);
         dom.itemNameInput.value = '';
         dom.itemNameInput.focus();
@@ -1521,7 +1521,7 @@
         item.selectedArtno = m.artno;
         if (m.artpabrik && !item.barcode) item.barcode = m.artpabrik;
         if (m.satbesar) item.satuanBsr = m.satbesar;
-        if (m.packing) item.packing = m.packing;
+        if (m.packing) { item.packing = m.packing; item.qtyKecil = m.packing; }
         // disc/ppn NOT auto-populated — user enters manually
         // Auto-populate harga jual from match
         if (!parseFloat(item.hjual1)) item.hjual1 = parseFloat(m.hjual) || null;
@@ -1650,7 +1650,7 @@
     item.matches = [match];
     if (match.artpabrik) item.barcode = match.artpabrik;
     if (match.satbesar) item.satuanBsr = match.satbesar;
-    if (match.packing) item.packing = match.packing;
+    if (match.packing) { item.packing = match.packing; item.qtyKecil = match.packing; }
     // disc/ppn NOT auto-populated — user enters manually
     item.hjual1 = parseFloat(match.hjual) || null;
     item.hjual2 = parseFloat(match.hjual2) || null;

@@ -138,7 +138,7 @@ build-sidecar:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Building PyInstaller sidecar..."
-    uv run --group dev pyinstaller pyinstaller.spec --noconfirm --clean
+    uv run --group dev python -m PyInstaller pyinstaller.spec --noconfirm --clean
     echo "Copying sidecar to src-tauri/binaries/..."
     mkdir -p src-tauri/binaries
     # Copy exe + _internal as Tauri resources (not externalBin)

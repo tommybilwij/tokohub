@@ -87,13 +87,30 @@ def generate_self_signed_cert(
     return str(cert_path), str(key_path)
 
 
+def _cert_is_valid(cert_path: Path, min_remaining_days: int = 30) -> bool:
+    """Check if an existing certificate is still valid for at least min_remaining_days."""
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        remaining = cert.not_valid_after_utc - datetime.now(timezone.utc)
+        if remaining.total_seconds() <= 0:
+            logger.warning("SSL cert has expired")
+            return False
+        if remaining.days < min_remaining_days:
+            logger.warning("SSL cert expires in %d days, will regenerate", remaining.days)
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("Could not read SSL cert for expiry check: %s", exc)
+        return False
+
+
 def ensure_ssl_cert(cert_dir: Path | str = _DEFAULT_CERT_DIR) -> tuple[str, str]:
-    """Return (cert_path, key_path), generating if missing."""
+    """Return (cert_path, key_path), generating if missing or expiring within 30 days."""
     cert_dir = Path(cert_dir)
     cert_path = cert_dir / _CERT_FILENAME
     key_path = cert_dir / _KEY_FILENAME
 
-    if cert_path.exists() and key_path.exists():
+    if cert_path.exists() and key_path.exists() and _cert_is_valid(cert_path):
         return str(cert_path), str(key_path)
 
     return generate_self_signed_cert(cert_dir)

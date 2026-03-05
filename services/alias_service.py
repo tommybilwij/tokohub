@@ -23,12 +23,16 @@ def normalize_alias(name):
 async def find_by_alias(pool, name):
     """Look up an artno by alias name. Returns artno or None."""
     normalized = normalize_alias(name)
-    row = await execute_single(
-        pool,
-        "SELECT artno FROM stock_alias WHERE alias_name = %s",
-        (normalized,)
-    )
-    return row['artno'] if row else None
+    try:   
+        row = await execute_single(
+            pool,
+            "SELECT artno FROM stock_alias WHERE alias_name = %s",
+            (normalized,)
+        )
+        return row['artno'] if row else None
+    except Exception:
+        logger.debug("stock_alias table not available, skipping alias lookup")
+        return None
 
 
 async def save_alias(pool, alias_name, artno, created_by='RECEIPT_APP'):

@@ -29,7 +29,7 @@
     orderDate:       $('#orderDate'),
     itemNameInput:   $('#itemNameInput'),
     btnAddItem:      $('#btnAddItem'),
-    shippingCostInput: $('#shippingCostInput'),
+    shippingCostInput: null, // removed — now per-item
     searchResults:   $('#searchResults'),
     itemTableBody:   $('#itemTableBody'),
     itemCount:       $('#itemCount'),
@@ -118,7 +118,6 @@
           user: dom.userSelect ? dom.userSelect.value : '',
           vendor: dom.vendorSelect ? dom.vendorSelect.value : '',
           orderDate: dom.orderDate ? dom.orderDate.value : '',
-          shippingCost: dom.shippingCostInput ? dom.shippingCostInput.value : '',
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -142,6 +141,7 @@
         item.disc2 = parseFloat(item.disc2) || null;
         item.disc3 = parseFloat(item.disc3) || null;
         item.ppn = parseFloat(item.ppn) || null;
+        item.bkirim = parseFloat(item.bkirim) || 0;
         // Sanitize hjual — NaN from old buggy auto-adjust
         ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
           if (item[f] != null && isNaN(item[f])) item[f] = null;
@@ -196,10 +196,6 @@
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
         if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
-        if (draft.header.shippingCost && dom.shippingCostInput) {
-          const sc = parsePrice(draft.header.shippingCost);
-          dom.shippingCostInput.value = sc ? formatNumber(sc) : '0.00';
-        }
       }
 
       return true;
@@ -385,11 +381,14 @@
     dom.vendorSelect.addEventListener('change', _saveStateDebounced);
     dom.orderDate.addEventListener('change', _saveStateDebounced);
 
-    // Shipping cost: format on blur + recalc all items
-    dom.shippingCostInput.addEventListener('change', () => {
-      const val = parsePrice(dom.shippingCostInput.value);
-      dom.shippingCostInput.value = val ? formatNumber(val) : '0.00';
-      state.items.forEach((_, idx) => _updateComputedPrices(idx));
+    // Per-item shipping cost: delegate change events
+    document.addEventListener('change', (e) => {
+      if (!e.target.matches('.edit-bkirim')) return;
+      const idx = parseInt(e.target.dataset.idx);
+      const val = parsePrice(e.target.value);
+      e.target.value = val ? formatNumber(val) : '';
+      state.items[idx].bkirim = val || 0;
+      _updateComputedPrices(idx);
       _saveStateDebounced();
     });
 
@@ -474,8 +473,8 @@
       el.addEventListener('click', () => {
         if (!requireHeaderFields()) return;
         dom.searchResults.classList.add('d-none');
-        addItem(item.artname, item.artpabrik || '', 1, 0, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
-                null, null, null, null);
+        addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
+                parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
         dom.itemNameInput.value = '';
         dom.itemNameInput.focus();
       });
@@ -579,7 +578,6 @@
   function clearAllItems() {
     if (state.items.length === 0) return;
     state.items = [];
-    dom.shippingCostInput.value = '0.00';
     renderItemTable();
     showToast('Semua item dihapus', 'info');
   }
@@ -610,31 +608,22 @@
     return `<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>${rowsHTML}</tbody></table>`;
   }
 
-  // Render a bundling group (1 or 2) for the detail panel
-  function _renderBundlingGroup(idx, tier, b, item) {
+  // Render bundling group inline (no per-section buttons, used in 3-column jual row)
+  function _renderBundlingGroupInline(idx, tier, b, item) {
     const checked = b.enabled ? 'checked' : '';
     const disabled = b.enabled ? '' : 'disabled';
     const vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
-    const showBtns = b.enabled && item.status === 'auto' && item._refHjual;
     return `
-      <div class="dp-bundling-section">
-        <div class="dp-section-header">
+      <div class="dp-jual-col dp-bundling-inline">
+        <div class="dp-jual-col-header">
           <label class="bundling-toggle">
             <input type="checkbox" class="form-check-input bundling-enable" data-idx="${idx}" data-tier="${tier}" ${checked}>
-            Harga Jual (Bundling ${tier})
+            Bundling ${tier}
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty" data-idx="${idx}" data-tier="${tier}"
                    value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${disabled}> <span style="text-transform:none">Pcs</span>
           </span>
-          ${showBtns ? `<span class="auto-adjust-group">
-            <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" data-tier="${tier}" title="Bulatkan ke ratusan">
-              <i class="bi bi-chevron-bar-up"></i> Bulatan 100
-            </button>
-            <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}" data-tier="${tier}">
-              <i class="bi bi-arrow-repeat"></i> Ikuti Margin
-            </button>
-          </span>` : ''}
         </div>
         <div class="bundling-fields${b.enabled ? '' : ' bundling-fields-disabled'}" data-idx="${idx}" data-tier="${tier}">
           ${_renderJualTable(idx, tier, vals)}
@@ -675,15 +664,10 @@
       };
     }
 
-    // Current netto per pcs (including shipping)
+    // Current netto per pcs (including per-item shipping)
     const hbelibsr = item.priceBsr || 0;
     const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
-    const totalShipping = parsePrice(dom.shippingCostInput.value);
-    let shippingForItem = 0;
-    if (totalShipping > 0) {
-      const itemCount = state.items.length;
-      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
-    }
+    const shippingForItem = item.bkirim || 0;
     const finalBsr = net.final + shippingForItem;
     const qtyKcl = item.packing || 1;
     const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
@@ -694,14 +678,66 @@
     const tierKey = tier || 'main';
 
     // Apply same absolute margin (rupiah) from reference to current netto
+    _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, 'absolute');
+  }
+
+  function _autoAdjustJualPct(idx, tier) {
+    const item = state.items[idx];
+    if (!item.matches || !item.matches.length) return;
+    const m = item.matches[0];
+
+    const dbBeli = parseFloat(m.hbelibsr) || 0;
+    const dbNet = calcNetPrice(dbBeli, parseFloat(m.pctdisc1)||0, parseFloat(m.pctdisc2)||0, parseFloat(m.pctdisc3)||0, parseFloat(m.pctppn)||0);
+    const dbPacking = parseInt(m.packing) || 1;
+    const refNettoPcs = dbNet.final / dbPacking;
+    if (!refNettoPcs) return;
+
+    let refHjual;
+    if (tier) {
+      const bundlings = m._bundlings || [];
+      const bIdx = parseInt(tier) - 1;
+      const db = bundlings[bIdx];
+      if (!db) return;
+      refHjual = {
+        hjual1: parseFloat(db.hjual1) || 0, hjual2: parseFloat(db.hjual2) || 0,
+        hjual3: parseFloat(db.hjual3) || 0, hjual4: parseFloat(db.hjual4) || 0,
+        hjual5: parseFloat(db.hjual5) || 0
+      };
+    } else {
+      refHjual = {
+        hjual1: parseFloat(m.hjual) || 0, hjual2: parseFloat(m.hjual2) || 0,
+        hjual3: parseFloat(m.hjual3) || 0, hjual4: parseFloat(m.hjual4) || 0,
+        hjual5: parseFloat(m.hjual5) || 0
+      };
+    }
+
+    const hbelibsr = item.priceBsr || 0;
+    const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
+    const shippingForItem = item.bkirim || 0;
+    const finalBsr = net.final + shippingForItem;
+    const qtyKcl = item.packing || 1;
+    const currentNettoPcs = qtyKcl > 0 ? finalBsr / qtyKcl : 0;
+    if (!currentNettoPcs) return;
+
+    const target = tier ? item[`bundling${tier}`] : item;
+    const tierKey = tier || 'main';
+
+    _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, 'percent');
+  }
+
+  function _applyMarginToTarget(target, tierKey, idx, refHjual, refNettoPcs, currentNettoPcs, mode) {
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
       const refVal = refHjual[f];
       if (refVal > 0) {
-        const margin = refVal - refNettoPcs;
-        target[f] = currentNettoPcs + margin;
+        if (mode === 'percent') {
+          const pct = (refVal - refNettoPcs) / refNettoPcs;
+          target[f] = currentNettoPcs * (1 + pct);
+        } else {
+          const margin = refVal - refNettoPcs;
+          target[f] = currentNettoPcs + margin;
+        }
       }
     });
-    // Update jual input values in DOM
     ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
       const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
       if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
@@ -757,15 +793,8 @@
       if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
     });
 
-    // Shipping cost divided equally per item
-    const totalShipping = parsePrice(dom.shippingCostInput.value);
-    let shippingForItem = 0;
-    if (totalShipping > 0) {
-      const itemCount = state.items.length;
-      shippingForItem = itemCount > 0 ? totalShipping / itemCount : 0;
-    }
-    const shippingValEl = document.querySelector(`.bt-shipping-val[data-idx="${idx}"]`);
-    if (shippingValEl) shippingValEl.textContent = shippingForItem ? formatNumber(shippingForItem) : '—';
+    // Per-item shipping cost
+    const shippingForItem = item.bkirim || 0;
 
     // Netto /Bsr and /Pcs (final = netto + ppn + shipping for this item)
     const finalBsr = net.final + shippingForItem;
@@ -864,8 +893,10 @@
         let marginHTML = '';
         if (val > 0 && dsiNettoPcs) {
           const mg = val - dsiNettoPcs;
+          const pct = (mg / dsiNettoPcs * 100).toFixed(1);
           const isNeg = mg < 0;
-          marginHTML = `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
+          marginHTML = `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '' : '+'}${pct}%</span>`
+                     + `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
         }
         const emptyCls = val ? '' : ' dsi-pt-empty';
         return `<td><span class="dsi-pt-val${emptyCls}">${val ? formatNumber(val) : '—'}</span>${marginHTML}</td>`;
@@ -1020,7 +1051,7 @@
         <td colspan="8">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
-            <!-- Left: Harga Beli -->
+            <!-- Row 1: Harga Beli (full width) -->
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
@@ -1082,9 +1113,10 @@
                        value="${item.foc || ''}" placeholder="0" min="0" step="1">
                 <span class="bt-unit">Pcs</span>
               </div>
-              <div class="beli-row-shipping" title="Dari input Biaya Kirim di bawah, dibagi rata per item">
+              <div class="beli-row-shipping">
                 <span class="bt-label">B.Kirim</span>
-                <span class="bt-shipping-val" data-idx="${idx}">—</span>
+                <input type="text" class="amt-input edit-bkirim" data-idx="${idx}"
+                       value="${item.bkirim ? formatNumber(item.bkirim) : ''}" placeholder="0" inputmode="decimal">
               </div>
               <div class="dp-netto-row">
                 <span class="dp-label">Netto</span>
@@ -1092,23 +1124,30 @@
                 <span class="dp-netto-val netto-pcs" data-idx="${idx}">—</span><span class="dp-unit">/Pcs</span>
               </div>
             </div>
-            <!-- Right: Harga Jual -->
-            <div class="dp-section dp-jual">
-              <div class="dp-section-header">Harga Jual (Satuan)${(item.status === 'auto' && item._refHjual)
+            <!-- Row 2: Harga Jual wrapper -->
+            <div class="dp-section dp-jual-wrapper">
+              <div class="dp-section-header">Harga Jual${(item.status === 'auto' && item._refHjual)
                 ? ` <span class="auto-adjust-group">
-                       <button type="button" class="auto-adjust-toggle btn-round-hundred" data-idx="${idx}" title="Bulatkan ke ratusan">
-                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-pct-all" data-idx="${idx}">
+                         <i class="bi bi-percent"></i> Ikuti Margin %
                        </button>
-                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual" data-idx="${idx}">
+                       <button type="button" class="auto-adjust-toggle btn-auto-adjust-jual-all" data-idx="${idx}">
                          <i class="bi bi-arrow-repeat"></i> Ikuti Margin
+                       </button>
+                       <button type="button" class="auto-adjust-toggle btn-round-hundred-all" data-idx="${idx}" title="Bulatkan ke ratusan (semua)">
+                         <i class="bi bi-chevron-bar-up"></i> Bulatan 100
                        </button>
                      </span>`
                 : ''}</div>
-              ${_renderJualTable(idx, null, mainJualVals)}
+              <div class="dp-jual-row">
+                <div class="dp-jual-col">
+                  <div class="dp-jual-col-header">Satuan</div>
+                  ${_renderJualTable(idx, null, mainJualVals)}
+                </div>
+                ${_renderBundlingGroupInline(idx, 1, item.bundling1, item)}
+                ${_renderBundlingGroupInline(idx, 2, item.bundling2, item)}
+              </div>
             </div>
-            <!-- Full-width: Bundling -->
-            ${_renderBundlingGroup(idx, 1, item.bundling1, item)}
-            ${_renderBundlingGroup(idx, 2, item.bundling2, item)}
           </div>
         </td>
       `;
@@ -1460,35 +1499,54 @@
       });
     });
 
-    // Ikuti H.Beli button — one-time adjust jual to match existing margins
-    // Round up jual prices to nearest 100
-    $$('.btn-round-hundred').forEach(btn => {
+    // Bulatan 100 — apply to ALL tiers (main + bundling 1 + bundling 2)
+    $$('.btn-round-hundred-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
         const item = state.items[idx];
-        const target = tier ? item[`bundling${tier}`] : item;
-        const tierKey = tier || 'main';
-        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          if (target[f] > 0) target[f] = Math.ceil(target[f] / 100) * 100;
-        });
-        ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
-          const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
-          if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
+        [null, '1', '2'].forEach(tier => {
+          const target = tier ? item[`bundling${tier}`] : item;
+          if (tier && !target.enabled) return;
+          const tierKey = tier || 'main';
+          ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+            if (target[f] > 0) target[f] = Math.ceil(target[f] / 100) * 100;
+          });
+          ['hjual1','hjual2','hjual3','hjual4','hjual5'].forEach(f => {
+            const input = document.querySelector(`.jual-input[data-idx="${idx}"][data-tier="${tierKey}"][data-field="${f}"]`);
+            if (input) input.value = (target[f] != null && !isNaN(target[f])) ? formatNumber(target[f]) : '';
+          });
         });
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });
     });
 
-    // Ikuti Margin — apply same absolute margin from STOK SAAT INI
-    $$('.btn-auto-adjust-jual').forEach(btn => {
+    // Ikuti Margin % — apply to ALL tiers
+    $$('.btn-auto-adjust-jual-pct-all').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
         const idx = +btn.dataset.idx;
-        const tier = btn.dataset.tier; // undefined for main, "1"/"2" for bundling
-        _autoAdjustJual(idx, tier);
+        const item = state.items[idx];
+        [undefined, '1', '2'].forEach(tier => {
+          if (tier && !item[`bundling${tier}`].enabled) return;
+          _autoAdjustJualPct(idx, tier);
+        });
+        _updateComputedPrices(idx);
+        _saveStateDebounced();
+      });
+    });
+
+    // Ikuti Margin — apply to ALL tiers
+    $$('.btn-auto-adjust-jual-all').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = +btn.dataset.idx;
+        const item = state.items[idx];
+        [undefined, '1', '2'].forEach(tier => {
+          if (tier && !item[`bundling${tier}`].enabled) return;
+          _autoAdjustJual(idx, tier);
+        });
         _updateComputedPrices(idx);
         _saveStateDebounced();
       });
@@ -1534,8 +1592,11 @@
         item.selectedArtno = m.artno;
         if (m.artpabrik && !item.barcode) item.barcode = m.artpabrik;
         if (m.satbesar) item.satuanBsr = m.satbesar;
-        if (m.packing) item.packing = m.packing;
-        // disc/ppn NOT auto-populated — user enters manually
+        if (m.packing) { item.packing = m.packing; item.qtyKecil = m.packing; }
+        if (item.disc1 == null) item.disc1 = parseFloat(m.pctdisc1) || null;
+        if (item.disc2 == null) item.disc2 = parseFloat(m.pctdisc2) || null;
+        if (item.disc3 == null) item.disc3 = parseFloat(m.pctdisc3) || null;
+        if (item.ppn == null) item.ppn = parseFloat(m.pctppn) || null;
         // Auto-populate harga jual from match
         if (!parseFloat(item.hjual1)) item.hjual1 = parseFloat(m.hjual) || null;
         if (!parseFloat(item.hjual2)) item.hjual2 = parseFloat(m.hjual2) || null;
@@ -1663,8 +1724,11 @@
     item.matches = [match];
     if (match.artpabrik) item.barcode = match.artpabrik;
     if (match.satbesar) item.satuanBsr = match.satbesar;
-    if (match.packing) item.packing = match.packing;
-    // disc/ppn NOT auto-populated — user enters manually
+    if (match.packing) { item.packing = match.packing; item.qtyKecil = match.packing; }
+    item.disc1 = parseFloat(match.pctdisc1) || null;
+    item.disc2 = parseFloat(match.pctdisc2) || null;
+    item.disc3 = parseFloat(match.pctdisc3) || null;
+    item.ppn = parseFloat(match.pctppn) || null;
     item.hjual1 = parseFloat(match.hjual) || null;
     item.hjual2 = parseFloat(match.hjual2) || null;
     item.hjual3 = parseFloat(match.hjual3) || null;
@@ -1810,6 +1874,7 @@
       hjual5_override: i.hjual5,
       satuan_bsr: i.satuanBsr,
       packing_override: i.qtyKecil || i.packing || 0,
+      shipping_cost: i.bkirim || 0,
     };
     const b1 = _buildBundlingPayload(i.bundling1);
     const b2 = _buildBundlingPayload(i.bundling2);
@@ -1823,7 +1888,6 @@
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
 
-    const shippingCost = parsePrice(dom.shippingCostInput.value);
     const items = state.items
       .filter((i) => i.selectedArtno)
       .map(_buildItemPayload);
@@ -1838,7 +1902,6 @@
           supplier_id: supplierId,
           items,
           order_date: dom.orderDate.value,
-          shipping_cost: shippingCost,
         },
       });
 
@@ -1906,7 +1969,6 @@
 
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
-    const shippingCost = parsePrice(dom.shippingCostInput.value);
     const matched = state.items.filter((i) => i.selectedArtno);
 
     // Block if any item has QTY KCL = 0
@@ -1928,7 +1990,6 @@
           userid: userId,
           items,
           order_date: dom.orderDate.value,
-          shipping_cost: shippingCost,
         },
       });
 

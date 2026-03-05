@@ -41,6 +41,7 @@ class POItem(BaseModel):
     qty_besar: float | None = None
     satuan_bsr: str | None = None
     foc: int = 0
+    shipping_cost: float = 0
     bundling1: dict | None = None
     bundling2: dict | None = None
 
@@ -49,7 +50,7 @@ class POPreviewRequest(BaseModel):
     supplier_id: str
     items: list[POItem]
     order_date: str | None = None
-    shipping_cost: float = 0
+    shipping_cost: float = 0  # legacy total fallback
 
 
 class POCommitRequest(BaseModel):
@@ -57,4 +58,4 @@ class POCommitRequest(BaseModel):
     userid: str
     items: list[POItem]
     order_date: str | None = None
-    shipping_cost: float = 0
+    shipping_cost: float = 0  # legacy total fallback

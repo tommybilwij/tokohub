@@ -9,11 +9,17 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 
 from dependencies import get_db
-from services.db import execute_query
+from services.db import execute_query, execute_single
 
 router = APIRouter()
 
 _KASSA_IDS = ('002', '003', '004')
+
+
+@router.get('/api/sales/departments')
+async def api_departments(db: aiomysql.Pool = Depends(get_db)):
+    rows = await execute_query(db, "SELECT deptid, dpdesc FROM dept ORDER BY deptid")
+    return [{'id': r['deptid'], 'name': r['dpdesc']} for r in rows]
 
 
 def _parse_sales_range(raw_from: str, raw_to: str):
@@ -59,7 +65,7 @@ async def _sl_table_names(db, dt_from, dt_to):
     return [r['TABLE_NAME'] for r in rows]
 
 
-async def _query_sales(db, dt_from, dt_to):
+async def _query_sales(db, dt_from, dt_to, dept=None):
     """Query sl* tables for sales in the given datetime range."""
     tables = await _sl_table_names(db, dt_from, dt_to)
     if not tables:
@@ -69,17 +75,23 @@ async def _query_sales(db, dt_from, dt_to):
         f"SELECT artno, transtime, qty, unitprc, netamount FROM `{t}`"
         for t in tables
     )
+    params = [dt_from, dt_to]
+    dept_filter = ''
+    if dept:
+        dept_filter = ' AND st.deptid = %s'
+        params.append(dept)
+
     sql = (
-        f"SELECT s.artno, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
+        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
         f"SUM(s.qty) AS total_qty, SUM(s.netamount) AS total_amount "
         f"FROM ({unions}) s "
         f"JOIN stock st ON st.artno = s.artno "
-        f"WHERE s.transtime BETWEEN %s AND %s "
-        f"GROUP BY s.artno, st.artname, st.artpabrik, s.unitprc "
+        f"WHERE s.transtime BETWEEN %s AND %s{dept_filter} "
+        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik, s.unitprc "
         f"ORDER BY total_amount DESC"
     )
 
-    return await execute_query(db, sql, (dt_from, dt_to))
+    return await execute_query(db, sql, tuple(params))
 
 
 # Use request directly since 'from' is a Python reserved keyword
@@ -91,7 +103,8 @@ async def api_sales_history(request: Request, db: aiomysql.Pool = Depends(get_db
     if not dt_from:
         return []
 
-    rows = await _query_sales(db, dt_from, dt_to)
+    dept = request.query_params.get('dept', '')
+    rows = await _query_sales(db, dt_from, dt_to, dept=dept or None)
     for r in rows:
         for k in ('hjual', 'total_qty', 'total_amount'):
             if r.get(k) is not None:
@@ -107,16 +120,19 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
     if not dt_from:
         return {'error': 'from and to are required'}
 
-    rows = await _query_sales(db, dt_from, dt_to)
+    dept = request.query_params.get('dept', '')
+    rows = await _query_sales(db, dt_from, dt_to, dept=dept or None)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['Artno', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
+    writer.writerow(['Artno', 'Dept', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
     for r in rows:
+        barcode = r.get('barcode', '') or ''
         writer.writerow([
             r.get('artno', ''),
+            r.get('deptid', ''),
             r.get('artname', ''),
-            r.get('barcode', ''),
+            f"'{barcode}" if barcode else '',
             r.get('hjual', 0),
             r.get('total_qty', 0),
             r.get('total_amount', 0),

@@ -111,7 +111,9 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
     artno_list = [item['artno'] for item in items]
     stock_map = await get_stock_details(pool, artno_list)
 
-    shipping = Decimal(str(shipping_cost or 0))
+    # Per-item shipping: sum item-level shipping_cost; fall back to header-level total
+    has_per_item_shipping = any(item.get('shipping_cost') for item in items)
+    header_shipping = Decimal(str(shipping_cost or 0))
 
     lines = []
     grand_total = Decimal('0')
@@ -166,6 +168,12 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
         amount = (hbelinetto + ppn) * qty
         netto_full = hbelinetto + ppn  # per-unit netto including PPN (before shipping)
 
+        # Per-item shipping
+        item_shipping = Decimal(str(item.get('shipping_cost') or 0)) if has_per_item_shipping else Decimal('0')
+        amount_with_ship = amount + item_shipping
+        netto_full_with_ship = netto_full + (item_shipping / qty if qty else Decimal('0'))
+        jlhppn_with_ship = float(ppn * qty) + float(item_shipping)
+
         lines.append({
             'artno': artno,
             'artpabrik': stock['artpabrik'] or '',
@@ -178,7 +186,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
             'hbelibsr': float(hbelibsr),
             'hbelikcl': float(hbelikcl),
             'hbelinetto': float(hbelinetto),
-            'netto_full': float(netto_full),
+            'netto_full': float(netto_full_with_ship),
             'jlhdisc1': float(disc1 * qty),
             'jlhdisc2': float(disc2 * qty),
             'jlhdisc3': float(disc3 * qty),
@@ -186,7 +194,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
             'pctdisc2': float(pctdisc2),
             'pctdisc3': float(pctdisc3),
             'pctppn': float(pctppn),
-            'jlhppn': float(ppn * qty),
+            'jlhppn': jlhppn_with_ship,
             'jlhdisc1_kcl': float(disc1_kcl),
             'jlhdisc2_kcl': float(disc2_kcl),
             'jlhdisc3_kcl': float(disc3_kcl),
@@ -198,23 +206,23 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
             'hjual4': float(item['hjual4_override']) if item.get('hjual4_override') is not None else float(stock['hjual4'] or 0),
             'hjual5': float(item['hjual5_override']) if item.get('hjual5_override') is not None else float(stock['hjual5'] or 0),
             'foc': int(item.get('foc', 0)),
-            'amount': float(amount),
+            'amount': float(amount_with_ship),
             'bundling1': item.get('bundling1'),
             'bundling2': item.get('bundling2'),
         })
-        grand_total += amount
+        grand_total += amount_with_ship
 
-    # Distribute shipping cost equally into each line's netto_full and proportionally into jlhppn/amount
-    num_lines = len(lines)
-    if shipping > 0 and grand_total > 0:
-        shipping_per_item = float(shipping / num_lines)
+    # Legacy fallback: distribute header-level shipping if no per-item shipping was provided
+    if not has_per_item_shipping and header_shipping > 0 and grand_total > 0:
+        num_lines = len(lines)
+        shipping_per_item = float(header_shipping / num_lines)
         for line in lines:
             weight = Decimal(str(line['amount'])) / grand_total
-            line_shipping = float(shipping * weight)
+            line_shipping = float(header_shipping * weight)
             line['jlhppn'] = line['jlhppn'] + line_shipping
             line['amount'] = line['amount'] + line_shipping
             line['netto_full'] = line['netto_full'] + shipping_per_item
-        grand_total += shipping
+        grand_total += header_shipping
 
     return {
         'supplier_id': supplier_id,
@@ -222,7 +230,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
         'lines': lines,
         'grand_total': float(grand_total),
         'line_count': len(lines),
-        'shipping_cost': float(shipping),
+        'shipping_cost': float(sum(Decimal(str(item.get('shipping_cost') or 0)) for item in items) or header_shipping),
     }
 
 

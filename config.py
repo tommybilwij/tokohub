@@ -13,8 +13,10 @@ _BASE_DIR = Path(__file__).parent
 
 # Determine .envrc location: frozen builds use a stable user-writable path
 if getattr(sys, 'frozen', False):
-    _ENVRC_PATH = Path.home() / '.tokohub' / '.envrc'
+    _USER_DATA_DIR = Path.home() / '.tokohub'
+    _ENVRC_PATH =  _USER_DATA_DIR / '.envrc'
 else:
+    _USER_DATA_DIR = _BASE_DIR
     _ENVRC_PATH = _BASE_DIR / '.envrc'
 
 # Load .envrc into os.environ BEFORE constructing any settings.
@@ -82,8 +84,8 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    upload_folder: Path = _BASE_DIR / 'uploads'
-    log_folder: Path = _BASE_DIR / 'logs'
+    upload_folder: Path = _USER_DATA_DIR / 'uploads'
+    log_folder: Path = _USER_DATA_DIR / 'logs'
     allowed_extensions: set[str] = {'png', 'jpg', 'jpeg', 'csv', 'xlsx'}
     max_content_length: int = 16 * 1024 * 1024
 

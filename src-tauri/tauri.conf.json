@@ -18,7 +18,8 @@
         "resizable": true,
         "minimizable": true,
         "maximizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "zoomHotkeysEnabled": true
       }
     ]
   },

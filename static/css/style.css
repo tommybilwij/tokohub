@@ -419,8 +419,8 @@ body {
    Detail Panel — Grid Layout (Phase 4: more spacing)
    ----------------------------------------------------------------------- */
 .dp-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   padding: 0.75rem 1rem 0.75rem 2.5rem;
 }
@@ -467,18 +467,43 @@ body {
   border-bottom-color: var(--clr-accent-100);
 }
 
-.dp-jual {
+/* Harga Jual wrapper — same style as dp-beli */
+.dp-jual-wrapper {
   border-color: var(--clr-accent-100);
   border-left: 4px solid var(--clr-accent-600);
   background: var(--clr-card-bg);
 }
 
-.dp-jual .dp-section-header {
+.dp-jual-wrapper > .dp-section-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   color: var(--clr-accent-800);
   border-bottom-color: var(--clr-accent-100);
+}
+
+/* Jual row: 3-column layout (Satuan | Bundling 1 | Bundling 2) */
+.dp-jual-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* Column headers inside jual row */
+.dp-jual-col-header {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--clr-accent-800);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--clr-accent-100);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Match bundling header height (checkbox + qty input) */
+  min-height: 38px;
 }
 
 /* -----------------------------------------------------------------------
@@ -579,7 +604,7 @@ body {
 
 /* Inputs inside beli-table */
 .beli-table .pct-input {
-  width: 78px;
+  width: 90px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);
@@ -591,7 +616,7 @@ body {
 }
 
 .beli-table .amt-input {
-  width: 82px;
+  width: 120px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);
@@ -604,7 +629,7 @@ body {
 }
 
 .beli-table .amt-total {
-  width: 100px;
+  width: 140px;
   margin: 0 auto;
   display: block;
   font-size: var(--fs-base);
@@ -628,10 +653,6 @@ body {
   border-top: 1px dashed var(--clr-accent-100);
 }
 
-.beli-row-shipping {
-  cursor: help;
-}
-
 .beli-row-foc .bt-label,
 .beli-row-shipping .bt-label {
   font-weight: var(--fw-semibold);
@@ -647,10 +668,9 @@ body {
   font-size: var(--fs-base);
 }
 
-.beli-row-shipping .bt-shipping-val {
-  flex: 1;
-  text-align: center;
-  font-weight: var(--fw-semibold);
+.beli-row-shipping .edit-bkirim {
+  width: 100px;
+  margin: 0 8px;
 }
 
 .dp-netto-val {
@@ -762,7 +782,6 @@ body {
    Bundling sections — Phase 4: dashed border, lighter accent
    ----------------------------------------------------------------------- */
 .dp-bundling-section {
-  grid-column: 1 / -1;
   background: var(--clr-card-bg);
   border: 1px solid var(--clr-accent-100);
   border-left: 4px solid var(--clr-accent-600);
@@ -990,7 +1009,6 @@ body {
    Stock Info Banner — "STOK SAAT INI" (Phase 4: flat bg)
    ----------------------------------------------------------------------- */
 .dp-stock-info {
-  grid-column: 1 / -1;
   background: var(--clr-neutral-50);
   border: 1px solid var(--clr-neutral-300);
   border-left: 4px solid var(--clr-neutral-500);
@@ -1397,7 +1415,7 @@ body {
    Responsive — Phase 6: tablet breakpoint at 1200px
    ----------------------------------------------------------------------- */
 @media (max-width: 1200px) {
-  .dp-grid {
+  .dp-jual-row {
     grid-template-columns: 1fr;
   }
 }
@@ -1409,9 +1427,12 @@ body {
   }
 
   .dp-grid {
-    grid-template-columns: 1fr;
     padding: 0.5rem 0.75rem;
     gap: 0.5rem;
+  }
+
+  .dp-jual-row {
+    grid-template-columns: 1fr;
   }
 
   .dsi-beli-row {

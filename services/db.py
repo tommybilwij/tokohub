@@ -25,6 +25,8 @@ async def create_pool():
         minsize=2,
         maxsize=cfg.pool_size,
         autocommit=False,
+        pool_recycle=300,
+        connect_timeout=10,
     )
     logger.info("Database connection pool created (%s connections)", cfg.pool_size)
 

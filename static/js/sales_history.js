@@ -176,6 +176,7 @@
     elBody.innerHTML = sorted.map(function (r, i) {
       return '<tr>' +
         '<td class="text-center">' + (i + 1) + '</td>' +
+        '<td class="text-center">' + esc(r.deptid || '') + '</td>' +
         '<td>' + esc(r.artname) + '</td>' +
         '<td><code>' + esc(r.barcode || '') + '</code></td>' +
         '<td class="text-end">' + fmt(r.hjual) + '</td>' +

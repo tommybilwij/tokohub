@@ -70,12 +70,12 @@ async def _query_sales(db, dt_from, dt_to):
         for t in tables
     )
     sql = (
-        f"SELECT s.artno, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
+        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
         f"SUM(s.qty) AS total_qty, SUM(s.netamount) AS total_amount "
         f"FROM ({unions}) s "
         f"JOIN stock st ON st.artno = s.artno "
         f"WHERE s.transtime BETWEEN %s AND %s "
-        f"GROUP BY s.artno, st.artname, st.artpabrik, s.unitprc "
+        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik, s.unitprc "
         f"ORDER BY total_amount DESC"
     )
 
@@ -111,12 +111,14 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['Artno', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
+    writer.writerow(['Artno', 'Dept', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
     for r in rows:
+        barcode = r.get('barcode', '') or ''
         writer.writerow([
             r.get('artno', ''),
+            r.get('deptid', ''),
             r.get('artname', ''),
-            r.get('barcode', ''),
+            f"'{barcode}" if barcode else '',
             r.get('hjual', 0),
             r.get('total_qty', 0),
             r.get('total_amount', 0),

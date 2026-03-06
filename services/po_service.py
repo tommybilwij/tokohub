@@ -434,7 +434,7 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 
-        # Update bundling in stock table (over1/hjualo1, over2/hjualo2, ispaketprc)
+        # Update bundling in stock table (over1/hjualo1, over2/hjualo2)
         b1 = line.get('bundling1') or {}
         b2 = line.get('bundling2') or {}
         has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0

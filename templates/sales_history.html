@@ -95,7 +95,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/jspdf.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/jspdf.plugin.autotable.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sales_history.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

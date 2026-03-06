@@ -488,11 +488,27 @@
   // -----------------------------------------------------------------------
   // Item Management
   // -----------------------------------------------------------------------
-  function addItemFromInput() {
+  async function addItemFromInput() {
     if (!requireHeaderFields()) return;
 
     const name = dom.itemNameInput.value.trim();
     if (!name) return;
+
+    // Search immediately and auto-add if 100% match
+    try {
+      const results = await api(`/api/stock/search?q=${encodeURIComponent(name)}&limit=5`);
+      if (results.length && results[0].score >= 100) {
+        const item = results[0];
+        dom.searchResults.classList.add('d-none');
+        addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto', [item], item.artno,
+                parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
+        dom.itemNameInput.value = '';
+        dom.itemNameInput.focus();
+        return;
+      }
+    } catch (e) {
+      console.warn('Search on enter failed:', e.message);
+    }
 
     addItem(name, '', 1, 0, 'CTN', 1, 0);
     dom.itemNameInput.value = '';
@@ -879,8 +895,8 @@
     // Column headers: always Satuan + Bundling 1 + Bundling 2
     const tierCols = [
       { label: 'Satuan', prices: { hjual1: m.hjual, hjual2: m.hjual2, hjual3: m.hjual3, hjual4: m.hjual4, hjual5: m.hjual5 } },
-      { label: bundlings[0] ? `Bundling \u2265${bundlings[0].qty}` : 'Bundling 1', prices: bundlings[0] || {} },
-      { label: bundlings[1] ? `Bundling \u2265${bundlings[1].qty}` : 'Bundling 2', prices: bundlings[1] || {} },
+      { label: bundlings[0] ? `Bundling 1 \u2265${bundlings[0].qty}` : 'Bundling 1', prices: bundlings[0] || {} },
+      { label: bundlings[1] ? `Bundling 2 \u2265${bundlings[1].qty}` : 'Bundling 2', prices: bundlings[1] || {} },
     ];
     // Row definitions: only show if at least one tier has a non-zero value
     const priceTypes = [

@@ -330,11 +330,11 @@ body {
 
 /* Column widths */
 #itemTable .col-num      { width: 32px; text-align: center; }
-#itemTable .col-name     { min-width: 220px; }
-#itemTable .col-barcode  { width: 110px; }
+#itemTable .col-name     { min-width: 180px; }
+#itemTable .col-barcode  { width: 140px; }
 #itemTable .col-satbsr   { width: 185px; }
 #itemTable .col-qtykcl   { width: 110px; }
-#itemTable .col-price    { width: 110px; }
+#itemTable .col-price    { width: 140px; }
 #itemTable .col-match    { min-width: 240px; }
 #itemTable .col-actions  { width: 36px; }
 

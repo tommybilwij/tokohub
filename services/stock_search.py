@@ -54,7 +54,9 @@ async def _load_stock_cache(pool):
         pool,
         """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                   packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
-                  hjual, hjual2, hjual3, hjual4, hjual5
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2
            FROM stock
            WHERE isactive = 1
            ORDER BY artname"""
@@ -97,6 +99,27 @@ def _compute_score(query_normalized, query_sizes, candidate):
             composite = min(100, composite + 10)
 
     return round(composite, 1)
+
+
+def _bundlings_from_stock_row(row):
+    """Build bundling tiers from stock table columns (hjualo1/o2, over1/over2)."""
+    bundlings = []
+    for suffix, qty_col in [('o1', 'over1'), ('o2', 'over2')]:
+        qty = float(row.get(qty_col) or 0)
+        if not qty:
+            continue
+        h1 = float(row.get(f'hjual{suffix}') or 0)
+        h2 = float(row.get(f'hjual2{suffix}') or 0)
+        h3 = float(row.get(f'hjual3{suffix}') or 0)
+        h4 = float(row.get(f'hjual4{suffix}') or 0)
+        h5 = float(row.get(f'hjual5{suffix}') or 0)
+        if h1 or h2 or h3 or h4 or h5:
+            bundlings.append({
+                'qty': qty,
+                'hjual1': h1, 'hjual2': h2, 'hjual3': h3,
+                'hjual4': h4, 'hjual5': h5,
+            })
+    return bundlings
 
 
 async def _fetch_bundlings(pool, artno_list):
@@ -157,7 +180,9 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
             pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                       packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
-                  hjual, hjual2, hjual3, hjual4, hjual5
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2
                FROM stock WHERE artno = %s""",
             (alias_artno,)
         )
@@ -172,7 +197,9 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
             pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
                       packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
-                  hjual, hjual2, hjual3, hjual4, hjual5
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2
                FROM stock WHERE artpabrik = %s AND isactive = 1""",
             (query,)
         )
@@ -207,10 +234,13 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
     scored.sort(key=lambda x: x['score'], reverse=True)
     results = pinned + scored[:top_n]
 
-    # Attach bundling data from itempaket
+    # Attach bundling data from itempaket, fallback to stock columns (hjualo1/o2)
     artno_list = [r['artno'] for r in results]
     bundling_map = await _fetch_bundlings(pool, artno_list)
     for r in results:
-        r['_bundlings'] = bundling_map.get(r['artno'], [])
+        bundlings = bundling_map.get(r['artno'], [])
+        if not bundlings:
+            bundlings = _bundlings_from_stock_row(r)
+        r['_bundlings'] = bundlings
 
     return results

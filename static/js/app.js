@@ -892,7 +892,7 @@
         let marginHTML = '';
         if (val > 0 && dsiNettoPcs) {
           const mg = val - dsiNettoPcs;
-          const pct = (mg / dsiNettoPcs * 100).toFixed(1);
+          const pct = (mg / dsiNettoPcs * 100).toFixed(2);
           const isNeg = mg < 0;
           marginHTML = `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '' : '+'}${pct}%</span>`
                      + `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;

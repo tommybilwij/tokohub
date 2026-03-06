@@ -859,9 +859,9 @@
 
     // Disc rows (always show all four)
     const discItems = [
-      { label: 'D1', val: parseFloat(m.pctdisc1) || 0 },
-      { label: 'D2', val: parseFloat(m.pctdisc2) || 0 },
-      { label: 'D3', val: parseFloat(m.pctdisc3) || 0 },
+      { label: 'Diskon 1', val: parseFloat(m.pctdisc1) || 0 },
+      { label: 'Diskon 2', val: parseFloat(m.pctdisc2) || 0 },
+      { label: 'Diskon 3', val: parseFloat(m.pctdisc3) || 0 },
       { label: 'PPN', val: parseFloat(m.pctppn) || 0 },
     ];
     const discHTML = discItems.map(d =>
@@ -1069,7 +1069,7 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="bt-label">D1</td>
+                    <td class="bt-label">Diskon 1</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
@@ -1078,7 +1078,7 @@
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
-                    <td class="bt-label">D2</td>
+                    <td class="bt-label">Diskon 2</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
@@ -1087,7 +1087,7 @@
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
-                    <td class="bt-label">D3</td>
+                    <td class="bt-label">Diskon 3</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"

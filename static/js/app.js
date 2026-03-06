@@ -857,23 +857,22 @@
     const packNum = m.packing ? parseInt(m.packing) : '';
     const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? trunc2(m.hbelibsr / packNum) : 0);
 
-    // Disc pills (only non-zero — parseFloat to handle string "0.0000")
-    const discItems = [];
-    if (parseFloat(m.pctdisc1)) discItems.push({ label: 'D1', val: parseFloat(m.pctdisc1) });
-    if (parseFloat(m.pctdisc2)) discItems.push({ label: 'D2', val: parseFloat(m.pctdisc2) });
-    if (parseFloat(m.pctdisc3)) discItems.push({ label: 'D3', val: parseFloat(m.pctdisc3) });
-    if (parseFloat(m.pctppn)) discItems.push({ label: 'PPN', val: parseFloat(m.pctppn) });
-    const discHTML = discItems.length
-      ? discItems.map(d => `<span class="dsi-disc">${d.label} <b>${d.val}%</b></span>`).join('')
-      : '';
+    // Disc rows (always show all four)
+    const discItems = [
+      { label: 'D1', val: parseFloat(m.pctdisc1) || 0 },
+      { label: 'D2', val: parseFloat(m.pctdisc2) || 0 },
+      { label: 'D3', val: parseFloat(m.pctdisc3) || 0 },
+      { label: 'PPN', val: parseFloat(m.pctppn) || 0 },
+    ];
+    const discHTML = discItems.map(d =>
+      `<span class="dsi-disc${d.val ? '' : ' dsi-disc-empty'}">${d.label} <b>${d.val ? d.val + '%' : '—'}</b></span>`
+    ).join('');
 
-    // Netto
-    const hasDiscOrPpn = parseFloat(m.pctdisc1) || parseFloat(m.pctdisc2) || parseFloat(m.pctdisc3) || parseFloat(m.pctppn);
-    const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
+    // Netto (always compute — falls back to hbelibsr if no disc/ppn)
+    const netPrices = calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn);
 
     // Netto per pcs for margin calc
-    const dsiNettoPcs = netPrices && packNum ? netPrices.final / packNum
-                      : (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
+    const dsiNettoPcs = packNum ? netPrices.final / packNum : 0;
 
     // Build price table rows: main + bundlings
     const bundlings = m._bundlings || [];
@@ -923,12 +922,12 @@
             <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
             <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
           </div>
-          ${discHTML ? `<div class="dsi-disc-pills">${discHTML}</div>` : ''}
-          ${netPrices ? `<div class="dsi-netto-bar">
+          <div class="dsi-disc-pills">${discHTML}</div>
+          <div class="dsi-netto-bar">
             <span class="dsi-lbl">Netto</span>
             <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
             <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-          </div>` : ''}
+          </div>
         </div>
 
         <div class="dsi-jual-header"><span class="dsi-section-lbl">Harga Jual</span></div>

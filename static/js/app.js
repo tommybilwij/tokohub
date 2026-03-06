@@ -91,10 +91,12 @@
     const afterD1 = hbelibsr - d1;
     const d2 = afterD1 * (pctdisc2 || 0) / 100;
     const afterD2 = afterD1 - d2;
-    const d3 = afterD2 * (pctdisc3 || 0) / 100;
-    const netto = afterD2 - d3;
-    const ppnAmt = netto * (pctppn || 0) / 100;
-    return { d1, d2, d3, ppnAmt, netto, final: netto + ppnAmt };
+    // PPN applied before D3
+    const ppnAmt = afterD2 * (pctppn || 0) / 100;
+    const afterPPN = afterD2 + ppnAmt;
+    const d3 = afterPPN * (pctdisc3 || 0) / 100;
+    const final = afterPPN - d3;
+    return { d1, d2, d3, ppnAmt, final };
   }
 
   function debounce(fn, ms) {
@@ -441,11 +443,16 @@
       return;
     }
 
+    // Show loading indicator
+    dom.searchResults.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div> <small class="text-muted">Mencari...</small></div>';
+    dom.searchResults.classList.remove('d-none');
+
     try {
       const results = await api(`/api/stock/search?q=${encodeURIComponent(query)}`);
       renderSearchResults(results);
     } catch (e) {
       console.error('Search error:', e);
+      dom.searchResults.classList.add('d-none');
     }
   }
 
@@ -877,8 +884,8 @@
     const discItems = [
       { label: 'Diskon 1', val: parseFloat(m.pctdisc1) || 0 },
       { label: 'Diskon 2', val: parseFloat(m.pctdisc2) || 0 },
-      { label: 'Diskon 3', val: parseFloat(m.pctdisc3) || 0 },
       { label: 'PPN', val: parseFloat(m.pctppn) || 0 },
+      { label: 'Diskon 3', val: parseFloat(m.pctdisc3) || 0 },
     ];
     const discHTML = discItems.map(d =>
       `<span class="dsi-disc${d.val ? '' : ' dsi-disc-empty'}">${d.label} <b>${d.val ? d.val + '%' : '—'}</b></span>`
@@ -949,13 +956,13 @@
           <div class="dsi-beli-line">
             <span class="dsi-beli-label">Beli</span>
             <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-            <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+            <span class="dsi-val">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
           </div>
           <div class="dsi-disc-pills">${discHTML}</div>
           <div class="dsi-netto-bar">
             <span class="dsi-lbl">Netto</span>
             <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-            <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+            <span class="dsi-netto-val">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
           </div>
         </div>
 
@@ -1116,15 +1123,6 @@
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
-                    <td class="bt-label">Diskon 3</td>
-                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="decimal"></td>
-                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="decimal"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
-                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
-                  </tr>
-                  <tr>
                     <td class="bt-label">PPN</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="ppn"
                                value="" placeholder="0" inputmode="decimal"></td>
@@ -1132,6 +1130,15 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr>
+                    <td class="bt-label">Diskon 3</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="decimal"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="decimal"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
+                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                 </tbody>
               </table>
@@ -1358,8 +1365,8 @@
       const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
       if (field === 'disc1') return hbelibsr;
       if (field === 'disc2') return hbelibsr - net.d1;
-      if (field === 'disc3') return hbelibsr - net.d1 - net.d2;
-      if (field === 'ppn') return net.netto;
+      if (field === 'ppn') return hbelibsr - net.d1 - net.d2;
+      if (field === 'disc3') return hbelibsr - net.d1 - net.d2 + net.ppnAmt;
       return hbelibsr;
     }
     // Percentage input → update state + recalc amt (live on input + change)

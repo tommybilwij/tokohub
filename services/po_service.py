@@ -149,24 +149,28 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
         after_disc1 = hbelibsr - disc1
         disc2 = after_disc1 * pctdisc2 / 100
         after_disc2 = after_disc1 - disc2
-        disc3 = after_disc2 * pctdisc3 / 100
-        hbelinetto = after_disc2 - disc3
 
         # Per-small-unit discount amounts (for stock table)
         disc1_kcl = hbelikcl * pctdisc1 / 100
         after_disc1_kcl = hbelikcl - disc1_kcl
         disc2_kcl = after_disc1_kcl * pctdisc2 / 100
         after_disc2_kcl = after_disc1_kcl - disc2_kcl
-        disc3_kcl = after_disc2_kcl * pctdisc3 / 100
-        hbelinetto_kcl = after_disc2_kcl - disc3_kcl
 
-        # Tax (use override if provided, else 0 — empty means no tax)
+        # Tax applied before D3 (use override if provided, else 0)
         pctppn = Decimal(str(item['ppn_override'])) if item.get('ppn_override') is not None else Decimal('0')
-        ppn = hbelinetto * pctppn / 100
-        ppn_kcl = hbelinetto_kcl * pctppn / 100
+        ppn = after_disc2 * pctppn / 100
+        ppn_kcl = after_disc2_kcl * pctppn / 100
 
-        amount = (hbelinetto + ppn) * qty
-        netto_full = hbelinetto + ppn  # per-unit netto including PPN (before shipping)
+        # D3 applied after PPN
+        after_ppn = after_disc2 + ppn
+        after_ppn_kcl = after_disc2_kcl + ppn_kcl
+        disc3 = after_ppn * pctdisc3 / 100
+        disc3_kcl = after_ppn_kcl * pctdisc3 / 100
+        hbelinetto = after_ppn - disc3
+        hbelinetto_kcl = after_ppn_kcl - disc3_kcl
+
+        amount = hbelinetto * qty
+        netto_full = hbelinetto  # per-unit netto (before shipping)
 
         # Per-item shipping
         item_shipping = Decimal(str(item.get('shipping_cost') or 0)) if has_per_item_shipping else Decimal('0')

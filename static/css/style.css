@@ -1278,7 +1278,7 @@ body {
 .dsi-val-sm {
   font-size: var(--fs-base);
   font-weight: var(--fw-semibold);
-  color: var(--clr-neutral-500);
+  color: var(--clr-neutral-800);
 }
 
 .dsi-unit {

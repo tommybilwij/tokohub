@@ -23,9 +23,15 @@
         <input type="datetime-local" id="shDateTo" class="form-control form-control-sm">
       </label>
       <label class="sh-date-label">Dept
-        <select id="shDeptFilter" class="form-select form-select-sm">
-          <option value="">Semua</option>
-        </select>
+        <div class="sh-dept-dropdown" id="shDeptDropdown">
+          <button type="button" class="form-select form-select-sm sh-dept-btn" id="shDeptBtn">Semua</button>
+          <div class="sh-dept-menu" id="shDeptMenu">
+            <label class="sh-dept-item">
+              <input type="checkbox" value="" checked class="sh-dept-all"> Semua
+            </label>
+            <div id="shDeptList"></div>
+          </div>
+        </div>
       </label>
       <button class="btn btn-sm btn-primary" id="shBtnSearch">
         <i class="bi bi-search"></i> Cari

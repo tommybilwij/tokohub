@@ -15,7 +15,11 @@
   var elCount     = document.getElementById('shResultCount');
   var elBtnExport = document.getElementById('shBtnExport');
   var elBtnExportPdf = document.getElementById('shBtnExportPdf');
-  var elDeptFilter = document.getElementById('shDeptFilter');
+  var elDeptDropdown = document.getElementById('shDeptDropdown');
+  var elDeptBtn = document.getElementById('shDeptBtn');
+  var elDeptMenu = document.getElementById('shDeptMenu');
+  var elDeptList = document.getElementById('shDeptList');
+  var elDeptAll = document.querySelector('.sh-dept-all');
   var elTotalItems = document.getElementById('shTotalItems');
   var elTotalQty   = document.getElementById('shTotalQty');
   var elTotalSales = document.getElementById('shTotalSales');
@@ -32,12 +36,54 @@
     .then(function (res) { return res.json(); })
     .then(function (depts) {
       depts.forEach(function (d) {
-        var opt = document.createElement('option');
-        opt.value = d.id;
-        opt.textContent = d.id + ' - ' + d.name;
-        elDeptFilter.appendChild(opt);
+        var label = document.createElement('label');
+        label.className = 'sh-dept-item';
+        label.innerHTML = '<input type="checkbox" value="' + esc(d.id) + '" class="sh-dept-cb"> ' + esc(d.id) + ' - ' + esc(d.name);
+        elDeptList.appendChild(label);
       });
     });
+
+  // Dropdown toggle
+  elDeptBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    elDeptMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', function (e) {
+    if (!elDeptDropdown.contains(e.target)) elDeptMenu.classList.remove('open');
+  });
+
+  // "Semua" checkbox
+  elDeptAll.addEventListener('change', function () {
+    var cbs = elDeptList.querySelectorAll('.sh-dept-cb');
+    if (elDeptAll.checked) {
+      cbs.forEach(function (cb) { cb.checked = false; });
+    }
+    _updateDeptLabel();
+  });
+
+  // Individual dept checkboxes
+  elDeptMenu.addEventListener('change', function (e) {
+    if (e.target.classList.contains('sh-dept-cb')) {
+      elDeptAll.checked = false;
+      var any = elDeptList.querySelector('.sh-dept-cb:checked');
+      if (!any) elDeptAll.checked = true;
+      _updateDeptLabel();
+    }
+  });
+
+  function _getSelectedDepts() {
+    if (elDeptAll.checked) return '';
+    var selected = [];
+    elDeptList.querySelectorAll('.sh-dept-cb:checked').forEach(function (cb) {
+      selected.push(cb.value);
+    });
+    return selected.join(',');
+  }
+
+  function _updateDeptLabel() {
+    var sel = _getSelectedDepts();
+    elDeptBtn.textContent = sel ? sel.split(',').length + ' dept' : 'Semua';
+  }
 
   // -----------------------------------------------------------------------
   // Helpers
@@ -126,9 +172,7 @@
     fetchData();
   });
 
-  elDeptFilter.addEventListener('change', function () {
-    if (elFrom.value && elTo.value) fetchData();
-  });
+  // No auto-fetch on dept change — user clicks Cari
 
   // -----------------------------------------------------------------------
   // Fetch data
@@ -143,7 +187,7 @@
     elEmpty.classList.add('d-none');
     elSummary.classList.add('d-none');
 
-    var dept = elDeptFilter.value;
+    var dept = _getSelectedDepts();
     var url = '/api/sales/history?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
     if (dept) url += '&dept=' + encodeURIComponent(dept);
     fetch(url)
@@ -238,13 +282,50 @@
   // Export CSV
   // -----------------------------------------------------------------------
   elBtnExport.addEventListener('click', function () {
-    var from = elFrom.value;
-    var to = elTo.value;
-    if (!from || !to) return;
-    var url = '/api/sales/export?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
-    var dept = elDeptFilter.value;
-    if (dept) url += '&dept=' + encodeURIComponent(dept);
-    window.location.href = url;
+    if (!rows.length) return;
+
+    var sorted = rows.slice().sort(function (a, b) {
+      var va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+    var csvRows = [['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total']];
+    sorted.forEach(function (r, i) {
+      var barcode = r.barcode || '';
+      csvRows.push([
+        i + 1,
+        r.artno || '',
+        barcode ? "'" + barcode : '',
+        r.deptid || '',
+        r.artname || '',
+        r.hjual || 0,
+        r.total_qty || 0,
+        r.total_amount || 0
+      ]);
+    });
+
+    var csv = csvRows.map(function (row) {
+      return row.map(function (cell) {
+        var s = String(cell);
+        if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      }).join(',');
+    }).join('\n');
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    var f = elFrom.value.replace('T', '_').replace(/:/g, '');
+    var t = elTo.value.replace('T', '_').replace(/:/g, '');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'penjualan_' + f + '_' + t + '.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
   });
 
   // -----------------------------------------------------------------------
@@ -258,7 +339,8 @@
 
     var from = elFrom.value.replace('T', ' ');
     var to = elTo.value.replace('T', ' ');
-    var deptText = elDeptFilter.value ? ('Dept ' + elDeptFilter.options[elDeptFilter.selectedIndex].textContent) : 'Semua Dept';
+    var deptSel = _getSelectedDepts();
+    var deptText = deptSel ? ('Dept ' + deptSel) : 'Semua Dept';
     doc.setFontSize(14);
     doc.text('Histori Penjualan', 14, 15);
     doc.setFontSize(9);

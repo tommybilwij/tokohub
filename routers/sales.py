@@ -78,8 +78,11 @@ async def _query_sales(db, dt_from, dt_to, dept=None):
     params = [dt_from, dt_to]
     dept_filter = ''
     if dept:
-        dept_filter = ' AND st.deptid = %s'
-        params.append(dept)
+        dept_ids = [d.strip() for d in dept.split(',') if d.strip()]
+        if dept_ids:
+            placeholders_d = ','.join(['%s'] * len(dept_ids))
+            dept_filter = f' AND st.deptid IN ({placeholders_d})'
+            params.extend(dept_ids)
 
     sql = (
         f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "

@@ -1912,9 +1912,55 @@ body {
   color: var(--clr-neutral-500);
 }
 
-.sh-date-label input {
+.sh-date-label input,
+.sh-date-label .sh-dept-dropdown {
   margin-top: 2px;
   font-size: var(--fs-sm);
+}
+
+/* Dept multi-select dropdown */
+.sh-dept-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.sh-dept-btn {
+  min-width: 100px;
+  text-align: left;
+}
+
+.sh-dept-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  padding: var(--sp-2) 0;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sh-dept-menu.open {
+  display: block;
+}
+
+.sh-dept-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sh-dept-item:hover {
+  background: var(--clr-primary-50);
 }
 
 /* Summary banner */

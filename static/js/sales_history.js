@@ -197,9 +197,10 @@
     elBody.innerHTML = sorted.map(function (r, i) {
       return '<tr>' +
         '<td class="text-center">' + (i + 1) + '</td>' +
+        '<td>' + esc(r.artno || '') + '</td>' +
+        '<td><code>' + esc(r.barcode || '') + '</code></td>' +
         '<td class="text-center">' + esc(r.deptid || '') + '</td>' +
         '<td>' + esc(r.artname) + '</td>' +
-        '<td><code>' + esc(r.barcode || '') + '</code></td>' +
         '<td class="text-end">' + fmt(r.hjual) + '</td>' +
         '<td class="text-end">' + fmtInt(r.total_qty) + '</td>' +
         '<td class="text-end fw-semibold">' + fmt(r.total_amount) + '</td>' +
@@ -276,22 +277,22 @@
     var tableRows = sorted.map(function (r, i) {
       totalQty += Number(r.total_qty) || 0;
       totalAmount += Number(r.total_amount) || 0;
-      return [i + 1, r.deptid || '', r.artname || '', r.barcode || '', fmt(r.hjual), fmtInt(r.total_qty), fmt(r.total_amount)];
+      return [i + 1, r.artno || '', r.barcode || '', r.deptid || '', r.artname || '', fmt(r.hjual), fmtInt(r.total_qty), fmt(r.total_amount)];
     });
-    tableRows.push(['', '', '', '', 'TOTAL', fmtInt(totalQty), fmt(totalAmount)]);
+    tableRows.push(['', '', '', '', '', 'TOTAL', fmtInt(totalQty), fmt(totalAmount)]);
 
     doc.autoTable({
       startY: 25,
-      head: [['#', 'Dept', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total']],
+      head: [['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total']],
       body: tableRows,
       styles: { fontSize: 8, cellPadding: 1.5 },
       headStyles: { fillColor: [40, 167, 69] },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        1: { halign: 'center', cellWidth: 14 },
-        4: { halign: 'right' },
+        3: { halign: 'center', cellWidth: 14 },
         5: { halign: 'right' },
         6: { halign: 'right' },
+        7: { halign: 'right' },
       },
       didParseCell: function (data) {
         if (data.row.index === tableRows.length - 1) {

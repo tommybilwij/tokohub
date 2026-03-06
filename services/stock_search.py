@@ -122,32 +122,6 @@ def _bundlings_from_stock_row(row):
     return bundlings
 
 
-async def _fetch_bundlings(pool, artno_list):
-    """Fetch bundling (itempaket) data for a list of artnos."""
-    if not artno_list:
-        return {}
-    placeholders = ','.join(['%s'] * len(artno_list))
-    rows = await execute_query(
-        pool,
-        f"""SELECT artno, qty, hjual1, hjual2, hjual3, hjual4, hjual5
-            FROM itempaket
-            WHERE artno IN ({placeholders})
-            ORDER BY artno, qty""",
-        tuple(artno_list)
-    )
-    result = {}
-    for row in rows:
-        result.setdefault(row['artno'], []).append({
-            'qty': float(row['qty'] or 0),
-            'hjual1': float(row['hjual1'] or 0),
-            'hjual2': float(row['hjual2'] or 0),
-            'hjual3': float(row['hjual3'] or 0),
-            'hjual4': float(row['hjual4'] or 0),
-            'hjual5': float(row['hjual5'] or 0),
-        })
-    return result
-
-
 async def search_stock(pool, query, top_n=None, min_score=None, score_against=None):
     """
     Multi-pass search for stock items.
@@ -234,13 +208,8 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
     scored.sort(key=lambda x: x['score'], reverse=True)
     results = pinned + scored[:top_n]
 
-    # Attach bundling data from itempaket, fallback to stock columns (hjualo1/o2)
-    artno_list = [r['artno'] for r in results]
-    bundling_map = await _fetch_bundlings(pool, artno_list)
+    # Attach bundling data from stock columns (hjualo1/o2, over1/over2)
     for r in results:
-        bundlings = bundling_map.get(r['artno'], [])
-        if not bundlings:
-            bundlings = _bundlings_from_stock_row(r)
-        r['_bundlings'] = bundlings
+        r['_bundlings'] = _bundlings_from_stock_row(r)
 
     return results

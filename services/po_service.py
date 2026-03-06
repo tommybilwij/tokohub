@@ -242,7 +242,7 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         Only new-row INSERTs and brief end-of-txn UPDATEs — minimal locks.
 
     Phase 2 (individual auto-committed updates):
-        UPDATE stock prices and DELETE/INSERT itempaket bundling per item.
+        UPDATE stock prices and bundling columns (over1/hjualo1, over2/hjualo2) per item.
         Each is a separate ~1ms transaction so MyPosse is never blocked.
         If any fail, the PO is already safely committed.
 
@@ -434,28 +434,26 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 
-        # Update bundling (itempaket): DELETE + INSERT in one connection
-        bundlings = [b for b in [line.get('bundling1'), line.get('bundling2')]
-                     if b and b.get('min_qty')]
+        # Update bundling in stock table (over1/hjualo1, over2/hjualo2)
+        b1 = line.get('bundling1') or {}
+        b2 = line.get('bundling2') or {}
         try:
-            async with pool.acquire() as bconn:
-                async with bconn.cursor() as bcur:
-                    await bcur.execute(
-                        "DELETE FROM itempaket WHERE artno = %s",
-                        (line['artno'],)
-                    )
-                    for i_bund, bund in enumerate(bundlings, start=1):
-                        await bcur.execute(
-                            """INSERT INTO itempaket
-                               (artno, subartno, qty, hjual1, hjual2, hjual3, hjual4, hjual5)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                            (line['artno'], str(i_bund),
-                             int(bund['min_qty']),
-                             bund.get('hjual1') or 0, bund.get('hjual2') or 0,
-                             bund.get('hjual3') or 0, bund.get('hjual4') or 0,
-                             bund.get('hjual5') or 0)
-                        )
-                    await bconn.commit()
+            await execute_modify(
+                pool,
+                """UPDATE stock
+                   SET over1 = %s,
+                       hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                       over2 = %s,
+                       hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                   WHERE artno = %s""",
+                (b1.get('min_qty') or 0,
+                 b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
+                 b1.get('hjual4') or 0, b1.get('hjual5') or 0,
+                 b2.get('min_qty') or 0,
+                 b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
+                 b2.get('hjual4') or 0, b2.get('hjual5') or 0,
+                 line['artno']),
+            )
         except Exception:
             logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
 

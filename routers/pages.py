@@ -70,6 +70,11 @@ async def sales_history_page(request: Request, templates: Jinja2Templates = Depe
     return templates.TemplateResponse(request, 'sales_history.html')
 
 
+@router.get('/foc-history')
+async def foc_history_page(request: Request, templates: Jinja2Templates = Depends(get_templates)):
+    return templates.TemplateResponse(request, 'foc_history.html')
+
+
 @router.get('/settings')
 async def settings_page(request: Request, templates: Jinja2Templates = Depends(get_templates)):
     return templates.TemplateResponse(request, 'settings.html', {

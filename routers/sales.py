@@ -150,3 +150,5 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
         media_type='text/csv',
         headers={'Content-Disposition': f'attachment; filename={filename}'}
     )
+
+

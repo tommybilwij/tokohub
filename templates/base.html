@@ -47,6 +47,12 @@
             </a>
           </li>
           <li class="nav-item">
+            <a class="nav-link {% if request.url.path == '/foc-history' %}active{% endif %}"
+               href="/foc-history">
+              <i class="bi bi-gift"></i> Barang Diskon
+            </a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}"
                href="/settings">
               <i class="bi bi-gear"></i> Settings

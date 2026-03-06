@@ -125,14 +125,14 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['Artno', 'Dept', 'Nama Barang', 'Barcode', 'Harga Jual', 'Qty', 'Total'])
+    writer.writerow(['Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total'])
     for r in rows:
         barcode = r.get('barcode', '') or ''
         writer.writerow([
             r.get('artno', ''),
+            f"'{barcode}" if barcode else '',
             r.get('deptid', ''),
             r.get('artname', ''),
-            f"'{barcode}" if barcode else '',
             r.get('hjual', 0),
             r.get('total_qty', 0),
             r.get('total_amount', 0),

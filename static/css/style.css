@@ -1921,7 +1921,7 @@ body {
 /* Dept multi-select dropdown */
 .sh-dept-dropdown {
   position: relative;
-  display: inline-block;
+  display: block;
 }
 
 .sh-dept-btn {

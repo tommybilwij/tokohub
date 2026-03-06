@@ -30,6 +30,7 @@
   var rows = [];
   var sortCol = 'total_amount';
   var sortAsc = false;
+  var lastDept = '';
 
   // Load departments
   fetch('/api/sales/departments')
@@ -187,9 +188,9 @@
     elEmpty.classList.add('d-none');
     elSummary.classList.add('d-none');
 
-    var dept = _getSelectedDepts();
+    lastDept = _getSelectedDepts();
     var url = '/api/sales/history?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
-    if (dept) url += '&dept=' + encodeURIComponent(dept);
+    if (lastDept) url += '&dept=' + encodeURIComponent(lastDept);
     fetch(url)
       .then(function (res) { return res.json(); })
       .then(function (data) {
@@ -295,11 +296,10 @@
 
     var csvRows = [['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total']];
     sorted.forEach(function (r, i) {
-      var barcode = r.barcode || '';
       csvRows.push([
         i + 1,
         r.artno || '',
-        barcode ? "'" + barcode : '',
+        '="' + (r.barcode || '') + '"',
         r.deptid || '',
         r.artname || '',
         r.hjual || 0,
@@ -339,8 +339,7 @@
 
     var from = elFrom.value.replace('T', ' ');
     var to = elTo.value.replace('T', ' ');
-    var deptSel = _getSelectedDepts();
-    var deptText = deptSel ? ('Dept ' + deptSel) : 'Semua Dept';
+    var deptText = lastDept ? ('Dept ' + lastDept) : 'Semua Dept';
     doc.setFontSize(14);
     doc.text('Histori Penjualan', 14, 15);
     doc.setFontSize(9);

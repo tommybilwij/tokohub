@@ -86,7 +86,7 @@ class Settings(BaseSettings):
 
     upload_folder: Path = _USER_DATA_DIR / 'uploads'
     log_folder: Path = _USER_DATA_DIR / 'logs'
-    allowed_extensions: set[str] = {'png', 'jpg', 'jpeg', 'csv', 'xlsx'}
+    allowed_extensions: set[str] = {'png', 'jpg', 'jpeg'}
     max_content_length: int = 16 * 1024 * 1024
 
     # Fuzzy matching

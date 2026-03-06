@@ -37,9 +37,7 @@
     btnPreviewPO:    $('#btnPreviewPO'),
     btnClearAll:     $('#btnClearAll'),
     btnUploadPhoto:  $('#btnUploadPhoto'),
-    btnUploadCSV:    $('#btnUploadCSV'),
     photoInput:      $('#photoInput'),
-    csvInput:        $('#csvInput'),
     ocrStatus:       $('#ocrStatus'),
     // Modals
     matchModal:      $('#matchModal'),
@@ -396,7 +394,6 @@
 
     // File uploads
     dom.btnUploadPhoto.addEventListener('click', uploadPhoto);
-    dom.btnUploadCSV.addEventListener('click', uploadCSV);
 
     // PO commit
     dom.btnCommitPO.addEventListener('click', commitPO);
@@ -1843,34 +1840,6 @@
       dom.ocrStatus.textContent = `${data.items.length} baris terdeteksi & matched.`;
     } catch (e) {
       dom.ocrStatus.textContent = 'OCR gagal: ' + e.message;
-    } finally {
-      hideSpinner();
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // CSV Upload
-  // -----------------------------------------------------------------------
-  async function uploadCSV() {
-    if (!requireHeaderFields()) return;
-    const file = dom.csvInput.files[0];
-    if (!file) { showToast('Pilih file CSV/Excel terlebih dahulu.', 'warning'); return; }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    showSpinner();
-    try {
-      const data = await api('/receipt/upload-csv', { method: 'POST', body: formData });
-      (data.items || []).forEach((item) => {
-        addItem(item.name, '', item.qty, 0, 'CTN', 1, item.price || 0);
-      });
-      dom.csvInput.value = '';
-
-      // Auto-match all added items
-      await _doMatch();
-    } catch (e) {
-      showToast('Import gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }

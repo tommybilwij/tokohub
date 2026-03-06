@@ -47,34 +47,6 @@ async def upload_photo(photo: UploadFile = File(...), db: aiomysql.Pool = Depend
             os.remove(filepath)
 
 
-@router.post('/receipt/upload-csv')
-async def upload_csv(file: UploadFile = File(...)):
-    if not file.filename or not _allowed_file(file.filename):
-        return JSONResponse({'error': 'Invalid file type. Use CSV or XLSX.'}, status_code=400)
-
-    filename = Path(file.filename).name
-    filepath = os.path.join(str(settings.upload_folder), filename)
-
-    content = await file.read()
-    with open(filepath, 'wb') as f:
-        f.write(content)
-
-    try:
-        ext = filename.rsplit('.', 1)[1].lower()
-        if ext == 'csv':
-            from services.csv_import import parse_csv
-            items = parse_csv(file_path=filepath)
-        else:
-            from services.csv_import import parse_excel
-            items = parse_excel(file_path=filepath)
-        return {'items': items}
-    except Exception as e:
-        logger.exception("CSV/Excel parsing failed")
-        return JSONResponse({'error': f'File parsing failed: {e}'}, status_code=500)
-    finally:
-        if os.path.exists(filepath):
-            os.remove(filepath)
-
 
 @router.post('/receipt/match')
 async def match_items(data: MatchRequest, db: aiomysql.Pool = Depends(get_db)):

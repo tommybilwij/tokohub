@@ -589,10 +589,10 @@
     const dis = tier != null && !values._enabled ? 'disabled' : '';
     const rows = [
       { label: 'Jual 1', field: 'hjual1' },
+      { label: 'Member', field: 'hjual2' },
       { label: 'Jual 3', field: 'hjual3' },
       { label: 'Jual 4', field: 'hjual4' },
       { label: 'Jual 5', field: 'hjual5' },
-      { label: 'Member', field: 'hjual2' },
     ];
     const rowsHTML = rows.map(r => {
       const val = values[r.field];
@@ -874,21 +874,34 @@
     // Netto per pcs for margin calc
     const dsiNettoPcs = packNum ? netPrices.final / packNum : 0;
 
-    // Build price table rows: main + bundlings
+    // Build price table: columns = tiers (Satuan, Bundling), rows = price types (Jual 1, Member, etc.)
     const bundlings = m._bundlings || [];
-    const priceHeaders = ['Jual 1', 'Jual 3', 'Jual 4', 'Jual 5', 'Member'];
-    const mainPrices = [m.hjual, m.hjual3, m.hjual4, m.hjual5, m.hjual2];
-    const priceRows = [{ label: 'Satuan', prices: mainPrices, isMain: true }];
-    bundlings.forEach(b => {
-      priceRows.push({ label: `Bundling \u2265${b.qty}`, prices: [b.hjual1, b.hjual3, b.hjual4, b.hjual5, b.hjual2], isMain: false });
-    });
+    // Column headers: always Satuan + Bundling 1 + Bundling 2
+    const tierCols = [
+      { label: 'Satuan', prices: { hjual1: m.hjual, hjual2: m.hjual2, hjual3: m.hjual3, hjual4: m.hjual4, hjual5: m.hjual5 } },
+      { label: bundlings[0] ? `Bundling \u2265${bundlings[0].qty}` : 'Bundling 1', prices: bundlings[0] || {} },
+      { label: bundlings[1] ? `Bundling \u2265${bundlings[1].qty}` : 'Bundling 2', prices: bundlings[1] || {} },
+    ];
+    // Row definitions: only show if at least one tier has a non-zero value
+    const priceTypes = [
+      { label: 'Jual 1', field: 'hjual1' },
+      { label: 'Member', field: 'hjual2' },
+      { label: 'Jual 3', field: 'hjual3' },
+      { label: 'Jual 4', field: 'hjual4' },
+      { label: 'Jual 5', field: 'hjual5' },
+    ];
+    const visiblePriceTypes = priceTypes.filter(pt =>
+      tierCols.some(tc => parseFloat(tc.prices[pt.field]) > 0)
+    );
+    // Always show Jual 1
+    if (!visiblePriceTypes.find(pt => pt.field === 'hjual1')) {
+      visiblePriceTypes.unshift(priceTypes[0]);
+    }
 
-    const numCols = priceHeaders.length + 1;
-    const jualHeaderRow = `<tr class="dsi-jual-head-row"><th class="dsi-pt-tier"><span class="dsi-section-lbl">Tier</span></th>${priceHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-    const jualBodyRows = priceRows.map(row => {
-      const rowCls = row.isMain ? '' : ' class="dsi-pt-bundling"';
-      const cells = row.prices.map(p => {
-        const val = parseFloat(p) || 0;
+    const jualHeaderRow = `<tr class="dsi-jual-head-row"><th class="dsi-pt-tier"></th>${tierCols.map(tc => `<th>${tc.label}</th>`).join('')}</tr>`;
+    const jualBodyRows = visiblePriceTypes.map(pt => {
+      const cells = tierCols.map(tc => {
+        const val = parseFloat(tc.prices[pt.field]) || 0;
         let marginHTML = '';
         if (val > 0 && dsiNettoPcs) {
           const mg = val - dsiNettoPcs;
@@ -900,7 +913,7 @@
         const emptyCls = val ? '' : ' dsi-pt-empty';
         return `<td><span class="dsi-pt-val${emptyCls}">${val ? formatNumber(val) : '—'}</span>${marginHTML}</td>`;
       }).join('');
-      return `<tr${rowCls}><td class="dsi-pt-tier">${row.label}</td>${cells}</tr>`;
+      return `<tr><td class="dsi-pt-tier">${pt.label}</td>${cells}</tr>`;
     }).join('');
 
     return `

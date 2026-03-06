@@ -321,6 +321,9 @@
     if (_restoreState()) {
       renderItemTable();
     }
+
+    // Re-zoom table on window resize
+    window.addEventListener('resize', debounce(_autoZoomTable, 200));
   }
 
   async function loadUsers() {
@@ -1209,6 +1212,22 @@
     dom.btnPreviewPO.disabled = !allMatched;
 
     _saveState();
+    _autoZoomTable();
+  }
+
+  function _autoZoomTable() {
+    const table = document.getElementById('itemTable');
+    const wrapper = table.closest('.table-responsive');
+    if (!wrapper) return;
+    // Reset zoom to measure natural width
+    wrapper.style.zoom = '';
+    const containerW = wrapper.parentElement.clientWidth;
+    const tableW = table.scrollWidth;
+    if (tableW > containerW && containerW > 0) {
+      wrapper.style.zoom = (containerW / tableW).toFixed(4);
+    } else {
+      wrapper.style.zoom = '';
+    }
   }
 
   function _bindItemEvents() {

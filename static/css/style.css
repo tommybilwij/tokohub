@@ -733,7 +733,7 @@ body {
 }
 
 .jual-table .jual-input {
-  width: 100px;
+  width: 95px;
   font-size: var(--fs-base);
   padding: var(--sp-1) var(--sp-1);
   border: 1px solid var(--clr-accent-100);
@@ -751,7 +751,7 @@ body {
 }
 
 .jual-table .jual-pct-input {
-  width: 72px;
+  width: 65px;
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
   padding: var(--sp-1) var(--sp-1);
@@ -768,6 +768,10 @@ body {
 
 .jual-table .jual-pct-input.negative {
   color: var(--clr-danger);
+}
+
+.jual-table .jt-margin {
+  min-width: 90px;
 }
 
 .jual-table .jual-margin {

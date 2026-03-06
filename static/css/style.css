@@ -2002,6 +2002,7 @@ body {
   padding: var(--sp-1) var(--sp-2);
   border-bottom: 1px solid var(--clr-neutral-200);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 .sh-table tbody tr:nth-child(odd) {

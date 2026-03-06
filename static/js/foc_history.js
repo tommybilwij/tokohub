@@ -161,8 +161,7 @@
         '<td>' + esc(r.stockid || '') + '</td>' +
         '<td>' + esc(r.artname || '') + '</td>' +
         '<td class="text-end fw-semibold">' + fmtInt(r.qtybonus) + '</td>' +
-        '<td class="text-end">' + fmtInt(r.beli) + '</td>' +
-        '<td>' + esc((r.packing || '') + ' ' + (r.satuankcl || 'Pcs') + '/' + (r.satuanbsr || '')) + '</td>' +
+        '<td style="white-space:nowrap">' + esc((r.packing || '') + ' ' + (r.satuankcl || 'Pcs') + '/' + (r.satuanbsr || '')) + '</td>' +
         '<td>' + esc(suppText) + '</td>' +
         '<td><code>' + esc(r.nofaktur || '') + '</code></td>' +
         '</tr>';
@@ -197,7 +196,7 @@
     if (!rows.length) return;
 
     var sorted = _sorted();
-    var csvRows = [['#', 'Tanggal', 'Artno', 'Nama Barang', 'FOC (Pcs)', 'Beli (Pcs)', 'Packing', 'Satuan Besar', 'Supplier', 'No Faktur']];
+    var csvRows = [['#', 'Tanggal', 'Artno', 'Nama Barang', 'FOC (Pcs)', 'Satuan', 'Supplier', 'No Faktur']];
     sorted.forEach(function (r, i) {
       csvRows.push([
         i + 1,
@@ -205,9 +204,7 @@
         r.stockid || '',
         r.artname || '',
         r.qtybonus || 0,
-        r.beli || 0,
-        r.packing || '',
-        r.satuanbsr || '',
+        (r.packing || '') + ' ' + (r.satuankcl || 'Pcs') + '/' + (r.satuanbsr || ''),
         (r.suppid || '') + (r.suppname ? ' - ' + r.suppname : ''),
         r.nofaktur || ''
       ]);
@@ -253,24 +250,22 @@
         r.stockid || '',
         r.artname || '',
         fmtInt(r.qtybonus),
-        fmtInt(r.beli),
         (r.packing || '') + ' ' + (r.satuankcl || 'Pcs') + '/' + (r.satuanbsr || ''),
         (r.suppid || '') + (r.suppname ? ' - ' + r.suppname : ''),
         r.nofaktur || ''
       ];
     });
-    tableRows.push(['', '', '', '', fmtInt(totalFoc), '', '', 'TOTAL', '']);
+    tableRows.push(['', '', '', '', fmtInt(totalFoc), '', 'TOTAL', '']);
 
     doc.autoTable({
       startY: 25,
-      head: [['#', 'Tanggal', 'Artno', 'Nama Barang', 'FOC', 'Beli', 'Satuan', 'Supplier', 'No Faktur']],
+      head: [['#', 'Tanggal', 'Artno', 'Nama Barang', 'FOC', 'Satuan', 'Supplier', 'No Faktur']],
       body: tableRows,
       styles: { fontSize: 8, cellPadding: 1.5 },
       headStyles: { fillColor: [40, 167, 69] },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
         4: { halign: 'right' },
-        5: { halign: 'right' },
       },
       didParseCell: function (data) {
         if (data.row.index === tableRows.length - 1) {

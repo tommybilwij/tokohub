@@ -158,7 +158,7 @@
         const parts = key.split(':');
         const depth = parts.length - 1;
         const parent = depth > 0 ? parts.slice(0, -1).join(':') : null;
-        const indentPx = depth * 32;
+        const indentPx = depth * 44;
         const indent = depth > 0 ? '" style="padding-left:' + indentPx + 'px' : '';
         // Check all ancestors are selected
         let ancestorsOk = true;

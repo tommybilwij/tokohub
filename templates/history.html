@@ -243,7 +243,9 @@ function fmtPct(v) { return v != null && v !== '' && v != 0 ? Number(v) + '%' : 
 function diffCell(bv, av, fmt) {
   const bStr = fmt(bv);
   const aStr = fmt(av);
-  const changed = bv != null && av != null && Number(bv) !== Number(av);
+  const bNum = (bv != null && bv !== '') ? Number(bv) : null;
+  const aNum = (av != null && av !== '') ? Number(av) : null;
+  const changed = aNum != null && (bNum == null || bNum !== aNum);
   return `<td class="text-end">${bStr}</td><td class="text-end ${changed ? 'snap-changed' : ''}">${aStr}</td>`;
 }
 

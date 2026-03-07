@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # Fields to capture from stock table for before/after comparison
 _STOCK_FIELDS = (
     'artno', 'artname', 'satbesar', 'satkecil', 'packing',
-    'hbelibsr', 'hbelikcl',
+    'hbelibsr', 'hbelikcl', 'hbelinetto',
     'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn',
     'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
     'ispaketprc', 'over1', 'over2',
@@ -37,7 +37,16 @@ async def capture_before(pool, artnos: list[str]) -> dict:
         f"SELECT {cols} FROM stock WHERE artno IN ({placeholders})",
         tuple(artnos),
     )
-    return {r['artno']: dict(r) for r in rows}
+    result = {}
+    for r in rows:
+        d = dict(r)
+        # stock.hbelinetto is netto per pcs; remap to match build_after naming
+        netto_kcl = float(d.get('hbelinetto') or 0)
+        packing = float(d.get('packing') or 1)
+        d['hbelinetto_kcl'] = netto_kcl
+        d['hbelinetto'] = netto_kcl * packing if packing else netto_kcl
+        result[d['artno']] = d
+    return result
 
 
 def build_after(preview_lines: list[dict]) -> dict:

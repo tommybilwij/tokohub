@@ -82,12 +82,10 @@
     return '<div class="sblm-hint">' + (sv ? sv + '%' : '—') + '</div>';
   }
 
-  // CSS class for changed values — compare display-rounded (2dp) to avoid float noise
+  // CSS class for changed values — compare formatted display to avoid float noise
   function changedCls(stockVal, editVal) {
     if (stockVal == null || stockVal === undefined) return '';
-    var sv = Math.round((Number(stockVal) || 0) * 100) / 100;
-    var ev = Math.round((Number(editVal) || 0) * 100) / 100;
-    return Math.abs(sv - ev) >= 0.005 ? ' value-changed' : '';
+    return fmtNum(Number(stockVal) || 0) !== fmtNum(Number(editVal) || 0) ? ' value-changed' : '';
   }
 
   // ------- Load dropdowns -------
@@ -493,7 +491,7 @@
     if (nPcs) nPcs.textContent = (h && pk > 0) ? fmtNum(finalBsr / pk) : '—';
     if (hasStk) {
       var stkNetC = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
-      var nChanged = Math.abs(Math.round(stkNetC.final * 100) - Math.round(finalBsr * 100)) >= 1;
+      var nChanged = fmtNum(stkNetC.final) !== fmtNum(finalBsr);
       if (nBsr) nBsr.classList.toggle('value-changed', nChanged);
       if (nPcs) nPcs.classList.toggle('value-changed', nChanged);
     }
@@ -504,7 +502,7 @@
     if (bBsr) bBsr.textContent = h ? fmtNum(h) : '—';
     if (bPcs) bPcs.textContent = (h && pk > 0) ? fmtNum(trunc2(h / pk)) : '—';
     if (hasStk) {
-      var bChanged = Math.abs(Math.round((stk.hbelibsr || 0) * 100) - Math.round(h * 100)) >= 1;
+      var bChanged = fmtNum(stk.hbelibsr || 0) !== fmtNum(h);
       if (bBsr) bBsr.classList.toggle('value-changed', bChanged);
       if (bPcs) bPcs.classList.toggle('value-changed', bChanged);
     }
@@ -512,11 +510,30 @@
     // Disc amounts
     var qtyBsr = line.qty || 1;
     var amtMap = { pctdisc1: net.d1, pctdisc2: net.d2, pctdisc3: net.d3, pctppn: net.ppnAmt };
+    var stkAmtMap2 = {};
+    if (hasStk) {
+      var _sn2 = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+      stkAmtMap2 = { pctdisc1: _sn2.d1, pctdisc2: _sn2.d2, pctdisc3: _sn2.d3, pctppn: _sn2.ppnAmt };
+    }
     ['pctdisc1','pctdisc2','pctdisc3','pctppn'].forEach(function (f) {
       var amtEl = document.querySelector('.edit-disc-amt[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? fmtNum(amtMap[f]) : '';
       var totEl = document.querySelector('.edit-disc-total[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (totEl && document.activeElement !== totEl) totEl.value = amtMap[f] ? fmtNum(amtMap[f] * qtyBsr) : '';
+      var pctEl = document.querySelector('.edit-disc-pct[data-idx="' + idx + '"][data-field="' + f + '"]');
+      if (hasStk) {
+        var stkAmt = stkAmtMap2[f] || 0;
+        var curAmt = amtMap[f] || 0;
+        // Compare against displayed input value to handle active editing
+        var dispAmt = amtEl ? fmtNum(parseNum(amtEl.value)) : fmtNum(curAmt);
+        var dispTotal = totEl ? fmtNum(parseNum(totEl.value)) : fmtNum(curAmt * qtyBsr);
+        var amtDiff = fmtNum(stkAmt) !== dispAmt;
+        var totalDiff = fmtNum(stkAmt * qtyBsr) !== dispTotal;
+        var pctDiff = Math.abs(Math.round((stk[f] || 0) * 100) - Math.round((line[f] || 0) * 100)) >= 1;
+        if (amtEl) amtEl.classList.toggle('value-changed', amtDiff);
+        if (totEl) totEl.classList.toggle('value-changed', totalDiff);
+        if (pctEl) pctEl.classList.toggle('value-changed', pctDiff);
+      }
     });
 
     // Stock netto/pcs for margin comparison
@@ -541,9 +558,19 @@
           var bkey = 'bundling' + tier;
           val = line[bkey] ? line[bkey][f] : 0;
         }
+        var jualEl = document.querySelector('.jual-input[data-idx="' + idx + '"][data-tier="' + tier + '"][data-field="' + f + '"]');
         var pctEl = document.querySelector('.jual-pct-input[data-idx="' + idx + '"][data-tier="' + tier + '"][data-field="' + f + '"]');
         var mrgEl = document.querySelector('.jual-margin[data-idx="' + idx + '"][data-tier="' + tier + '"][data-field="' + f + '"]');
         if (!pctEl || !mrgEl) return;
+
+        // Update jual input highlight
+        if (hasStk && jualEl) {
+          var stkFld = tier === 'main' ? (f === 'hjual1' ? 'hjual' : f) : (_bundlingStkMap[tier] ? _bundlingStkMap[tier][f] : null);
+          var sv2 = stkFld ? (Number(stk[stkFld]) || 0) : 0;
+          var jChanged = fmtNum(sv2) !== fmtNum(Number(val) || 0);
+          jualEl.classList.toggle('value-changed', jChanged);
+        }
+
         if (!val || !nettoPcs) {
           if (document.activeElement !== pctEl) pctEl.value = '';
           mrgEl.textContent = '—';
@@ -563,8 +590,8 @@
           if (stkVal) {
             var stkMargin = stkVal - stkNettoPcsC;
             var stkPct = (stkMargin / stkNettoPcsC) * 100;
-            var mrgChanged = Math.abs(Math.round(stkMargin * 100) - Math.round(margin * 100)) >= 1;
-            var pctChanged = Math.abs(Math.round(stkPct * 100) - Math.round(pct * 100)) >= 1;
+            var mrgChanged = fmtNum(stkMargin) !== fmtNum(margin);
+            var pctChanged = stkPct.toFixed(2) !== pct.toFixed(2);
             mrgEl.classList.toggle('value-changed', mrgChanged);
             pctEl.classList.toggle('value-changed', pctChanged);
           } else {

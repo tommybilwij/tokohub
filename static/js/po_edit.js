@@ -73,13 +73,13 @@
   function sblmHint(stockVal) {
     if (stockVal == null || stockVal === undefined) return '';
     var sv = Number(stockVal) || 0;
-    return '<div class="sblm-hint">' + fmtNum(sv) + '</div>';
+    return '<div class="sblm-hint">' + (sv ? fmtNum(sv) : '—') + '</div>';
   }
 
   function sblmPctHint(stockVal) {
     if (stockVal == null || stockVal === undefined) return '';
     var sv = Number(stockVal) || 0;
-    return '<div class="sblm-hint">' + sv + '%</div>';
+    return '<div class="sblm-hint">' + (sv ? sv + '%' : '—') + '</div>';
   }
 
   // CSS class for changed values
@@ -241,7 +241,7 @@
           var stkMargin = sv - stkNettoPcs;
           var stkPct = (stkMargin / stkNettoPcs) * 100;
           pctHint = '<div class="sblm-hint">' + stkPct.toFixed(2) + '%</div>';
-          mrgHint = '<div class="sblm-hint">' + fmtNum(stkMargin) + '</div>';
+          mrgHint = '<div class="sblm-hint">' + (sv ? fmtNum(stkMargin) : '—') + '</div>';
         } else {
           pctHint = '<div class="sblm-hint">—</div>';
           mrgHint = '<div class="sblm-hint">—</div>';
@@ -352,7 +352,7 @@
                 '</div>' +
               '</div>' +
               '<div class="dp-input-group">' +
-                '<label class="dp-input-label">Total Harga Beli' + (aft.amount != null ? ' <span class="sblm-hint" style="display:inline">' + fmtNum(aft.amount || 0) + '</span>' : '') + '</label>' +
+                '<label class="dp-input-label">Total Harga Beli' + (aft.amount ? ' <span class="sblm-hint" style="display:inline">' + fmtNum(aft.amount) + '</span>' : '') + '</label>' +
                 '<div class="d-flex align-items-center" style="height:100%">' +
                   '<input type="text" class="form-control edit-price-total text-end" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
                 '</div>' +
@@ -362,7 +362,7 @@
           // Harga Beli section
           '<div class="dp-section dp-beli">' +
             '<div class="dp-section-header">Harga Beli</div>' +
-            (stk.hbelibsr != null ? '<div class="dp-sblm-row"><span class="dp-label"></span><span class="sblm-hint">' + fmtNum(stk.hbelibsr) + '</span><span class="sblm-hint dp-unit">/' + esc(stk.satbesar || sat) + '</span><span class="sblm-hint">' + (stk.packing ? fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) : '') + '</span><span class="sblm-hint dp-unit">/Pcs</span></div>' : '') +
+            (stk.hbelibsr != null ? '<div class="dp-beli-row dp-sblm-row"><span class="dp-label"></span><span class="dp-val sblm-hint">' + fmtNum(stk.hbelibsr) + '</span><span class="dp-unit sblm-hint">/' + esc(stk.satbesar || sat) + '</span><span class="dp-val sblm-hint">' + (stk.packing ? fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) : '') + '</span><span class="dp-unit sblm-hint">/Pcs</span></div>' : '') +
             '<div class="dp-beli-row">' +
               '<span class="dp-label">Beli</span>' +
               '<span class="dp-val hbeli-bsr' + changedCls(stk.hbelibsr, line.hbelibsr) + '" data-idx="' + idx + '">' + (line.hbelibsr ? fmtNum(line.hbelibsr) : '—') + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
@@ -380,12 +380,12 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
-              (aft.foc != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.foc || 0) + '</div>' : '') +
+              (aft.foc != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.foc ? aft.foc : '—') + '</div>' : '') +
               '<input type="number" class="amt-input edit-foc" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
               '<span class="bt-unit">Pcs</span>' +
             '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              (aft.shipping_cost != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + fmtNum(aft.shipping_cost || 0) + '</div>' : '') +
+              (aft.shipping_cost != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</div>' : '') +
               '<input type="text" class="amt-input edit-bkirim" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
             '</div>' +
             (function () {
@@ -394,7 +394,7 @@
               var stkNettoBsr = stkNet.final;
               var stkPk = stk.packing || 1;
               var stkNettoPcs = stkPk > 0 ? stkNettoBsr / stkPk : 0;
-              return '<div class="dp-sblm-row"><span class="dp-label"></span><span class="sblm-hint">' + fmtNum(stkNettoBsr) + '</span><span class="sblm-hint dp-unit">/' + esc(stk.satbesar || sat) + '</span><span class="sblm-hint">' + fmtNum(stkNettoPcs) + '</span><span class="sblm-hint dp-unit">/Pcs</span></div>';
+              return '<div class="dp-beli-row dp-sblm-row"><span class="dp-label"></span><span class="dp-val sblm-hint">' + fmtNum(stkNettoBsr) + '</span><span class="dp-unit sblm-hint">/' + esc(stk.satbesar || sat) + '</span><span class="dp-val sblm-hint">' + fmtNum(stkNettoPcs) + '</span><span class="dp-unit sblm-hint">/Pcs</span></div>';
             })() +
             '<div class="dp-netto-row">' +
               '<span class="dp-label">Netto</span>' +
@@ -430,18 +430,20 @@
     var cls = changedCls(stk[field], line[field]);
     var hint = sblmPctHint(stk[field]);
     // Calculate snapshot disc amounts for sblm hints
-    var stkAmtHint = '', stkTotalHint = '';
+    var stkAmtHint = '', stkTotalHint = '', amtCls = '', totalCls = '';
     if (stk.hbelibsr != null) {
       var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
       var stkAmtMap = { pctdisc1: stkNet.d1, pctdisc2: stkNet.d2, pctdisc3: stkNet.d3, pctppn: stkNet.ppnAmt };
       var stkAmt = stkAmtMap[field] || 0;
-      stkAmtHint = '<div class="sblm-hint">' + fmtNum(stkAmt) + '</div>';
-      stkTotalHint = '<div class="sblm-hint">' + fmtNum(stkAmt * qtyBsr) + '</div>';
+      stkAmtHint = '<div class="sblm-hint">' + (stkAmt ? fmtNum(stkAmt) : '—') + '</div>';
+      stkTotalHint = '<div class="sblm-hint">' + (stkAmt ? fmtNum(stkAmt * qtyBsr) : '—') + '</div>';
+      amtCls = changedCls(stkAmt, amt);
+      totalCls = changedCls(stkAmt * qtyBsr, amt * qtyBsr);
     }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
-      '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td class="' + totalCls + '">' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td class="' + amtCls + '">' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
       '<td class="' + cls + '">' + hint + '<input type="number" class="pct-input edit-disc-pct" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
       '</tr>';
   }

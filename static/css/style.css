@@ -2271,10 +2271,16 @@ body {
 .sblm-inline { display: inline-block; margin-left: 8px; }
 .sblm-inline .sblm-hint { display: inline; }
 .dp-sblm-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 var(--dp-pad-x, 10px);
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.dp-sblm-row .dp-val,
+.dp-sblm-row .dp-netto-val,
+.dp-sblm-row .dp-unit {
+  color: #c62828 !important;
 }
 
 /* Home page cards */

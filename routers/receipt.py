@@ -198,6 +198,19 @@ async def toggle_fp_lock(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     return result
 
 
+@router.delete('/api/fp/{fp_number}')
+async def delete_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.fp_service import delete_fp as _delete
+    try:
+        result = await _delete(db, fp_number)
+        if 'error' in result:
+            return JSONResponse(result, status_code=400)
+        return result
+    except Exception as e:
+        logger.exception("Faktur delete failed")
+        return JSONResponse({'error': str(e)}, status_code=500)
+
+
 @router.post('/receipt/update')
 async def update_fp(data: FPUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()

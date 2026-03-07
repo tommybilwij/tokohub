@@ -226,6 +226,96 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
     return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
 
 
+async def delete_ph(pool, ph_number: str) -> dict:
+    """Delete a Perubahan Harga: restore old prices where possible, hard-delete rows."""
+    header = await execute_single(
+        pool,
+        "SELECT nobukti, becreff, islocked FROM icphg WHERE nobukti = %s",
+        (ph_number,),
+    )
+    if not header:
+        return {'error': 'Not found'}
+    if header['islocked']:
+        return {'error': 'Perubahan harga terkunci, tidak bisa dihapus'}
+
+    becreff = header['becreff']
+
+    # Get sthist lines for price restoration
+    lines = await execute_query(
+        pool,
+        """SELECT stockid, oprice, noindex,
+                  hjual, hjual2, hjual3, hjual4, hjual5
+           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        (becreff,),
+    )
+    noindex_max = max((l['noindex'] for l in lines), default=0)
+
+    # Phase 1 — Atomic: delete sthist + icphg
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cursor:
+            try:
+                await cursor.execute(
+                    "DELETE FROM sthist WHERE becreff = %s AND tipetrans = 0", (becreff,),
+                )
+                await cursor.execute(
+                    "DELETE FROM icphg WHERE nobukti = %s", (ph_number,),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                logger.exception("Price change delete failed")
+                raise
+
+    # Phase 2 — Restore prices where no newer change exists
+    for line in lines:
+        artno = line['stockid']
+        newer = await execute_single(
+            pool,
+            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
+            (artno, noindex_max),
+        )
+        if newer:
+            continue
+
+        old_hjual = float(line.get('oprice') or 0)
+        if not old_hjual:
+            continue
+
+        # oprice only stores old hjual; look for previous sthist to get hjual2-5
+        prev = await execute_single(
+            pool,
+            """SELECT hjual2, hjual3, hjual4, hjual5
+               FROM sthist WHERE stockid = %s AND noindex < %s
+               ORDER BY noindex DESC LIMIT 1""",
+            (artno, min(l['noindex'] for l in lines if l['stockid'] == artno)),
+        )
+        try:
+            if prev:
+                await execute_modify(
+                    pool,
+                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
+                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
+                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
+                )
+            else:
+                await execute_modify(
+                    pool,
+                    "UPDATE stock SET hjual=%s WHERE artno=%s",
+                    (old_hjual, artno),
+                )
+        except Exception:
+            logger.warning("Failed to restore price for %s", artno, exc_info=True)
+
+    try:
+        from services.stock_search import invalidate_cache
+        invalidate_cache()
+    except Exception:
+        pass
+
+    logger.info("Price change deleted: %s (becreff=%d, lines=%d)", ph_number, becreff, len(lines))
+    return {'ok': True, 'ph_number': ph_number, 'lines_deleted': len(lines)}
+
+
 async def get_ph_history(pool, page=1, per_page=20, date_from=None, date_to=None) -> tuple:
     """Get paginated list of price change headers from icphg."""
     where = []

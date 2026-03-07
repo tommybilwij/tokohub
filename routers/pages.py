@@ -117,9 +117,10 @@ async def history_page(
         denied = await _check_page(request, user, 'faktur')
         if denied: return denied
     can_edit = await has_page_access(pool, user['role'], 'faktur:edit')
+    can_delete = await has_page_access(pool, user['role'], 'faktur:delete')
     can_lock = await has_page_access(pool, user['role'], 'faktur:lock')
     return templates.TemplateResponse(request, 'history.html', {
-        'can_entry': has_entry, 'can_edit': can_edit, 'can_lock': can_lock,
+        'can_entry': has_entry, 'can_edit': can_edit, 'can_delete': can_delete, 'can_lock': can_lock,
         **await _user_ctx(request, user),
     })
 
@@ -193,6 +194,7 @@ async def price_change_page(
     pool = request.app.state.db_pool
     ctx = await _user_ctx(request, user)
     ctx['can_entry'] = await has_page_access(pool, user['role'], 'price_change')
+    ctx['can_delete'] = await has_page_access(pool, user['role'], 'price_change:delete')
     ctx['can_lock'] = await has_page_access(pool, user['role'], 'price_change:lock')
     return templates.TemplateResponse(request, 'price_change_history.html', ctx)
 

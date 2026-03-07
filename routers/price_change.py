@@ -16,6 +16,7 @@ from services.price_change_service import (
     get_ph_history,
     get_ph_detail,
     toggle_ph_lock,
+    delete_ph,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,18 @@ async def api_ph_toggle_lock(ph_number: str, db: aiomysql.Pool = Depends(get_db)
     if 'error' in result:
         return JSONResponse(result, status_code=404)
     return result
+
+
+@router.delete('/api/ph/{ph_number}')
+async def api_ph_delete(ph_number: str, db: aiomysql.Pool = Depends(get_db)):
+    try:
+        result = await delete_ph(db, ph_number)
+        if 'error' in result:
+            return JSONResponse(result, status_code=400)
+        return result
+    except Exception as e:
+        logger.exception("Price change delete failed")
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
 @router.get('/api/price-change/report')

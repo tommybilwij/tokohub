@@ -2,7 +2,7 @@
 {% block title %}Faktur Pembelian{% endblock %}
 
 {% block content %}
-<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
+<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0"><i class="bi bi-receipt-cutoff"></i> Faktur Pembelian</h5>
     {% if can_entry | default(false) %}
@@ -180,6 +180,7 @@
 
   var pageEl = document.querySelector('.sh-page');
   var canEdit = pageEl.dataset.canEdit === 'true';
+  var canDelete = pageEl.dataset.canDelete === 'true';
   var canLock = pageEl.dataset.canLock === 'true';
 
   var elDateFrom = document.getElementById('hDateFrom');
@@ -302,6 +303,9 @@
             var editDis = o.isupdateprice ? ' disabled' : '';
             actions += ' <button class="btn btn-sm btn-edit-fp ' + editCls + '" data-fp="' + o.nofaktur + '" title="Edit"' + editDis + '><i class="bi bi-pencil"></i></button>';
           }
+          if (canDelete && !o.isupdateprice) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-fp" data-fp="' + o.nofaktur + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
           if (canLock) {
             var lockCls = o.isupdateprice ? 'btn-warning' : 'btn-outline-secondary';
             var lockIcon = o.isupdateprice ? 'lock-fill' : 'unlock';
@@ -391,6 +395,27 @@
           tbody.appendChild(tr);
         });
         new bootstrap.Modal(document.getElementById('fpDetailModal')).show();
+      });
+    });
+
+    // Delete
+    document.querySelectorAll('#hTableBody .btn-delete-fp').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var fp = btn.dataset.fp;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus faktur ' + fp + '? Stok dan harga akan dikembalikan.') : Promise.resolve(confirm('Hapus faktur ' + fp + '?')));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/fp/' + encodeURIComponent(fp), {method: 'DELETE'});
+          var data = await res.json();
+          if (data.ok) {
+            window.showToast && showToast('Faktur ' + fp + ' berhasil dihapus');
+            loadData(currentPage);
+          } else {
+            window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
       });
     });
 

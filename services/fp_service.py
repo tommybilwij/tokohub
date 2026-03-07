@@ -425,6 +425,107 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
     return result
 
 
+async def delete_fp(pool, fp_number: str) -> dict:
+    """Delete a Faktur Pembelian: reverse stock balance, restore prices from snapshot, hard-delete rows."""
+    header = await execute_single(
+        pool,
+        "SELECT nofaktur, becreff, isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
+    )
+    if not header:
+        return {'error': 'Faktur not found'}
+    if not header['isupdateprice']:
+        return {'error': 'Faktur terkunci, tidak bisa dihapus'}
+
+    becreff = header['becreff']
+
+    # Get sthist lines for reversal
+    lines = await execute_query(
+        pool,
+        "SELECT stockid, qty, packing, qtybonus, noindex FROM sthist WHERE becreff = %s AND tipetrans = 1",
+        (becreff,),
+    )
+
+    # Get snapshot for price restoration
+    from services.snapshot_service import get_snapshot
+    snapshot = await get_snapshot(pool, fp_number)
+
+    # Phase 1 — Atomic: reverse stlastbal, delete sthist + icbym + snapshots
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            try:
+                for line in lines:
+                    qty_small = float(
+                        Decimal(str(line['qty'])) * Decimal(str(line['packing'] or 1))
+                    ) + float(line.get('qtybonus') or 0)
+                    await cursor.execute(
+                        "UPDATE stlastbal SET curqty = curqty - %s WHERE artno = %s AND warehouseid = 'LAPANGAN'",
+                        (qty_small, line['stockid']),
+                    )
+
+                await cursor.execute(
+                    "DELETE FROM sthist WHERE becreff = %s AND tipetrans = 1", (becreff,),
+                )
+                await cursor.execute(
+                    "DELETE FROM icbym WHERE nofaktur = %s AND tipe = '1'", (fp_number,),
+                )
+                await cursor.execute(
+                    "DELETE FROM tokohub.faktur_pembelian_snapshots WHERE po_number = %s", (fp_number,),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                logger.exception("Faktur delete failed (Phase 1)")
+                raise
+
+    # Phase 2 — Restore stock prices from snapshot where no newer change exists
+    if snapshot:
+        noindex_max = max((l['noindex'] for l in lines), default=0)
+        for item in snapshot.get('items', []):
+            before = item.get('before')
+            if not before:
+                continue
+            artno = item['artno']
+
+            newer = await execute_single(
+                pool,
+                "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
+                (artno, noindex_max),
+            )
+            if newer:
+                continue
+
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock SET
+                        hbelibsr=%s, hbelikcl=%s, hbelinetto=%s,
+                        pctdisc1=%s, pctdisc2=%s, pctdisc3=%s, pctppn=%s,
+                        hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s,
+                        satbesar=%s, packing=%s,
+                        ispaketprc=%s, over1=%s, over2=%s,
+                        hjualo1=%s, hjual2o1=%s, hjual3o1=%s, hjual4o1=%s, hjual5o1=%s,
+                        hjualo2=%s, hjual2o2=%s, hjual3o2=%s, hjual4o2=%s, hjual5o2=%s
+                    WHERE artno=%s""",
+                    (before.get('hbelibsr', 0), before.get('hbelikcl', 0), before.get('hbelinetto_kcl', 0),
+                     before.get('pctdisc1', 0), before.get('pctdisc2', 0), before.get('pctdisc3', 0), before.get('pctppn', 0),
+                     before.get('hjual', 0), before.get('hjual2', 0), before.get('hjual3', 0), before.get('hjual4', 0), before.get('hjual5', 0),
+                     before.get('satbesar', ''), before.get('packing', 0),
+                     before.get('ispaketprc', 0), before.get('over1', 0), before.get('over2', 0),
+                     before.get('hjualo1', 0), before.get('hjual2o1', 0), before.get('hjual3o1', 0), before.get('hjual4o1', 0), before.get('hjual5o1', 0),
+                     before.get('hjualo2', 0), before.get('hjual2o2', 0), before.get('hjual3o2', 0), before.get('hjual4o2', 0), before.get('hjual5o2', 0),
+                     artno),
+                )
+            except Exception:
+                logger.warning("Failed to restore stock prices for %s", artno, exc_info=True)
+
+    from services.stock_search import invalidate_cache
+    invalidate_cache()
+
+    logger.info("Faktur deleted: %s (becreff=%d, lines=%d)", fp_number, becreff, len(lines))
+    return {'ok': True, 'fp_number': fp_number, 'lines_deleted': len(lines)}
+
+
 async def get_fp_history(pool, page=1, per_page=20,
                          date_from=None, date_to=None, supplier=None):
     """Retrieve recent Faktur Pembelian with optional filters."""

@@ -2,7 +2,7 @@
 {% block title %}Perubahan Harga{% endblock %}
 
 {% block content %}
-<div class="sh-page" data-can-lock="{{ can_lock | default(false) | tojson }}">
+<div class="sh-page" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0"><i class="bi bi-tag"></i> Perubahan Harga</h5>
     {% if can_entry | default(false) %}
@@ -108,6 +108,7 @@
   'use strict';
 
   var pageEl = document.querySelector('.sh-page');
+  var canDelete = pageEl.dataset.canDelete === 'true';
   var canLock = pageEl.dataset.canLock === 'true';
 
   var elDateFrom = document.getElementById('phDateFrom');
@@ -169,6 +170,9 @@
         items.forEach(function(o) {
           var tr = document.createElement('tr');
           var actions = '<button class="btn btn-sm btn-outline-primary btn-view-ph" data-ph="' + esc(o.nobukti) + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          if (canDelete && !o.islocked) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-ph" data-ph="' + esc(o.nobukti) + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
           if (canLock) {
             var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
             var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
@@ -241,6 +245,27 @@
           tbody.appendChild(tr);
         });
         new bootstrap.Modal(document.getElementById('phDetailModal')).show();
+      });
+    });
+
+    // Delete
+    document.querySelectorAll('#phTableBody .btn-delete-ph').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var ph = btn.dataset.ph;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus perubahan harga ' + ph + '? Harga jual akan dikembalikan.') : Promise.resolve(confirm('Hapus perubahan harga ' + ph + '?')));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/ph/' + encodeURIComponent(ph), {method: 'DELETE'});
+          var data = await res.json();
+          if (data.ok) {
+            window.showToast && showToast('Perubahan harga ' + ph + ' berhasil dihapus');
+            loadData(currentPage);
+          } else {
+            window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
       });
     });
 

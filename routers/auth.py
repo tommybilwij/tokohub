@@ -14,7 +14,7 @@ from services.auth import (
     get_all_roles, get_role_permissions, set_role_permissions,
     delete_role, count_users_with_role,
     create_session_token, decode_session_token,
-    SESSION_COOKIE, SESSION_MAX_AGE, PAGES,
+    SESSION_COOKIE, _get_session_max_age, PAGES,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ async def api_login(request: Request, db: aiomysql.Pool = Depends(get_db)):
     resp = JSONResponse({'ok': True, 'role': record['role'], 'username': username})
     resp.set_cookie(
         SESSION_COOKIE, token,
-        max_age=SESSION_MAX_AGE, httponly=True, samesite='lax',
+        max_age=_get_session_max_age(), httponly=True, samesite='lax',
     )
     return resp
 

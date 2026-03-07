@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     lan_mode: bool = True
     mdns_hostname: str = 'tokohub'
 
+    # Session
+    session_max_age: int = 86400  # 1 day in seconds
+
     # Branding
     store_name: str = ''
 
@@ -190,6 +193,7 @@ _KEY_TO_ENV = {
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
     'store_name': 'STORE_NAME',
+    'session_max_age': 'SESSION_MAX_AGE',
 }
 
 

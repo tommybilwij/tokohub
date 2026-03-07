@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 _SECRET_KEY = None
 _SERIALIZER = None
 SESSION_COOKIE = 'tokohub_session'
-SESSION_MAX_AGE = 86400 * 7  # 7 days
+
+
+def _get_session_max_age() -> int:
+    """Get session max age from config."""
+    from config import settings
+    return settings.session_max_age
 
 # All pages that can be permission-controlled
 # Keys with ':' are rendered as indented sub-items in the permissions UI.
@@ -65,7 +70,7 @@ def create_session_token(username: str, role: str) -> str:
 def decode_session_token(token: str) -> dict | None:
     """Decode session token. Returns {'u': username, 'r': role} or None."""
     try:
-        data = _get_serializer().loads(token, max_age=SESSION_MAX_AGE)
+        data = _get_serializer().loads(token, max_age=_get_session_max_age())
         return data
     except (BadSignature, SignatureExpired):
         return None

@@ -141,6 +141,19 @@
             <label class="form-label">Port</label>
             <input type="number" class="form-control form-control-sm" name="server_port" min="1" max="65535">
           </div>
+          <div class="col-md-4">
+            <label class="form-label">Sesi Login Otomatis Keluar</label>
+            <div class="input-group input-group-sm">
+              <input type="number" class="form-control form-control-sm" name="session_max_age" id="sessionMaxAge" min="60" placeholder="86400">
+              <span class="input-group-text">detik</span>
+            </div>
+            <div class="d-flex gap-1 mt-1">
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="3600" style="font-size:0.7rem">1 Jam</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="28800" style="font-size:0.7rem">8 Jam</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="86400" style="font-size:0.7rem">1 Hari</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="604800" style="font-size:0.7rem">7 Hari</button>
+            </div>
+          </div>
           <div class="col-md-4 d-flex align-items-end">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="lanModeCheck" name="lan_mode">
@@ -163,13 +176,13 @@
       </div>
     </div>
 
-    <!-- Data Cleanup -->
+    <!-- Hapus Data -->
     <div class="card mb-3">
       <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-trash3"></i> Data Cleanup</h5>
+        <h5 class="card-title"><i class="bi bi-trash3"></i> Hapus Data</h5>
         <div class="d-flex align-items-center justify-content-between">
           <div>
-            <p class="mb-0 text-muted small">Hapus semua data perubahan harga (snapshot faktur).</p>
+            <p class="mb-0 text-muted small">Hapus semua Faktur Pembelian Snapshots untuk edit Riwayat Faktur Pembelian.</p>
           </div>
           <button class="btn btn-outline-danger btn-sm" id="btnCleanupSnapshots">
             <i class="bi bi-trash"></i> Hapus Semua Snapshot
@@ -238,6 +251,7 @@
       setVal('formServer', 'store_name', cfg.store_name);
       setVal('formServer', 'server_host', cfg.server_host);
       setVal('formServer', 'server_port', cfg.server_port);
+      setVal('formServer', 'session_max_age', cfg.session_max_age || 86400);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;
       setVal('formServer', 'mdns_hostname', cfg.mdns_hostname);
       toggleMdnsHostname(cfg.lan_mode);
@@ -249,6 +263,13 @@
   }
   document.getElementById('lanModeCheck').addEventListener('change', function() {
     toggleMdnsHostname(this.checked);
+  });
+
+  // Session preset buttons
+  document.querySelectorAll('.session-preset').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('sessionMaxAge').value = this.dataset.val;
+    });
   });
 
   // Populate LAN URLs from live status
@@ -290,12 +311,14 @@
   // Collect form fields into a nested object
   function collectForm(form) {
     const data = {};
-    form.querySelectorAll('input').forEach(input => {
+    form.querySelectorAll('input, select').forEach(input => {
       const name = input.name;
       if (!name) return;
 
       let val;
-      if (input.type === 'checkbox') {
+      if (input.tagName === 'SELECT') {
+        val = Number(input.value) || input.value;
+      } else if (input.type === 'checkbox') {
         val = input.checked;
       } else if (input.type === 'password') {
         // Only send password if user typed something

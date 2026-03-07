@@ -79,7 +79,7 @@
   function sblmPctHint(stockVal) {
     if (stockVal == null || stockVal === undefined) return '';
     var sv = Number(stockVal) || 0;
-    return '<div class="sblm-hint">' + (sv ? sv + '%' : '—') + '</div>';
+    return '<div class="sblm-hint">' + (sv ? sv : '—') + '</div>';
   }
 
   // CSS class for changed values — compare formatted display to avoid float noise
@@ -242,7 +242,7 @@
         if (sv) {
           var stkMargin = sv - stkNettoPcs;
           var stkPct = (stkMargin / stkNettoPcs) * 100;
-          pctHint = '<div class="sblm-hint">' + stkPct.toFixed(2) + '%</div>';
+          pctHint = '<div class="sblm-hint">' + stkPct.toFixed(2) + '</div>';
           mrgHint = '<div class="sblm-hint">' + (sv ? fmtNum(stkMargin) : '—') + '</div>';
           // Compare with current margin
           var curVal = Number(val) || 0;

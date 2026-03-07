@@ -94,8 +94,8 @@
           mb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Tidak ada perubahan manual.</td></tr>';
         } else {
           data.manual.forEach(r => {
-            const oldH = r.before.hjual || 0;
-            const newH = r.after.hjual || 0;
+            const oldH = r.old_hjual || 0;
+            const newH = r.new_hjual || 0;
             const diff = newH - oldH;
             const cls = diff > 0 ? 'text-danger' : diff < 0 ? 'text-success' : '';
             const sign = diff > 0 ? '+' : '';
@@ -106,7 +106,7 @@
               <td class="text-end">${fmt(oldH)}</td>
               <td class="text-end fw-bold">${fmt(newH)}</td>
               <td class="text-end ${cls}">${sign}${fmt(diff)}</td>
-              <td>${r.created_by || ''}</td>
+              <td>${r.posttime || ''}</td>
             </tr>`;
           });
         }

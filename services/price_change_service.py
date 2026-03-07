@@ -1,7 +1,7 @@
 """Price change (Perubahan Harga) service.
 
-Handles reading stock prices, writing price changes to both
-myposse.sthist (tipetrans=0) and tokohub.perubahan_harga_snapshots.
+Handles reading stock prices, writing price changes to
+myposse.sthist (tipetrans=0) and icphg header.
 """
 
 import json
@@ -26,12 +26,6 @@ _STOCK_FIELDS = (
     'hjualo1', 'hjual2o1', 'hjual3o1', 'hjual4o1', 'hjual5o1',
     'hjualo2', 'hjual2o2', 'hjual3o2', 'hjual4o2', 'hjual5o2',
 )
-
-
-def _decimal_default(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    raise TypeError
 
 
 async def get_stock_prices(pool, artnos: list[str]) -> dict:
@@ -78,7 +72,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
     Writes to:
     1. stock table (update hjual prices)
     2. sthist (tipetrans=0, PH record)
-    3. tokohub.perubahan_harga_snapshots (before/after tracking)
+    3. icphg (price change header)
     """
     if not items:
         return {'error': 'No items'}
@@ -199,45 +193,6 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                     )
                 )
 
-                # 3. Insert into tokohub.perubahan_harga_snapshots
-                before_data = {
-                    'hjual': old_hjual,
-                    'hjual2': float(stock['hjual2'] or 0),
-                    'hjual3': float(stock['hjual3'] or 0),
-                    'hjual4': float(stock['hjual4'] or 0),
-                    'hjual5': float(stock['hjual5'] or 0),
-                    'hbelibsr': float(stock['hbelibsr'] or 0),
-                    'hbelikcl': float(stock['hbelikcl'] or 0),
-                    'hbelinetto': float(stock['hbelinetto'] or 0),
-                    'packing': float(stock['packing'] or 1),
-                    'satbesar': stock['satbesar'] or '',
-                    'bundling1': {'hjual1': float(stock['hjualo1'] or 0), 'hjual2': float(stock['hjual2o1'] or 0),
-                                  'hjual3': float(stock['hjual3o1'] or 0), 'hjual4': float(stock['hjual4o1'] or 0),
-                                  'hjual5': float(stock['hjual5o1'] or 0), 'qty': float(stock['over1'] or 0)},
-                    'bundling2': {'hjual1': float(stock['hjualo2'] or 0), 'hjual2': float(stock['hjual2o2'] or 0),
-                                  'hjual3': float(stock['hjual3o2'] or 0), 'hjual4': float(stock['hjual4o2'] or 0),
-                                  'hjual5': float(stock['hjual5o2'] or 0), 'qty': float(stock['over2'] or 0)},
-                }
-                after_data = {
-                    'hjual': new_hjual,
-                    'hjual2': new_hjual2,
-                    'hjual3': new_hjual3,
-                    'hjual4': new_hjual4,
-                    'hjual5': new_hjual5,
-                }
-                if b1:
-                    after_data['bundling1'] = b1
-                if b2:
-                    after_data['bundling2'] = b2
-                await cursor.execute(
-                    """INSERT INTO tokohub.perubahan_harga_snapshots
-                       (ph_number, becreff, artno, artname, tanggal, before_json, after_json, created_by)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                    (ph_number, becreff, artno, stock['artname'] or '',
-                     today, json.dumps(before_data, default=_decimal_default),
-                     json.dumps(after_data, default=_decimal_default), userid)
-                )
-
             # Insert icphg header
             uraian = ', '.join(i.get('artno', '') for i in items[:3])
             if len(items) > 3:
@@ -270,24 +225,26 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
 
 
 async def get_price_change_report(pool, report_date: date | None = None) -> list[dict]:
-    """Get price changes for a specific date from tokohub.perubahan_harga_snapshots."""
+    """Get manual price changes (tipetrans=0) for a specific date from sthist."""
     report_date = report_date or date.today()
     rows = await execute_query(
         pool,
-        """SELECT id, ph_number, becreff, artno, artname, tanggal,
-                  before_json, after_json, created_by, created_at
-           FROM tokohub.perubahan_harga_snapshots
-           WHERE tanggal = %s
-           ORDER BY id DESC""",
+        """SELECT nofaktur, becreff, stockid AS artno, artname, tanggal,
+                  hbelibsr, hbelinetto, hjual, hjual2, oprice,
+                  pctdisc1, pctdisc2, packing, satuanbsr, posttime
+           FROM sthist
+           WHERE tipetrans = 0 AND tanggal = %s
+           ORDER BY noindex DESC""",
         (report_date,),
     )
     result = []
     for r in rows:
         d = dict(r)
-        d['before'] = json.loads(d.pop('before_json'))
-        d['after'] = json.loads(d.pop('after_json'))
+        d['ph_number'] = d.pop('nofaktur')
+        d['old_hjual'] = float(d.get('oprice') or 0)
+        d['new_hjual'] = float(d.get('hjual') or 0)
         d['tanggal'] = d['tanggal'].isoformat() if d['tanggal'] else ''
-        d['created_at'] = d['created_at'].isoformat() if d['created_at'] else ''
+        d['posttime'] = d['posttime'].isoformat() if d['posttime'] else ''
         result.append(d)
     return result
 

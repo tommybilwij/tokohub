@@ -64,7 +64,7 @@ async def setup_page(request: Request, templates: Jinja2Templates = Depends(get_
     return templates.TemplateResponse(request, 'setup.html')
 
 
-@router.get('/entry')
+@router.get('/faktur-pembelian/input')
 async def entry_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -75,18 +75,7 @@ async def entry_page(
     return templates.TemplateResponse(request, 'receipt_form.html', await _user_ctx(request, user))
 
 
-@router.get('/receipt/new')
-async def receipt_new(
-    request: Request,
-    templates: Jinja2Templates = Depends(get_templates),
-    user: dict = Depends(get_current_user),
-):
-    denied = await _check_page(request, user, 'faktur:input')
-    if denied: return denied
-    return templates.TemplateResponse(request, 'receipt_form.html', await _user_ctx(request, user))
-
-
-@router.get('/aliases')
+@router.get('/faktur-pembelian/aliases')
 async def aliases_page(
     request: Request,
     page: int = 1,
@@ -102,7 +91,7 @@ async def aliases_page(
     })
 
 
-@router.get('/history')
+@router.get('/faktur-pembelian')
 async def history_page(
     request: Request,
     db: aiomysql.Pool = Depends(get_db),
@@ -158,7 +147,7 @@ async def laporan_page(
     })
 
 
-@router.get('/sales-history')
+@router.get('/laporan/penjualan')
 async def sales_history_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -172,7 +161,7 @@ async def sales_history_page(
     return templates.TemplateResponse(request, 'sales_history.html', ctx)
 
 
-@router.get('/foc-history')
+@router.get('/laporan/barang-bonus')
 async def foc_history_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -183,7 +172,7 @@ async def foc_history_page(
     return templates.TemplateResponse(request, 'foc_history.html', await _user_ctx(request, user))
 
 
-@router.get('/price-change')
+@router.get('/perubahan-harga')
 async def price_change_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -199,7 +188,7 @@ async def price_change_page(
     return templates.TemplateResponse(request, 'price_change_history.html', ctx)
 
 
-@router.get('/price-change-entry')
+@router.get('/perubahan-harga/input')
 async def price_change_entry_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
@@ -214,7 +203,7 @@ async def price_change_entry_page(
     return templates.TemplateResponse(request, 'price_change.html', ctx)
 
 
-@router.get('/price-change-report')
+@router.get('/laporan/perubahan-harga')
 async def price_change_report_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),

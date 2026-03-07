@@ -33,23 +33,23 @@
           {% endif %}
           {% if nav_pages is defined and ('faktur' in nav_pages or 'faktur:input' in nav_pages or 'faktur:daftar' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path in ['/history', '/entry'] %}active{% endif %}"
-               href="/history">
+            <a class="nav-link {% if request.url.path.startswith('/faktur-pembelian') %}active{% endif %}"
+               href="/faktur-pembelian">
               <i class="bi bi-receipt-cutoff"></i> Faktur Pembelian
             </a>
           </li>
           {% endif %}
           {% if nav_pages is defined and ('price_change' in nav_pages or 'price_change:daftar' in nav_pages or 'price_change:input' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path in ['/price-change', '/price-change-entry'] %}active{% endif %}"
-               href="/price-change">
+            <a class="nav-link {% if request.url.path.startswith('/perubahan-harga') %}active{% endif %}"
+               href="/perubahan-harga">
               <i class="bi bi-tag"></i> Perubahan Harga
             </a>
           </li>
           {% endif %}
           {% if nav_pages is defined and ('laporan' in nav_pages or 'laporan:penjualan' in nav_pages or 'laporan:perubahan_harga' in nav_pages or 'laporan:barang_bonus' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path in ['/laporan', '/sales-history', '/price-change-report', '/foc-history'] %}active{% endif %}"
+            <a class="nav-link {% if request.url.path.startswith('/laporan') %}active{% endif %}"
                href="/laporan">
               <i class="bi bi-bar-chart-line"></i> Laporan
             </a>

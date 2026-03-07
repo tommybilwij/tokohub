@@ -85,12 +85,12 @@ async def _query_sales(db, dt_from, dt_to, dept=None):
             params.extend(dept_ids)
 
     sql = (
-        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, s.unitprc AS hjual, "
+        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, st.hjual, "
         f"SUM(s.qty) AS total_qty, SUM(s.netamount) AS total_amount "
         f"FROM ({unions}) s "
         f"JOIN stock st ON st.artno = s.artno "
         f"WHERE s.transtime BETWEEN %s AND %s{dept_filter} "
-        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik, s.unitprc "
+        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik, st.hjual "
         f"ORDER BY total_amount DESC"
     )
 

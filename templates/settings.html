@@ -76,10 +76,10 @@
       </div>
     </div>
 
-    <!-- Fuzzy Matching -->
+    <!-- Fuzzy Matching: Input Barang -->
     <div class="card mb-3">
       <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-search"></i> Fuzzy Matching</h5>
+        <h5 class="card-title"><i class="bi bi-search"></i> Fuzzy Matching — Input Barang</h5>
         <form id="formFuzzy" class="row g-2">
           <div class="col-md-4">
             <label class="form-label">Cache TTL (detik)</label>
@@ -95,6 +95,28 @@
           </div>
           <div class="col-12 mt-2">
             <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formFuzzy">
+              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Fuzzy Matching: Perubahan Harga -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-search"></i> Fuzzy Matching — Perubahan Harga</h5>
+        <form id="formPcFuzzy" class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Top N</label>
+            <input type="number" class="form-control form-control-sm" name="pc_top_n" min="1" max="50">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Min Score</label>
+            <input type="number" class="form-control form-control-sm" name="pc_min_score" min="0" max="100">
+          </div>
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formPcFuzzy">
               <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
             </button>
           </div>
@@ -203,10 +225,14 @@
       setVal('formOpenai', 'openai.api_version', cfg.openai.api_version);
       // api_key field left empty
 
-      // Fuzzy
+      // Fuzzy (Input Barang)
       setVal('formFuzzy', 'fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
       setVal('formFuzzy', 'fuzzy_top_n', cfg.fuzzy_top_n);
       setVal('formFuzzy', 'fuzzy_min_score', cfg.fuzzy_min_score);
+
+      // Fuzzy (Perubahan Harga)
+      setVal('formPcFuzzy', 'pc_top_n', cfg.pc_top_n);
+      setVal('formPcFuzzy', 'pc_min_score', cfg.pc_min_score);
 
       // Server
       setVal('formServer', 'store_name', cfg.store_name);
@@ -345,7 +371,7 @@
     });
   }
 
-  const restartForms = new Set(['formDb', 'formOpenai', 'formFuzzy', 'formServer']);
+  const restartForms = new Set(['formDb', 'formOpenai', 'formFuzzy', 'formPcFuzzy', 'formServer']);
 
   // Attach save handler to each form
   document.querySelectorAll('form[id^="form"]').forEach(form => {

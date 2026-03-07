@@ -46,6 +46,8 @@ async def api_settings_get():
         'fuzzy_cache_ttl': config.settings.fuzzy_cache_ttl,
         'fuzzy_top_n': config.settings.fuzzy_top_n,
         'fuzzy_min_score': config.settings.fuzzy_min_score,
+        'pc_top_n': config.settings.pc_top_n,
+        'pc_min_score': config.settings.pc_min_score,
         'server_port': config.settings.server_port,
         'server_host': config.settings.server_host,
         'lan_mode': config.settings.lan_mode,

@@ -53,7 +53,7 @@ async def _load_stock_cache(pool):
     rows = await execute_query(
         pool,
         """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                  packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  packing, hbelibsr, hbelikcl, hbelinetto, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5,
                   hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
                   hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2
@@ -153,7 +153,7 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
         stock = await execute_single(
             pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                      packing, hbelibsr, hbelikcl, hbelinetto, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5,
                   hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
                   hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2
@@ -170,7 +170,7 @@ async def search_stock(pool, query, top_n=None, min_score=None, score_against=No
         stock = await execute_single(
             pool,
             """SELECT artno, artpabrik, artname, suppid, satbesar, satkecil,
-                      packing, hbelibsr, hbelikcl, pctdisc1, pctdisc2, pctdisc3, pctppn,
+                      packing, hbelibsr, hbelikcl, hbelinetto, pctdisc1, pctdisc2, pctdisc3, pctppn,
                   hjual, hjual2, hjual3, hjual4, hjual5,
                   hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1, over1,
                   hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2, over2

@@ -2146,6 +2146,58 @@ body {
 }
 
 /* -----------------------------------------------------------------------
+   Perubahan Harga table (mirrors #itemTable expand/collapse)
+   ----------------------------------------------------------------------- */
+#pcTable .pc-main td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-top: 1px solid #e9ecef;
+}
+#pcTable .pc-main {
+  cursor: pointer;
+  transition: background-color var(--ease-default);
+  border-left: 3px solid var(--clr-primary-500);
+}
+#pcTable .pc-main:hover { background-color: #eaf0fb; }
+#pcTable .pc-main .row-num {
+  font-weight: var(--fw-semibold);
+  color: #adb5bd;
+  width: 40px;
+  text-align: center;
+}
+#pcTable .pc-main.has-detail-open td { border-bottom: none; }
+#pcTable .pc-main.has-detail-open .expand-toggle {
+  transform: rotate(90deg);
+  color: var(--clr-primary-700);
+}
+#pcTable .pc-detail { display: none; }
+#pcTable .pc-detail.open {
+  display: table-row;
+  animation: fadeSlideIn var(--ease-expand) ease both;
+}
+#pcTable .pc-detail td {
+  padding: 0;
+  border-bottom: 2px solid var(--clr-card-border);
+  background: var(--clr-neutral-50);
+}
+#pcTable .pc-detail .dp-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+#pcTable .pc-detail .dp-section-header {
+  font-weight: var(--fw-semibold);
+  font-size: 0.85rem;
+  color: var(--clr-primary-700);
+  margin-bottom: 0.35rem;
+}
+#pcTable .pc-detail .pc-hjual {
+  width: 110px;
+}
+
+/* -----------------------------------------------------------------------
    Snapshot Comparison Cards
    ----------------------------------------------------------------------- */
 .snap-item-card { border-color: var(--clr-card-border); }

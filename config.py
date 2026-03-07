@@ -89,10 +89,14 @@ class Settings(BaseSettings):
     allowed_extensions: set[str] = {'png', 'jpg', 'jpeg'}
     max_content_length: int = 16 * 1024 * 1024
 
-    # Fuzzy matching
+    # Fuzzy matching (Input Barang)
     fuzzy_cache_ttl: int = 300
     fuzzy_top_n: int = 5
     fuzzy_min_score: int = 40
+
+    # Fuzzy matching (Perubahan Harga)
+    pc_top_n: int = 10
+    pc_min_score: int = 30
 
     # Server
     server_port: int = 5000
@@ -179,6 +183,8 @@ _KEY_TO_ENV = {
     'fuzzy_cache_ttl': 'FUZZY_CACHE_TTL',
     'fuzzy_top_n': 'FUZZY_TOP_N',
     'fuzzy_min_score': 'FUZZY_MIN_SCORE',
+    'pc_top_n': 'PC_TOP_N',
+    'pc_min_score': 'PC_MIN_SCORE',
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',

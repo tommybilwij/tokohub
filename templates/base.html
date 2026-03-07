@@ -63,6 +63,22 @@
             </a>
           </li>
           {% endif %}
+          {% if nav_pages is defined and 'price_change' in nav_pages %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path == '/price-change' %}active{% endif %}"
+               href="/price-change">
+              <i class="bi bi-tag"></i> Ubah Harga
+            </a>
+          </li>
+          {% endif %}
+          {% if nav_pages is defined and 'price_report' in nav_pages %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path == '/price-change-report' %}active{% endif %}"
+               href="/price-change-report">
+              <i class="bi bi-journal-text"></i> Laporan Harga
+            </a>
+          </li>
+          {% endif %}
           {% if user and user.role == 'admin' %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}"

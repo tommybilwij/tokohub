@@ -26,6 +26,8 @@ PAGES = {
     'sales:total':  'Total',
     'foc':          'Barang Bonus',
     'aliases':      'Alias',
+    'price_change': 'Perubahan Harga',
+    'price_report': 'Laporan Harga',
 }
 
 # Pages restricted to admin only (not configurable)

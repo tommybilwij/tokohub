@@ -25,6 +25,8 @@ class SettingsUpdate(BaseModel):
     fuzzy_cache_ttl: int | None = None
     fuzzy_top_n: int | None = None
     fuzzy_min_score: int | None = None
+    pc_top_n: int | None = None
+    pc_min_score: int | None = None
     server_port: int | None = None
     server_host: str | None = None
     lan_mode: bool | None = None

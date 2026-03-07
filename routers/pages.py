@@ -149,6 +149,28 @@ async def foc_history_page(
     return templates.TemplateResponse(request, 'foc_history.html', await _user_ctx(request, user))
 
 
+@router.get('/price-change')
+async def price_change_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    denied = await _check_page(request, user, 'price_change')
+    if denied: return denied
+    return templates.TemplateResponse(request, 'price_change.html', await _user_ctx(request, user))
+
+
+@router.get('/price-change-report')
+async def price_change_report_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    denied = await _check_page(request, user, 'price_report')
+    if denied: return denied
+    return templates.TemplateResponse(request, 'price_change_report.html', await _user_ctx(request, user))
+
+
 @router.get('/settings')
 async def settings_page(
     request: Request,

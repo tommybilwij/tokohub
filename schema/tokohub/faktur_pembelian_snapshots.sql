@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS tokohub.po_snapshots (
+CREATE TABLE IF NOT EXISTS tokohub.faktur_pembelian_snapshots (
   id INT(11) NOT NULL AUTO_INCREMENT,
   po_number VARCHAR(30) NOT NULL,
   snapshot_json MEDIUMTEXT NOT NULL,

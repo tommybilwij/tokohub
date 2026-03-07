@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Laporan Perubahan Harga{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0"><i class="bi bi-journal-text"></i> Laporan Perubahan Harga</h5>
+    <div class="d-flex align-items-center gap-2">
+      <input type="date" class="form-control form-control-sm" id="reportDate" style="width:160px">
+      <button class="btn btn-sm btn-primary-app" id="btnLoadReport"><i class="bi bi-search"></i></button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <!-- From Faktur (PO Snapshots) -->
+    <div class="px-3 pt-3 pb-1"><h6 class="text-muted mb-0"><i class="bi bi-receipt"></i> Dari Input Faktur</h6></div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>No. Faktur</th>
+            <th>Artno</th>
+            <th>Nama</th>
+            <th class="text-end">HJual Lama</th>
+            <th class="text-end">HJual Baru</th>
+            <th class="text-end">Selisih</th>
+            <th>Oleh</th>
+          </tr>
+        </thead>
+        <tbody id="fakturBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Manual Price Changes -->
+    <div class="px-3 pt-3 pb-1 border-top"><h6 class="text-muted mb-0"><i class="bi bi-pencil-square"></i> Perubahan Manual</h6></div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>No. PH</th>
+            <th>Artno</th>
+            <th>Nama</th>
+            <th class="text-end">HJual Lama</th>
+            <th class="text-end">HJual Baru</th>
+            <th class="text-end">Selisih</th>
+            <th>Oleh</th>
+          </tr>
+        </thead>
+        <tbody id="manualBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const dateInput = document.getElementById('reportDate');
+  dateInput.value = new Date().toISOString().split('T')[0];
+
+  function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }
+
+  function loadReport() {
+    const d = dateInput.value;
+    fetch(`/api/price-change/report?report_date=${d}`)
+      .then(r => r.json())
+      .then(data => {
+        // Faktur changes
+        const fb = document.getElementById('fakturBody');
+        fb.innerHTML = '';
+        if (!data.from_faktur || data.from_faktur.length === 0) {
+          fb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Tidak ada perubahan dari faktur.</td></tr>';
+        } else {
+          data.from_faktur.forEach(r => {
+            const diff = r.new_hjual - r.old_hjual;
+            const cls = diff > 0 ? 'text-danger' : diff < 0 ? 'text-success' : '';
+            const sign = diff > 0 ? '+' : '';
+            fb.innerHTML += `<tr>
+              <td><code>${r.ref_number}</code></td>
+              <td><code>${r.artno}</code></td>
+              <td>${r.artname}</td>
+              <td class="text-end">${fmt(r.old_hjual)}</td>
+              <td class="text-end fw-bold">${fmt(r.new_hjual)}</td>
+              <td class="text-end ${cls}">${sign}${fmt(diff)}</td>
+              <td>${r.created_by || ''}</td>
+            </tr>`;
+          });
+        }
+
+        // Manual changes
+        const mb = document.getElementById('manualBody');
+        mb.innerHTML = '';
+        if (!data.manual || data.manual.length === 0) {
+          mb.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Tidak ada perubahan manual.</td></tr>';
+        } else {
+          data.manual.forEach(r => {
+            const oldH = r.before.hjual || 0;
+            const newH = r.after.hjual || 0;
+            const diff = newH - oldH;
+            const cls = diff > 0 ? 'text-danger' : diff < 0 ? 'text-success' : '';
+            const sign = diff > 0 ? '+' : '';
+            mb.innerHTML += `<tr>
+              <td><code>${r.ph_number}</code></td>
+              <td><code>${r.artno}</code></td>
+              <td>${r.artname}</td>
+              <td class="text-end">${fmt(oldH)}</td>
+              <td class="text-end fw-bold">${fmt(newH)}</td>
+              <td class="text-end ${cls}">${sign}${fmt(diff)}</td>
+              <td>${r.created_by || ''}</td>
+            </tr>`;
+          });
+        }
+      });
+  }
+
+  document.getElementById('btnLoadReport').addEventListener('click', loadReport);
+  dateInput.addEventListener('change', loadReport);
+  loadReport();
+})();
+</script>
+{% endblock %}

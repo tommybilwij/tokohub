@@ -76,8 +76,8 @@ if settings.lan_mode:
     app.add_middleware(LANAuthMiddleware)
 
 # Routers
-from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth
-for r in [pages, settings_router, stock, receipt, sales, foc, health, auth]:
+from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth, price_change
+for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, price_change]:
     app.include_router(r.router)
 
 

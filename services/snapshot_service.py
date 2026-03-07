@@ -100,7 +100,7 @@ def build_after(preview_lines: list[dict]) -> dict:
 
 async def save_snapshot(pool, po_number: str, before: dict, after: dict,
                         created_by: str = '', meta: dict | None = None) -> None:
-    """Save before/after snapshot to tokohub.po_snapshots."""
+    """Save before/after snapshot to tokohub.faktur_pembelian_snapshots."""
     items = []
     all_artnos = set(list(before.keys()) + list(after.keys()))
     for artno in sorted(all_artnos):
@@ -115,7 +115,7 @@ async def save_snapshot(pool, po_number: str, before: dict, after: dict,
     snapshot = json.dumps(data, default=_decimal_default)
     await execute_modify(
         pool,
-        "INSERT INTO tokohub.po_snapshots (po_number, snapshot_json, created_by) VALUES (%s, %s, %s)",
+        "INSERT INTO tokohub.faktur_pembelian_snapshots (po_number, snapshot_json, created_by) VALUES (%s, %s, %s)",
         (po_number, snapshot, created_by),
     )
     logger.info("Snapshot saved for PO %s (%d items)", po_number, len(items))
@@ -125,7 +125,7 @@ async def get_snapshot(pool, po_number: str) -> dict | None:
     """Get the latest snapshot for a PO."""
     row = await execute_single(
         pool,
-        "SELECT snapshot_json, created_by, created_at FROM tokohub.po_snapshots "
+        "SELECT snapshot_json, created_by, created_at FROM tokohub.faktur_pembelian_snapshots "
         "WHERE po_number = %s ORDER BY id DESC LIMIT 1",
         (po_number,),
     )
@@ -143,7 +143,7 @@ async def get_snapshots_for_po(pool, po_number: str) -> list[dict]:
     """Get all snapshots for a PO (newest first)."""
     rows = await execute_query(
         pool,
-        "SELECT id, po_number, created_by, created_at FROM tokohub.po_snapshots "
+        "SELECT id, po_number, created_by, created_at FROM tokohub.faktur_pembelian_snapshots "
         "WHERE po_number = %s ORDER BY id DESC",
         (po_number,),
     )
@@ -152,8 +152,8 @@ async def get_snapshots_for_po(pool, po_number: str) -> list[dict]:
 
 async def delete_all_snapshots(pool) -> int:
     """Delete all snapshots. Returns rows deleted."""
-    row = await execute_single(pool, "SELECT COUNT(*) as cnt FROM tokohub.po_snapshots")
+    row = await execute_single(pool, "SELECT COUNT(*) as cnt FROM tokohub.faktur_pembelian_snapshots")
     count = row['cnt'] if row else 0
     if count:
-        await execute_modify(pool, "TRUNCATE TABLE tokohub.po_snapshots")
+        await execute_modify(pool, "TRUNCATE TABLE tokohub.faktur_pembelian_snapshots")
     return count

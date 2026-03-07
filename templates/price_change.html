@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Perubahan Harga{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between mb-2">
+  <div>
+    <h4 class="page-title mb-0">Perubahan Harga</h4>
+    <small class="text-muted">Cari barang, ubah harga jual, lalu simpan</small>
+  </div>
+  <div class="d-none d-md-block">
+    <kbd class="me-1">Esc</kbd> <small class="text-muted">Tutup detail</small>
+  </div>
+</div>
+<div class="row g-3">
+  <!-- Left: Search Panel -->
+  <div class="col-xl-3">
+    <div class="card">
+      <div class="card-header card-header-primary">
+        <h5 class="mb-0"><i class="bi bi-search"></i> Cari Barang</h5>
+      </div>
+      <div class="card-body">
+        <div class="position-relative">
+          <div class="input-group mb-2">
+            <input type="text" class="form-control" id="pcSearchInput" placeholder="Nama barang / barcode..." autofocus autocomplete="off">
+            <button class="btn btn-primary-app" type="button" id="pcBtnAdd">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:300px;overflow-y:auto" id="pcSearchResults"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Item List -->
+  <div class="col-xl-9">
+    <div class="card">
+      <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Perubahan Harga</h5>
+        <span class="badge badge-counter" id="pcItemCount">0 item</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="pcTable">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th>Nama Barang</th>
+                <th class="text-end">Beli/Bsr</th>
+                <th class="text-end">Netto/Pcs</th>
+                <th class="text-end">HJual 1</th>
+                <th class="text-end">Member</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="pcTableBody">
+              <tr id="pcEmptyRow">
+                <td colspan="7" class="text-center text-muted py-5">
+                  <i class="bi bi-inbox empty-state-icon"></i><br>
+                  <span class="mt-2 d-inline-block">Belum ada barang. Cari dari panel kiri.</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="d-flex gap-3 align-items-center flex-wrap">
+          <button class="btn btn-sm btn-cta" id="pcBtnCommit" disabled>
+            <i class="bi bi-check-lg"></i> Simpan Perubahan Harga
+          </button>
+          <div class="ms-auto"></div>
+          <button class="btn btn-outline-danger btn-sm" id="pcBtnClear" disabled>
+            <i class="bi bi-trash"></i> Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="pcSuccessModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header modal-header-primary">
+        <h5 class="modal-title"><i class="bi bi-check-circle"></i> Berhasil!</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+        <h4>No: <span id="pcSuccessNumber" class="text-primary"></span></h4>
+        <p><span id="pcSuccessCount"></span> item harga diubah.</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-primary-app" id="pcBtnNew">
+          <i class="bi bi-plus-circle"></i> Entry Baru
+        </button>
+        <a href="/price-change-report" class="btn btn-outline-secondary">
+          <i class="bi bi-journal-text"></i> Lihat Laporan
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const _pcUser = '{{ user.username if user else "" }}';
+</script>
+<script src="{{ url_for('static', filename='js/price_change.js') }}?v={{ range(10000,99999) | random }}"></script>
+{% endblock %}

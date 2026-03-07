@@ -1954,6 +1954,18 @@
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
 
+    // Validate bundling: if enabled, minQty must be > 0
+    for (const item of state.items) {
+      if (!item.selectedArtno) continue;
+      for (const tier of [1, 2]) {
+        const b = item['bundling' + tier];
+        if (b && b.enabled && !b.minQty) {
+          showToast(`${item.artname || item.selectedArtno}: Bundling ${tier} aktif tapi Qty belum diisi.`, 'warning');
+          return;
+        }
+      }
+    }
+
     const items = state.items
       .filter((i) => i.selectedArtno)
       .map(_buildItemPayload);

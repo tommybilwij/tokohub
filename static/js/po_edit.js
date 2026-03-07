@@ -832,6 +832,18 @@
     if (!elDate.value) { if (window.showToast) window.showToast('Isi tanggal', 'warning'); return; }
     if (!editLines.length) { if (window.showToast) window.showToast('Tidak ada item', 'warning'); return; }
 
+    // Validate bundling: if enabled, minQty must be > 0
+    for (var i = 0; i < editLines.length; i++) {
+      var ln = editLines[i];
+      for (var t = 1; t <= 2; t++) {
+        var bk = ln['bundling' + t];
+        if (bk && bk.enabled && !bk.minQty) {
+          if (window.showToast) window.showToast((ln.artname || ln.stockid) + ': Bundling ' + t + ' aktif tapi Qty belum diisi.', 'warning');
+          return;
+        }
+      }
+    }
+
     var ok = window.showConfirm
       ? await window.showConfirm('Update faktur ' + currentPO.noorder + ' dan update stok?')
       : confirm('Update faktur ' + currentPO.noorder + ' dan update stok?');

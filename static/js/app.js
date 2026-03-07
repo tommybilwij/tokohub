@@ -1262,10 +1262,7 @@
           </div>
         </td>
       `;
-      // Always expand detail row (qty/price inputs are inside)
-      detailTr.classList.add('open');
-      tr.classList.add('has-detail-open');
-
+      // Start collapsed — user can click the row to expand
       tbody.appendChild(detailTr);
     });
 

@@ -816,6 +816,10 @@ body {
 .jual-table .jt-margin {
   min-width: 90px;
 }
+.jual-table .jt-pct .sblm-hint,
+.jual-table .jt-margin .sblm-hint {
+  text-align: right;
+}
 
 .jual-table .jual-margin {
   font-weight: var(--fw-bold);
@@ -2176,6 +2180,7 @@ body {
   border-color: var(--clr-primary-500);
   box-shadow: var(--shadow-focus-primary);
 }
+#editItemTable .item-main code { color: inherit; }
 #editItemTable .item-main.has-detail-open td { border-bottom: none; }
 #editItemTable .item-detail { display: none; }
 #editItemTable .item-detail.open {
@@ -2259,8 +2264,7 @@ body {
 }
 
 /* Edit overlay: value changed highlight */
-.value-changed { background: #fff3cd; border-radius: 3px; }
-.value-changed input { background: #fff3cd !important; }
+.value-changed { background: #fff3cd !important; border-radius: 3px; padding: 1px 4px; }
 .sblm-hint {
   font-size: 0.8rem;
   color: #c62828;
@@ -2270,17 +2274,12 @@ body {
 }
 .sblm-inline { display: inline-block; margin-left: 8px; }
 .sblm-inline .sblm-hint { display: inline; }
-.dp-sblm-row {
-  margin-bottom: 0 !important;
-  margin-top: 0 !important;
-  background: none !important;
-  border: none !important;
-  padding: 0 !important;
-}
-.dp-sblm-row .dp-val,
-.dp-sblm-row .dp-netto-val,
-.dp-sblm-row .dp-unit {
-  color: #c62828 !important;
+.sblm-right {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c62828;
+  white-space: nowrap;
+  margin-left: var(--sp-2);
 }
 
 /* Home page cards */

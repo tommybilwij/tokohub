@@ -82,12 +82,12 @@
     return '<div class="sblm-hint">' + (sv ? sv + '%' : '—') + '</div>';
   }
 
-  // CSS class for changed values
+  // CSS class for changed values — compare display-rounded (2dp) to avoid float noise
   function changedCls(stockVal, editVal) {
     if (stockVal == null || stockVal === undefined) return '';
-    var sv = Number(stockVal) || 0;
-    var ev = Number(editVal) || 0;
-    return Math.abs(sv - ev) >= 0.001 ? ' value-changed' : '';
+    var sv = Math.round((Number(stockVal) || 0) * 100) / 100;
+    var ev = Math.round((Number(editVal) || 0) * 100) / 100;
+    return Math.abs(sv - ev) >= 0.005 ? ' value-changed' : '';
   }
 
   // ------- Load dropdowns -------
@@ -222,6 +222,10 @@
       stkNettoPcs = stkPk > 0 ? stkNet.final / stkPk : 0;
     }
 
+    // Current netto/pcs for margin comparison
+    var curNet = calcNetPrice(line.hbelibsr || 0, line.pctdisc1 || 0, line.pctdisc2 || 0, line.pctdisc3 || 0, line.pctppn || 0);
+    var curNettoPcs = line.packing > 0 ? (curNet.final + (line.bkirim || 0)) / line.packing : 0;
+
     var rowsHTML = rows.map(function (r) {
       var val = values[r.field];
       var stkVal;
@@ -234,7 +238,7 @@
       var cls = changedCls(stkVal, val);
       var hint = sblmHint(stkVal);
       // Margin/MRG% hints from stok sblm
-      var mrgHint = '', pctHint = '';
+      var mrgHint = '', pctHint = '', pctCls = '', mrgCls = '';
       if (stkVal != null && stkNettoPcs) {
         var sv = Number(stkVal) || 0;
         if (sv) {
@@ -242,18 +246,31 @@
           var stkPct = (stkMargin / stkNettoPcs) * 100;
           pctHint = '<div class="sblm-hint">' + stkPct.toFixed(2) + '%</div>';
           mrgHint = '<div class="sblm-hint">' + (sv ? fmtNum(stkMargin) : '—') + '</div>';
+          // Compare with current margin
+          var curVal = Number(val) || 0;
+          if (curNettoPcs && curVal) {
+            var curMargin = curVal - curNettoPcs;
+            var curPct = (curMargin / curNettoPcs) * 100;
+            pctCls = changedCls(stkPct, curPct);
+            mrgCls = changedCls(stkMargin, curMargin);
+          } else {
+            pctCls = ' value-changed';
+            mrgCls = ' value-changed';
+          }
         } else {
           pctHint = '<div class="sblm-hint">—</div>';
           mrgHint = '<div class="sblm-hint">—</div>';
+          var curVal2 = Number(val) || 0;
+          if (curVal2) { pctCls = ' value-changed'; mrgCls = ' value-changed'; }
         }
       }
       return '<tr>' +
         '<td class="jt-label">' + r.label + '</td>' +
-        '<td class="' + cls + '">' + hint + '<input type="text" class="jual-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        '<td>' + hint + '<input type="text" class="jual-input' + cls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
         ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-pct">' + pctHint + '<input type="text" class="jual-pct-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        '<td class="jt-pct">' + pctHint + '<input type="text" class="jual-pct-input' + pctCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
         ' value="" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-margin">' + mrgHint + '<span class="jual-margin" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
+        '<td class="jt-margin">' + mrgHint + '<span class="jual-margin' + mrgCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
         '</tr>';
     }).join('');
     return '<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>' + rowsHTML + '</tbody></table>';
@@ -334,7 +351,7 @@
                 '<div class="d-flex gap-1 align-items-center">' +
                   '<div class="qty-stepper">' +
                     '<button type="button" class="qty-stepper-btn ed-qtybsr-down" data-idx="' + idx + '"><i class="bi bi-dash"></i></button>' +
-                    '<input type="number" class="form-control edit-qty-besar" data-idx="' + idx + '" value="' + line.qty + '" min="0" step="1">' +
+                    '<input type="number" class="form-control edit-qty-besar' + (aft.qty != null ? changedCls(aft.qty_besar || aft.qty, line.qty) : '') + '" data-idx="' + idx + '" value="' + line.qty + '" min="0" step="1">' +
                     '<button type="button" class="qty-stepper-btn ed-qtybsr-up" data-idx="' + idx + '"><i class="bi bi-plus"></i></button>' +
                   '</div>' +
                   '<select class="form-select edit-satuan-bsr w-fixed-72" data-idx="' + idx + '">' + unitOpts + '</select>' +
@@ -345,7 +362,7 @@
                 '<div class="d-flex gap-1 align-items-center">' +
                   '<div class="qty-stepper">' +
                     '<button type="button" class="qty-stepper-btn ed-packing-down" data-idx="' + idx + '"><i class="bi bi-dash"></i></button>' +
-                    '<input type="number" class="form-control edit-packing" data-idx="' + idx + '" value="' + line.packing + '" min="1" step="1">' +
+                    '<input type="number" class="form-control edit-packing' + (stk.packing != null ? changedCls(stk.packing, line.packing) : '') + '" data-idx="' + idx + '" value="' + line.packing + '" min="1" step="1">' +
                     '<button type="button" class="qty-stepper-btn ed-packing-up" data-idx="' + idx + '"><i class="bi bi-plus"></i></button>' +
                   '</div>' +
                   '<span class="dp-unit-label">Pcs</span>' +
@@ -354,7 +371,7 @@
               '<div class="dp-input-group">' +
                 '<label class="dp-input-label">Total Harga Beli' + (aft.amount ? ' <span class="sblm-hint" style="display:inline">' + fmtNum(aft.amount) + '</span>' : '') + '</label>' +
                 '<div class="d-flex align-items-center" style="height:100%">' +
-                  '<input type="text" class="form-control edit-price-total text-end" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
+                  '<input type="text" class="form-control edit-price-total text-end' + (aft.amount ? changedCls(aft.amount, line.hbelibsr * line.qty) : '') + '" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -362,11 +379,11 @@
           // Harga Beli section
           '<div class="dp-section dp-beli">' +
             '<div class="dp-section-header">Harga Beli</div>' +
-            (stk.hbelibsr != null ? '<div class="dp-beli-row dp-sblm-row"><span class="dp-label"></span><span class="dp-val sblm-hint">' + fmtNum(stk.hbelibsr) + '</span><span class="dp-unit sblm-hint">/' + esc(stk.satbesar || sat) + '</span><span class="dp-val sblm-hint">' + (stk.packing ? fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) : '') + '</span><span class="dp-unit sblm-hint">/Pcs</span></div>' : '') +
             '<div class="dp-beli-row">' +
               '<span class="dp-label">Beli</span>' +
               '<span class="dp-val hbeli-bsr' + changedCls(stk.hbelibsr, line.hbelibsr) + '" data-idx="' + idx + '">' + (line.hbelibsr ? fmtNum(line.hbelibsr) : '—') + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
-              '<span class="dp-val hbeli-pcs" data-idx="' + idx + '">' + (line.packing > 0 ? fmtNum(trunc2(line.hbelibsr / line.packing)) : '—') + '</span><span class="dp-unit">/Pcs</span>' +
+              '<span class="dp-val hbeli-pcs' + changedCls(stk.hbelibsr, line.hbelibsr) + '" data-idx="' + idx + '">' + (line.packing > 0 ? fmtNum(trunc2(line.hbelibsr / line.packing)) : '—') + '</span><span class="dp-unit">/Pcs</span>' +
+              (stk.hbelibsr != null ? '<span class="sblm-right">' + fmtNum(stk.hbelibsr) + ' /' + esc(stk.satbesar || sat) + '&ensp;' + (stk.packing ? fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) + ' /Pcs' : '') + '</span>' : '') +
             '</div>' +
             '<table class="beli-table"><thead><tr>' +
               '<th></th>' +
@@ -380,26 +397,33 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
-              (aft.foc != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.foc ? aft.foc : '—') + '</div>' : '') +
               '<input type="number" class="amt-input edit-foc" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
               '<span class="bt-unit">Pcs</span>' +
+              (aft.foc != null ? '<span class="sblm-right">' + (aft.foc ? aft.foc + ' Pcs' : '—') + '</span>' : '') +
             '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              (aft.shipping_cost != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</div>' : '') +
               '<input type="text" class="amt-input edit-bkirim" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
+              (aft.shipping_cost != null ? '<span class="sblm-right">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</span>' : '') +
             '</div>' +
             (function () {
-              if (stk.hbelibsr == null) return '';
-              var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
-              var stkNettoBsr = stkNet.final;
-              var stkPk = stk.packing || 1;
-              var stkNettoPcs = stkPk > 0 ? stkNettoBsr / stkPk : 0;
-              return '<div class="dp-beli-row dp-sblm-row"><span class="dp-label"></span><span class="dp-val sblm-hint">' + fmtNum(stkNettoBsr) + '</span><span class="dp-unit sblm-hint">/' + esc(stk.satbesar || sat) + '</span><span class="dp-val sblm-hint">' + fmtNum(stkNettoPcs) + '</span><span class="dp-unit sblm-hint">/Pcs</span></div>';
-            })() +
-            '<div class="dp-netto-row">' +
+              var nettoCls = '';
+              if (stk.hbelibsr != null) {
+                var _sn = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+                nettoCls = changedCls(_sn.final, nettoBsr);
+              }
+              return '<div class="dp-netto-row">' +
               '<span class="dp-label">Netto</span>' +
-              '<span class="dp-netto-val netto-bsr" data-idx="' + idx + '">' + fmtNum(nettoBsr) + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
-              '<span class="dp-netto-val netto-pcs" data-idx="' + idx + '">' + fmtNum(nettoPcs) + '</span><span class="dp-unit">/Pcs</span>' +
+              '<span class="dp-netto-val netto-bsr' + nettoCls + '" data-idx="' + idx + '">' + fmtNum(nettoBsr) + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
+              '<span class="dp-netto-val netto-pcs' + nettoCls + '" data-idx="' + idx + '">' + fmtNum(nettoPcs) + '</span><span class="dp-unit">/Pcs</span>';
+            })() +
+              (function () {
+                if (stk.hbelibsr == null) return '';
+                var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+                var stkNettoBsr = stkNet.final;
+                var stkPk = stk.packing || 1;
+                var stkNettoPcs = stkPk > 0 ? stkNettoBsr / stkPk : 0;
+                return '<span class="sblm-right">' + fmtNum(stkNettoBsr) + ' /' + esc(stk.satbesar || sat) + '&ensp;' + fmtNum(stkNettoPcs) + ' /Pcs</span>';
+              })() +
             '</div>' +
           '</div>' +
           // Harga Jual section
@@ -442,9 +466,9 @@
     }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
-      '<td class="' + totalCls + '">' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td class="' + amtCls + '">' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td class="' + cls + '">' + hint + '<input type="number" class="pct-input edit-disc-pct" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
+      '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td>' + hint + '<input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
       '</tr>';
   }
 
@@ -458,17 +482,32 @@
     var finalBsr = net.final + shipping;
     var nettoPcs = pk > 0 ? finalBsr / pk : 0;
 
+    // Stock snapshot for comparison
+    var stk = beforePrices[line.stockid] || {};
+    var hasStk = stk.hbelibsr != null;
+
     // Netto
     var nBsr = document.querySelector('.netto-bsr[data-idx="' + idx + '"]');
     var nPcs = document.querySelector('.netto-pcs[data-idx="' + idx + '"]');
     if (nBsr) nBsr.textContent = h ? fmtNum(finalBsr) : '—';
     if (nPcs) nPcs.textContent = (h && pk > 0) ? fmtNum(finalBsr / pk) : '—';
+    if (hasStk) {
+      var stkNetC = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+      var nChanged = Math.abs(Math.round(stkNetC.final * 100) - Math.round(finalBsr * 100)) >= 1;
+      if (nBsr) nBsr.classList.toggle('value-changed', nChanged);
+      if (nPcs) nPcs.classList.toggle('value-changed', nChanged);
+    }
 
     // Beli
     var bBsr = document.querySelector('.hbeli-bsr[data-idx="' + idx + '"]');
     var bPcs = document.querySelector('.hbeli-pcs[data-idx="' + idx + '"]');
     if (bBsr) bBsr.textContent = h ? fmtNum(h) : '—';
     if (bPcs) bPcs.textContent = (h && pk > 0) ? fmtNum(trunc2(h / pk)) : '—';
+    if (hasStk) {
+      var bChanged = Math.abs(Math.round((stk.hbelibsr || 0) * 100) - Math.round(h * 100)) >= 1;
+      if (bBsr) bBsr.classList.toggle('value-changed', bChanged);
+      if (bPcs) bPcs.classList.toggle('value-changed', bChanged);
+    }
 
     // Disc amounts
     var qtyBsr = line.qty || 1;
@@ -479,6 +518,18 @@
       var totEl = document.querySelector('.edit-disc-total[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (totEl && document.activeElement !== totEl) totEl.value = amtMap[f] ? fmtNum(amtMap[f] * qtyBsr) : '';
     });
+
+    // Stock netto/pcs for margin comparison
+    var stkNettoPcsC = 0;
+    if (hasStk) {
+      var _snc = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+      var _spk = stk.packing || 1;
+      stkNettoPcsC = _spk > 0 ? _snc.final / _spk : 0;
+    }
+    var _bundlingStkMap = {
+      1: { hjual1: 'hjualo1', hjual2: 'hjual2o1', hjual3: 'hjual3o1', hjual4: 'hjual4o1', hjual5: 'hjual5o1' },
+      2: { hjual1: 'hjualo2', hjual2: 'hjual2o2', hjual3: 'hjual3o2', hjual4: 'hjual4o2', hjual5: 'hjual5o2' },
+    };
 
     // Jual margins — main + bundling tiers
     ['main', '1', '2'].forEach(function (tier) {
@@ -504,6 +555,23 @@
         mrgEl.textContent = margin < 0 ? '-' + fmtNum(Math.abs(margin)) : fmtNum(margin);
         pctEl.classList.toggle('negative', margin < 0);
         mrgEl.classList.toggle('negative', margin < 0);
+
+        // Highlight margin/pct if different from stock
+        if (hasStk && stkNettoPcsC) {
+          var stkField = tier === 'main' ? (f === 'hjual1' ? 'hjual' : f) : (_bundlingStkMap[tier] ? _bundlingStkMap[tier][f] : null);
+          var stkVal = stkField ? (Number(stk[stkField]) || 0) : 0;
+          if (stkVal) {
+            var stkMargin = stkVal - stkNettoPcsC;
+            var stkPct = (stkMargin / stkNettoPcsC) * 100;
+            var mrgChanged = Math.abs(Math.round(stkMargin * 100) - Math.round(margin * 100)) >= 1;
+            var pctChanged = Math.abs(Math.round(stkPct * 100) - Math.round(pct * 100)) >= 1;
+            mrgEl.classList.toggle('value-changed', mrgChanged);
+            pctEl.classList.toggle('value-changed', pctChanged);
+          } else {
+            mrgEl.classList.toggle('value-changed', true);
+            pctEl.classList.toggle('value-changed', true);
+          }
+        }
       });
     });
   }

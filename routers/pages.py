@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 
 from dependencies import get_db, get_templates, get_current_user
 from services.alias_service import list_aliases
-from services.po_service import get_po_history
+
 from services.lan_auth import get_local_ip
 from services.auth import PAGES, has_page_access, get_role_permissions
 from config import settings
@@ -105,19 +105,16 @@ async def aliases_page(
 @router.get('/history')
 async def history_page(
     request: Request,
-    page: int = 1,
     db: aiomysql.Pool = Depends(get_db),
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
     denied = await _check_page(request, user, 'history')
     if denied: return denied
-    rows, total = await get_po_history(db, page=page)
     pool = request.app.state.db_pool
     can_edit = await has_page_access(pool, user['role'], 'history:edit')
     can_lock = await has_page_access(pool, user['role'], 'ph:lock_history')
     return templates.TemplateResponse(request, 'history.html', {
-        'orders': rows, 'total': total, 'page': page,
         'can_edit': can_edit, 'can_lock': can_lock,
         **await _user_ctx(request, user),
     })

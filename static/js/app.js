@@ -196,9 +196,7 @@
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
         if (draft.header.vendor && dom.vendorSelect) {
           dom.vendorSelect.value = draft.header.vendor;
-          const vendorInput = document.getElementById('vendorInput');
-          const v = state.vendors.find(v => v.id === draft.header.vendor);
-          if (vendorInput && v) vendorInput.value = `${v.id} - ${v.name || ''}`;
+          if (window._setVendorInput) window._setVendorInput(draft.header.vendor);
         }
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
       }
@@ -345,25 +343,54 @@
   async function loadVendors() {
     try {
       state.vendors = await api('/api/vendors');
-      const datalist = document.getElementById('vendorDatalist');
       const vendorInput = document.getElementById('vendorInput');
-      state.vendors.forEach((v) => {
-        const opt = document.createElement('option');
-        opt.value = `${v.id} - ${v.name || ''}`;
-        opt.dataset.id = v.id;
-        datalist.appendChild(opt);
+      const vendorMenu = document.getElementById('vendorSuppMenu');
+      let vendorSelected = '';
+
+      function renderVendorMenu(filter) {
+        const q = (filter || '').toLowerCase();
+        const items = state.vendors.filter(v => {
+          const label = `${v.id} - ${v.name || ''}`;
+          return !q || label.toLowerCase().indexOf(q) >= 0;
+        });
+        vendorMenu.innerHTML = '';
+        items.slice(0, 50).forEach(v => {
+          const div = document.createElement('div');
+          div.className = 'h-supp-item';
+          div.textContent = `${v.id} - ${v.name || ''}`;
+          div.addEventListener('mousedown', e => {
+            e.preventDefault();
+            dom.vendorSelect.value = v.id;
+            vendorInput.value = `${v.id} - ${v.name || ''}`;
+            vendorSelected = vendorInput.value;
+            vendorMenu.classList.add('d-none');
+            _saveStateDebounced();
+          });
+          vendorMenu.appendChild(div);
+        });
+        vendorMenu.classList.remove('d-none');
+      }
+
+      vendorInput.addEventListener('focus', () => {
+        vendorSelected = vendorInput.value;
+        vendorInput.value = '';
+        renderVendorMenu('');
       });
-      // Sync hidden vendorSelect on input change
-      vendorInput.addEventListener('input', () => {
-        const match = state.vendors.find(v => vendorInput.value === `${v.id} - ${v.name || ''}`);
-        dom.vendorSelect.value = match ? match.id : '';
-        _saveStateDebounced();
+      vendorInput.addEventListener('input', () => renderVendorMenu(vendorInput.value));
+      vendorInput.addEventListener('blur', () => {
+        vendorMenu.classList.add('d-none');
+        if (!vendorInput.value && vendorSelected) vendorInput.value = vendorSelected;
       });
-      vendorInput.addEventListener('change', () => {
-        const match = state.vendors.find(v => vendorInput.value === `${v.id} - ${v.name || ''}`);
-        dom.vendorSelect.value = match ? match.id : '';
-        _saveStateDebounced();
+      vendorInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { vendorMenu.classList.add('d-none'); vendorInput.blur(); }
       });
+
+      // Expose setter for draft restore
+      window._setVendorInput = function(suppid) {
+        const v = state.vendors.find(x => x.id === suppid);
+        vendorInput.value = v ? `${v.id} - ${v.name || ''}` : (suppid || '');
+        vendorSelected = vendorInput.value;
+      };
     } catch (e) {
       console.error('Failed to load vendors:', e);
     }

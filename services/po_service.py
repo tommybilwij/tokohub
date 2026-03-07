@@ -501,25 +501,40 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     return result
 
 
-async def get_po_history(pool, page=1, per_page=20):
-    """Retrieve recent POs."""
+async def get_po_history(pool, page=1, per_page=20,
+                         date_from=None, date_to=None, supplier=None):
+    """Retrieve recent POs with optional filters."""
     offset = (page - 1) * per_page
+    where = []
+    params = []
+    if date_from:
+        where.append("m.tglorder >= %s")
+        params.append(date_from)
+    if date_to:
+        where.append("m.tglorder <= %s")
+        params.append(date_to)
+    if supplier:
+        where.append("m.suppid = %s")
+        params.append(supplier)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
     rows = await execute_query(
         pool,
-        """SELECT m.noorder, m.becreff, m.suppid, m.tglorder, m.jlhfaktur,
+        f"""SELECT m.noorder, m.becreff, m.suppid, m.tglorder, m.jlhfaktur,
                   m.userid, v.name AS supplier_name,
                   (SELECT COUNT(*) FROM icpos s WHERE s.becreff = m.becreff) AS line_count,
                   COALESCE(b.isupdateprice, 1) AS isupdateprice
            FROM icpom m
            LEFT JOIN vendor v ON v.id = m.suppid
            LEFT JOIN icbym b ON b.noorder = m.noorder
+           {where_sql}
            ORDER BY m.tglorder DESC, m.noorder DESC
            LIMIT %s OFFSET %s""",
-        (per_page, offset)
+        (*params, per_page, offset)
     )
     count_row = await execute_single(
         pool,
-        "SELECT COUNT(*) AS total FROM icpom"
+        f"SELECT COUNT(*) AS total FROM icpom m{where_sql}",
+        tuple(params) if params else None,
     )
     return rows, count_row['total']
 

@@ -231,18 +231,22 @@ async def get_price_change_report(pool, report_date: date | None = None) -> list
     report_date = report_date or date.today()
     rows = await execute_query(
         pool,
-        """SELECT nofaktur, becreff, stockid AS artno, artname, tanggal,
-                  hbelibsr, hbelinetto, hjual, hjual2, oprice,
-                  pctdisc1, pctdisc2, packing, satuanbsr, posttime
-           FROM sthist
-           WHERE tipetrans = 0 AND tanggal = %s
-           ORDER BY noindex DESC""",
+        """SELECT s.nofaktur, s.becreff, s.stockid AS artno, s.artpabrik, s.artname, s.tanggal,
+                  s.hbelibsr, s.hbelinetto, s.hjual, s.hjual2, s.oprice,
+                  s.pctdisc1, s.pctdisc2, s.packing, s.satuanbsr, s.posttime,
+                  st.deptid
+           FROM sthist s
+           LEFT JOIN stock st ON st.artno = s.stockid
+           WHERE s.tipetrans = 0 AND s.tanggal = %s
+           ORDER BY s.noindex DESC""",
         (report_date,),
     )
     result = []
     for r in rows:
         d = dict(r)
         d['ph_number'] = d.pop('nofaktur')
+        d['barcode'] = d.get('artpabrik') or ''
+        d['department'] = d.get('deptid') or ''
         d['old_hjual'] = float(d.get('oprice') or 0)
         d['new_hjual'] = float(d.get('hjual') or 0)
         d['tanggal'] = d['tanggal'].isoformat() if d['tanggal'] else ''
@@ -263,7 +267,8 @@ async def get_price_change_from_snapshots(pool, report_date: date | None = None)
            ORDER BY id DESC""",
         (report_date,),
     )
-    result = []
+    # Collect all artnos to look up barcode & department
+    all_items = []
     for r in rows:
         data = json.loads(r['snapshot_json'])
         for item in data.get('items', []):
@@ -272,7 +277,7 @@ async def get_price_change_from_snapshots(pool, report_date: date | None = None)
             old_hjual = float(b.get('hjual') or 0)
             new_hjual = float(a.get('hjual') or 0)
             if old_hjual != new_hjual and new_hjual > 0:
-                result.append({
+                all_items.append({
                     'source': 'faktur',
                     'ref_number': r['po_number'],
                     'artno': item['artno'],
@@ -282,4 +287,20 @@ async def get_price_change_from_snapshots(pool, report_date: date | None = None)
                     'created_by': r['created_by'],
                     'created_at': r['created_at'].isoformat() if r['created_at'] else '',
                 })
-    return result
+    # Look up barcode & department from stock
+    artnos = list({it['artno'] for it in all_items})
+    stock_map = {}
+    if artnos:
+        ph = ','.join(['%s'] * len(artnos))
+        stock_rows = await execute_query(
+            pool,
+            f"SELECT artno, artpabrik, deptid FROM stock WHERE artno IN ({ph})",
+            tuple(artnos),
+        )
+        for sr in stock_rows:
+            stock_map[sr['artno']] = sr
+    for it in all_items:
+        si = stock_map.get(it['artno']) or {}
+        it['barcode'] = si.get('artpabrik') or ''
+        it['department'] = si.get('deptid') or ''
+    return all_items

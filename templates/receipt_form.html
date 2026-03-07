@@ -34,9 +34,11 @@
         <!-- Supplier Selection -->
         <div class="mb-3">
           <label class="form-label fw-semibold">Supplier</label>
-          <input type="text" id="vendorInput" class="form-control" placeholder="Ketik untuk cari supplier..." autocomplete="off" list="vendorDatalist">
-          <datalist id="vendorDatalist"></datalist>
-          <input type="hidden" id="vendorSelect" value="">
+          <div class="h-supp-dropdown">
+            <input type="text" id="vendorInput" class="form-control" placeholder="Ketik untuk cari supplier..." autocomplete="off">
+            <input type="hidden" id="vendorSelect" value="">
+            <div class="h-supp-menu d-none" id="vendorSuppMenu"></div>
+          </div>
         </div>
 
         <!-- Order Date -->

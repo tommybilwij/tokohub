@@ -149,6 +149,28 @@ async def commit_po(data: POCommitRequest, db: aiomysql.Pool = Depends(get_db)):
         return JSONResponse({'error': str(e)}, status_code=500)
 
 
+@router.get('/api/po/list')
+async def api_po_list(
+    page: int = 1,
+    date_from: str = None,
+    date_to: str = None,
+    supplier: str = None,
+    db: aiomysql.Pool = Depends(get_db),
+):
+    from services.po_service import get_po_history
+    rows, total = await get_po_history(
+        db, page=page, date_from=date_from or None,
+        date_to=date_to or None, supplier=supplier or None,
+    )
+    items = []
+    for r in rows:
+        d = dict(r)
+        d['tglorder'] = d['tglorder'].strftime('%Y-%m-%d') if d['tglorder'] else ''
+        d['jlhfaktur'] = float(d['jlhfaktur'] or 0)
+        items.append(d)
+    return {'items': items, 'total': total, 'page': page}
+
+
 @router.get('/api/po/{po_number}')
 async def get_po(po_number: str, db: aiomysql.Pool = Depends(get_db)):
     from services.po_service import get_po_detail

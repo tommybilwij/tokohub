@@ -15,6 +15,22 @@
   const btnCommit = document.getElementById('pcBtnCommit');
   const btnClear = document.getElementById('pcBtnClear');
 
+  // When "Update Harga Beli" is checked, auto-check and lock "Kunci Riwayat"
+  const purchEl = document.getElementById('pcUpdatePurchPrice');
+  const lockEl = document.getElementById('pcLockHistory');
+  if (purchEl && lockEl) {
+    function syncLockFromPurch() {
+      if (purchEl.checked) {
+        lockEl.checked = true;
+        lockEl.disabled = true;
+      } else {
+        lockEl.disabled = false;
+      }
+    }
+    purchEl.addEventListener('change', syncLockFromPurch);
+    syncLockFromPurch(); // apply on load
+  }
+
   function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }
   function fmtNz(n) { return n ? fmt(n) : '—'; }
   function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }

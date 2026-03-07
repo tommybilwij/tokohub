@@ -20,7 +20,7 @@ SESSION_MAX_AGE = 86400 * 7  # 7 days
 PAGES = {
     'scanner':      'Scanner',
     'entry':        'Input Faktur',
-    'history':      'Daftar Faktur',
+    'history':      'Daftar Faktur Pembelian',
     'history:edit': 'Edit Faktur',
     'sales':        'Penjualan',
     'sales:harga':  'Harga Jual',

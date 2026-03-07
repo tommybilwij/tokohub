@@ -1,5 +1,5 @@
 /**
- * PO Edit Overlay for Daftar Faktur page.
+ * PO Edit Overlay for Daftar Faktur Pembelian page.
  * Replicates the Daftar Barang layout from Input Faktur.
  */
 (function () {
@@ -12,6 +12,8 @@
 
   var elTitle = document.getElementById('editTitle');
   var elSupplier = document.getElementById('editSupplier');
+  var elSuppInput = document.getElementById('editSuppInput');
+  var elSuppMenu = document.getElementById('editSuppMenu');
   var elDate = document.getElementById('editDate');
   var elUser = document.getElementById('editUser');
   var elBody = document.getElementById('editTableBody');
@@ -93,14 +95,51 @@
     if (!vendors.length) {
       try { vendors = await (await fetch('/api/vendors')).json(); } catch (e) { console.error(e); }
     }
-    elSupplier.innerHTML = '<option value="">-- Pilih Supplier --</option>';
-    vendors.forEach(function (v) {
-      var opt = document.createElement('option');
-      opt.value = v.id;
-      opt.textContent = v.id + ' - ' + (v.name || '');
-      elSupplier.appendChild(opt);
-    });
   }
+
+  // ------- Searchable supplier dropdown for edit -------
+  var editSuppSelected = '';
+  function renderEditSuppMenu(filter) {
+    var q = (filter || '').toLowerCase();
+    var items = vendors.filter(function(v) {
+      var label = v.id + ' - ' + (v.name || '');
+      return !q || label.toLowerCase().indexOf(q) >= 0;
+    });
+    elSuppMenu.innerHTML = '';
+    items.slice(0, 50).forEach(function(v) {
+      var div = document.createElement('div');
+      div.className = 'h-supp-item';
+      div.textContent = v.id + ' - ' + (v.name || '');
+      div.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        elSupplier.value = v.id;
+        elSuppInput.value = v.id + ' - ' + (v.name || '');
+        editSuppSelected = elSuppInput.value;
+        elSuppMenu.classList.add('d-none');
+      });
+      elSuppMenu.appendChild(div);
+    });
+    elSuppMenu.classList.remove('d-none');
+  }
+  function setEditSupplier(suppid) {
+    elSupplier.value = suppid || '';
+    var v = vendors.find(function(x) { return x.id === suppid; });
+    elSuppInput.value = v ? (v.id + ' - ' + (v.name || '')) : (suppid || '');
+    editSuppSelected = elSuppInput.value;
+  }
+  elSuppInput.addEventListener('focus', function() {
+    editSuppSelected = elSuppInput.value;
+    elSuppInput.value = '';
+    renderEditSuppMenu('');
+  });
+  elSuppInput.addEventListener('input', function() { renderEditSuppMenu(elSuppInput.value); });
+  elSuppInput.addEventListener('blur', function() {
+    elSuppMenu.classList.add('d-none');
+    if (!elSuppInput.value && editSuppSelected) elSuppInput.value = editSuppSelected;
+  });
+  elSuppInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { elSuppMenu.classList.add('d-none'); elSuppInput.blur(); }
+  });
 
   // ------- Fetch snapshot data -------
   async function fetchSnapshot(poNumber) {
@@ -133,7 +172,7 @@
 
     currentPO = data;
     elTitle.textContent = 'Edit Faktur: ' + data.noorder;
-    elSupplier.value = data.suppid || '';
+    setEditSupplier(data.suppid || '');
     elDate.value = data.tglorder || '';
 
     editLines = (data.lines || []).map(function (l) {
@@ -279,6 +318,9 @@
     var checked = b.enabled ? 'checked' : '';
     var disabled = b.enabled ? '' : 'disabled';
     var vals = { hjual1: b.hjual1, hjual2: b.hjual2, hjual3: b.hjual3, hjual4: b.hjual4, hjual5: b.hjual5, _enabled: b.enabled };
+    var stk = beforePrices[editLines[idx].stockid] || {};
+    var overField = tier === 1 ? 'over1' : 'over2';
+    var stkOver = stk[overField];
     return '<div class="dp-jual-col dp-bundling-inline">' +
       '<div class="dp-jual-col-header">' +
         '<label class="bundling-toggle">' +
@@ -286,8 +328,9 @@
           ' Bundling ' + tier +
         '</label>' +
         '<span class="bundling-qty-wrap">Qty &ge; ' +
-          '<input type="number" class="bundling-minqty" data-idx="' + idx + '" data-tier="' + tier + '"' +
+          '<input type="number" class="bundling-minqty' + (stkOver != null ? changedCls(stkOver, b.minQty) : '') + '" data-idx="' + idx + '" data-tier="' + tier + '"' +
           ' value="' + (b.minQty || '') + '" placeholder="0" min="1" step="0.01" ' + disabled + '> <span style="text-transform:none">Pcs</span>' +
+          (stkOver != null ? ' <span class="sblm-right">' + (Number(stkOver) ? stkOver + ' Pcs' : '—') + '</span>' : '') +
         '</span>' +
       '</div>' +
       '<div class="bundling-fields' + (b.enabled ? '' : ' bundling-fields-disabled') + '" data-idx="' + idx + '" data-tier="' + tier + '">' +
@@ -395,12 +438,12 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
-              '<input type="number" class="amt-input edit-foc" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
+              '<input type="number" class="amt-input edit-foc' + (aft.foc != null ? changedCls(aft.foc, line.qtybonus) : '') + '" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
               '<span class="bt-unit">Pcs</span>' +
               (aft.foc != null ? '<span class="sblm-right">' + (aft.foc ? aft.foc + ' Pcs' : '—') + '</span>' : '') +
             '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              '<input type="text" class="amt-input edit-bkirim" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
+              '<input type="text" class="amt-input edit-bkirim' + (aft.shipping_cost != null ? changedCls(aft.shipping_cost, line.bkirim) : '') + '" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
               (aft.shipping_cost != null ? '<span class="sblm-right">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</span>' : '') +
             '</div>' +
             (function () {
@@ -758,7 +801,12 @@
     // FOC
     table.querySelectorAll('.edit-foc').forEach(function (el) {
       el.addEventListener('change', function () {
-        editLines[parseInt(el.dataset.idx)].qtybonus = parseInt(el.value) || 0;
+        var idx = parseInt(el.dataset.idx);
+        editLines[idx].qtybonus = parseInt(el.value) || 0;
+        var aft = afterPrices[editLines[idx].stockid] || {};
+        if (aft.foc != null) {
+          el.classList.toggle('value-changed', fmtNum(aft.foc) !== fmtNum(editLines[idx].qtybonus));
+        }
       });
     });
 
@@ -768,6 +816,10 @@
         var idx = parseInt(el.dataset.idx);
         editLines[idx].bkirim = parseNum(el.value);
         el.value = editLines[idx].bkirim ? fmtNum(editLines[idx].bkirim) : '';
+        var aft = afterPrices[editLines[idx].stockid] || {};
+        if (aft.shipping_cost != null) {
+          el.classList.toggle('value-changed', fmtNum(aft.shipping_cost) !== fmtNum(editLines[idx].bkirim));
+        }
         updateComputedPrices(idx);
       });
     });
@@ -1057,10 +1109,11 @@
     }
   });
 
-  // ------- Wire up edit buttons -------
-  document.querySelectorAll('.btn-edit-po').forEach(function (btn) {
-    btn.addEventListener('click', function () {
+  // ------- Wire up edit buttons (event delegation for dynamic rows) -------
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.btn-edit-po');
+    if (btn && !btn.disabled) {
       openEdit(btn.dataset.po);
-    });
+    }
   });
 })();

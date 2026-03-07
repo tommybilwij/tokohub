@@ -434,7 +434,7 @@ async def delete_fp(pool, fp_number: str) -> dict:
     )
     if not header:
         return {'error': 'Faktur not found'}
-    if not header['isupdateprice']:
+    if header['isupdateprice']:
         return {'error': 'Faktur terkunci, tidak bisa dihapus'}
 
     becreff = header['becreff']

@@ -45,17 +45,14 @@
             <thead>
               <tr>
                 <th class="col-num">#</th>
-                <th>Nama Barang</th>
-                <th class="text-end">Beli/Bsr</th>
-                <th class="text-end">Netto/Pcs</th>
-                <th class="text-end">HJual 1</th>
-                <th class="text-end">Member</th>
-                <th></th>
+                <th class="col-name">Nama Barang</th>
+                <th class="col-barcode">Barcode</th>
+                <th class="col-actions"></th>
               </tr>
             </thead>
             <tbody id="pcTableBody">
               <tr id="pcEmptyRow">
-                <td colspan="7" class="text-center text-muted py-5">
+                <td colspan="4" class="text-center text-muted py-5">
                   <i class="bi bi-inbox empty-state-icon"></i><br>
                   <span class="mt-2 d-inline-block">Belum ada barang. Cari dari panel kiri.</span>
                 </td>
@@ -69,6 +66,10 @@
           <button class="btn btn-sm btn-cta" id="pcBtnCommit" disabled>
             <i class="bi bi-check-lg"></i> Simpan Perubahan Harga
           </button>
+          <div class="form-check ms-3">
+            <input type="checkbox" class="form-check-input" id="pcUpdatePurchPrice" checked>
+            <label class="form-check-label small" for="pcUpdatePurchPrice">Update Harga Beli</label>
+          </div>
           <div class="ms-auto"></div>
           <button class="btn btn-outline-danger btn-sm" id="pcBtnClear" disabled>
             <i class="bi bi-trash"></i> Hapus

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h4 class="page-title mb-0">Selamat datang, {{ user.username if user else 'Guest' }}</h4>
+    <small class="text-muted">Pilih menu untuk memulai</small>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% if 'scanner' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/scanner" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-upc-scan home-icon"></i>
+        <h6 class="mt-2 mb-0">Scanner</h6>
+        <small class="text-muted">Scan barcode barang</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'entry' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/entry" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-receipt home-icon"></i>
+        <h6 class="mt-2 mb-0">Input Faktur</h6>
+        <small class="text-muted">Penerimaan barang</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'history' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/history" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-clock-history home-icon"></i>
+        <h6 class="mt-2 mb-0">Daftar Faktur</h6>
+        <small class="text-muted">Riwayat penerimaan</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'sales' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/sales-history" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-graph-up home-icon"></i>
+        <h6 class="mt-2 mb-0">Penjualan</h6>
+        <small class="text-muted">Data penjualan</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'foc' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/foc-history" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-gift home-icon"></i>
+        <h6 class="mt-2 mb-0">Barang Bonus</h6>
+        <small class="text-muted">Riwayat FOC</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'price_change' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/price-change" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-tag home-icon"></i>
+        <h6 class="mt-2 mb-0">Ubah Harga</h6>
+        <small class="text-muted">Perubahan harga jual</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if 'price_report' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/price-change-report" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-journal-text home-icon"></i>
+        <h6 class="mt-2 mb-0">Laporan Harga</h6>
+        <small class="text-muted">Laporan perubahan harga</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+  {% if user and user.role == 'admin' %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/settings" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-gear home-icon"></i>
+        <h6 class="mt-2 mb-0">Settings</h6>
+        <small class="text-muted">Konfigurasi sistem</small>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/users" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-people home-icon"></i>
+        <h6 class="mt-2 mb-0">Users</h6>
+        <small class="text-muted">Kelola pengguna</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

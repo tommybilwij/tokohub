@@ -2257,3 +2257,21 @@ body {
   font-weight: 600;
   color: #664d03;
 }
+
+/* Home page cards */
+.card-home {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  color: inherit;
+}
+.card-home:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  border-color: var(--clr-accent-600, #388e3c);
+  color: inherit;
+}
+.card-home .home-icon {
+  font-size: 2.5rem;
+  color: var(--clr-accent-700, #2e7d32);
+}

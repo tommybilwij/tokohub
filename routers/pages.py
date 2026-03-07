@@ -40,8 +40,14 @@ async def _check_page(request: Request, user: dict | None, page: str):
 
 
 @router.get('/')
-async def index():
-    return RedirectResponse('/scanner')
+async def index(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    if not user:
+        return RedirectResponse('/login')
+    return templates.TemplateResponse(request, 'home.html', await _user_ctx(request, user))
 
 
 @router.get('/login')

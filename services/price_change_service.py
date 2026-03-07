@@ -68,7 +68,8 @@ async def _generate_ph_number(cursor, order_date):
     return f"{prefix}{seq:05d}"
 
 
-async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict:
+async def commit_price_change(pool, items: list[dict], userid: str = '',
+                              update_purch_price: bool = True) -> dict:
     """Commit price changes.
 
     Each item: {artno, hjual, hjual2, hjual3, hjual4, hjual5}
@@ -121,12 +122,35 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                 pctprofit4 = _pct(new_hjual4) if new_hjual4 else -100
                 pctprofit5 = _pct(new_hjual5) if new_hjual5 else -100
 
-                # 1. Update stock table
+                # 1. Update stock table — main harga jual
+                update_cols = ['hjual=%s', 'hjual2=%s', 'hjual3=%s', 'hjual4=%s', 'hjual5=%s']
+                update_vals = [new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5]
+
+                # Bundling 1
+                b1 = item.get('bundling1')
+                if b1:
+                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                                        float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
+
+                # Bundling 2
+                b2 = item.get('bundling2')
+                if b2:
+                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                                        float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                update_vals.append(artno)
                 await cursor.execute(
-                    """UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s
-                       WHERE artno=%s""",
-                    (new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5, artno)
+                    f"UPDATE stock SET {', '.join(update_cols)} WHERE artno=%s",
+                    tuple(update_vals)
                 )
+
+                # Bundling values for sthist — use new if changed, else keep old
+                sthist_o1 = [float(b1.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b1 else [
+                    stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
+                sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
+                    stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
 
                 # 2. Insert into sthist (tipetrans=0)
                 await cursor.execute(
@@ -155,7 +179,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                         %s, %s, %s,
                         %s, %s, %s,
                         %s, 0, %s,
-                        1, 0,
+                        1, %s,
                         %s, %s, %s, %s, %s, %s,
                         '1'
                     )""",
@@ -165,11 +189,12 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                         stock['pctdisc1'], stock['pctdisc2'], stock['pctdisc3'], stock['pctppn'],
                         stock['jlhdisc1'], stock['jlhdisc2'], stock['jlhdisc3'], stock['jlhppn'],
                         new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
-                        stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1'],
-                        stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2'],
+                        *sthist_o1,
+                        *sthist_o2,
                         stock['over1'], stock['over2'], stock['ispaketprc'],
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
+                        1 if update_purch_price else 0,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
                     )
                 )
@@ -186,6 +211,12 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                     'hbelinetto': float(stock['hbelinetto'] or 0),
                     'packing': float(stock['packing'] or 1),
                     'satbesar': stock['satbesar'] or '',
+                    'bundling1': {'hjual1': float(stock['hjualo1'] or 0), 'hjual2': float(stock['hjual2o1'] or 0),
+                                  'hjual3': float(stock['hjual3o1'] or 0), 'hjual4': float(stock['hjual4o1'] or 0),
+                                  'hjual5': float(stock['hjual5o1'] or 0), 'qty': float(stock['over1'] or 0)},
+                    'bundling2': {'hjual1': float(stock['hjualo2'] or 0), 'hjual2': float(stock['hjual2o2'] or 0),
+                                  'hjual3': float(stock['hjual3o2'] or 0), 'hjual4': float(stock['hjual4o2'] or 0),
+                                  'hjual5': float(stock['hjual5o2'] or 0), 'qty': float(stock['over2'] or 0)},
                 }
                 after_data = {
                     'hjual': new_hjual,
@@ -194,6 +225,10 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                     'hjual4': new_hjual4,
                     'hjual5': new_hjual5,
                 }
+                if b1:
+                    after_data['bundling1'] = b1
+                if b2:
+                    after_data['bundling2'] = b2
                 await cursor.execute(
                     """INSERT INTO tokohub.perubahan_harga_snapshots
                        (ph_number, becreff, artno, artname, tanggal, before_json, after_json, created_by)
@@ -202,6 +237,22 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                      today, json.dumps(before_data, default=_decimal_default),
                      json.dumps(after_data, default=_decimal_default), userid)
                 )
+
+            # Insert icphg header
+            uraian = ', '.join(i.get('artno', '') for i in items[:3])
+            if len(items) > 3:
+                uraian += f' +{len(items) - 3}'
+            # Use first item artname if available for more readable uraian
+            first_stock = before_map.get(items[0]['artno'])
+            if first_stock:
+                uraian = first_stock['artname'] or uraian
+                if len(items) > 1:
+                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            await cursor.execute(
+                """INSERT INTO icphg (nobukti, becreff, tglberlaku, uraian, userid)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (ph_number, becreff, today, uraian[:200], userid)
+            )
 
             # Increment nextrec.newph
             await cursor.execute("UPDATE nextrec SET newph = newph + 1")

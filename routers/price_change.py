@@ -43,7 +43,9 @@ async def api_commit_price_change(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
-        result = await commit_price_change(db, items, userid=user['username'] if user else '')
+        update_purch_price = data.get('update_purch_price', True)
+        result = await commit_price_change(db, items, userid=user['username'] if user else '',
+                                           update_purch_price=update_purch_price)
         return result
     except Exception as e:
         logger.exception("Price change commit failed")

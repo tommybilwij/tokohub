@@ -194,7 +194,12 @@
       // Restore header fields after dropdowns are populated
       if (draft.header) {
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
-        if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
+        if (draft.header.vendor && dom.vendorSelect) {
+          dom.vendorSelect.value = draft.header.vendor;
+          const vendorInput = document.getElementById('vendorInput');
+          const v = state.vendors.find(v => v.id === draft.header.vendor);
+          if (vendorInput && v) vendorInput.value = `${v.id} - ${v.name || ''}`;
+        }
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
       }
 
@@ -340,11 +345,24 @@
   async function loadVendors() {
     try {
       state.vendors = await api('/api/vendors');
+      const datalist = document.getElementById('vendorDatalist');
+      const vendorInput = document.getElementById('vendorInput');
       state.vendors.forEach((v) => {
         const opt = document.createElement('option');
-        opt.value = v.id;
-        opt.textContent = `${v.id} - ${v.name || ''}`;
-        dom.vendorSelect.appendChild(opt);
+        opt.value = `${v.id} - ${v.name || ''}`;
+        opt.dataset.id = v.id;
+        datalist.appendChild(opt);
+      });
+      // Sync hidden vendorSelect on input change
+      vendorInput.addEventListener('input', () => {
+        const match = state.vendors.find(v => vendorInput.value === `${v.id} - ${v.name || ''}`);
+        dom.vendorSelect.value = match ? match.id : '';
+        _saveStateDebounced();
+      });
+      vendorInput.addEventListener('change', () => {
+        const match = state.vendors.find(v => vendorInput.value === `${v.id} - ${v.name || ''}`);
+        dom.vendorSelect.value = match ? match.id : '';
+        _saveStateDebounced();
       });
     } catch (e) {
       console.error('Failed to load vendors:', e);
@@ -585,6 +603,12 @@
       added._refHjual = { hjual1: added.hjual1, hjual2: added.hjual2, hjual3: added.hjual3, hjual4: added.hjual4, hjual5: added.hjual5 };
     }
     renderItemTable();
+    // Scroll to newly added item
+    const newIdx = state.items.length - 1;
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`.item-main[data-idx="${newIdx}"]`);
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
     showToast(`"${name}" ditambahkan`, 'success');
   }
 

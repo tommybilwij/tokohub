@@ -490,7 +490,8 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
 
     # Save before/after snapshot
     try:
-        await save_snapshot(pool, po_number, before_state, after_state, userid or '')
+        snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
+        await save_snapshot(pool, po_number, before_state, after_state, userid or '', meta=snap_meta)
     except Exception:
         logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
 
@@ -837,7 +838,8 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
 
     # Save before/after snapshot
     try:
-        await save_snapshot(pool, po_number, before_state, after_state, userid or '')
+        snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
+        await save_snapshot(pool, po_number, before_state, after_state, userid or '', meta=snap_meta)
     except Exception:
         logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
 

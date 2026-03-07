@@ -52,6 +52,8 @@ def build_after(preview_lines: list[dict]) -> dict:
             'packing': line.get('packing', 0),
             'hbelibsr': line.get('hbelibsr', 0),
             'hbelikcl': line.get('hbelikcl', 0),
+            'hbelinetto': line.get('hbelinetto', 0),
+            'hbelinetto_kcl': line.get('hbelinetto_kcl', 0),
             'pctdisc1': line.get('pctdisc1', 0),
             'pctdisc2': line.get('pctdisc2', 0),
             'pctdisc3': line.get('pctdisc3', 0),
@@ -61,6 +63,12 @@ def build_after(preview_lines: list[dict]) -> dict:
             'hjual3': line.get('hjual3', 0),
             'hjual4': line.get('hjual4', 0),
             'hjual5': line.get('hjual5', 0),
+            # PO line data
+            'qty': line.get('qty', 0),
+            'qty_besar': line.get('qty_besar', 0),
+            'amount': line.get('amount', 0),
+            'foc': line.get('foc', 0),
+            'jlhppn': line.get('jlhppn', 0),  # includes biaya kirim (shipping added to ppn in DB)
         }
         b1 = line.get('bundling1') or {}
         b2 = line.get('bundling2') or {}
@@ -81,7 +89,8 @@ def build_after(preview_lines: list[dict]) -> dict:
     return result
 
 
-async def save_snapshot(pool, po_number: str, before: dict, after: dict, created_by: str = '') -> None:
+async def save_snapshot(pool, po_number: str, before: dict, after: dict,
+                        created_by: str = '', meta: dict | None = None) -> None:
     """Save before/after snapshot to tokohub.po_snapshots."""
     items = []
     all_artnos = set(list(before.keys()) + list(after.keys()))
@@ -91,7 +100,10 @@ async def save_snapshot(pool, po_number: str, before: dict, after: dict, created
             'before': before.get(artno),
             'after': after.get(artno),
         })
-    snapshot = json.dumps({'items': items}, default=_decimal_default)
+    data = {'items': items}
+    if meta:
+        data['meta'] = meta
+    snapshot = json.dumps(data, default=_decimal_default)
     await execute_modify(
         pool,
         "INSERT INTO tokohub.po_snapshots (po_number, snapshot_json, created_by) VALUES (%s, %s, %s)",

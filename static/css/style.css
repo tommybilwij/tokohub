@@ -2144,3 +2144,21 @@ body {
   border-bottom: 2px solid var(--clr-card-border);
   background: var(--clr-neutral-50);
 }
+
+/* -----------------------------------------------------------------------
+   Snapshot Comparison Cards
+   ----------------------------------------------------------------------- */
+.snap-item-card { border-color: var(--clr-card-border); }
+.snap-item-card .card-header {
+  background: var(--clr-neutral-50);
+  border-bottom: 1px solid var(--clr-card-border);
+  font-size: 0.9rem;
+}
+.snap-item-card .table { font-size: 0.85rem; margin-bottom: 0; }
+.snap-item-card .table td,
+.snap-item-card .table th { vertical-align: middle; padding: 0.35rem 0.5rem; }
+.snap-changed {
+  background: #fff3cd !important;
+  font-weight: 600;
+  color: #664d03;
+}

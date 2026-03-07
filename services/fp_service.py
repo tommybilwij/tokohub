@@ -1,8 +1,11 @@
-"""Purchase Order creation and stock balance update (async).
+"""Faktur Pembelian creation and stock balance update (async).
 
 No table locking — all writes use atomic single-row operations
 (UPDATE ... SET col = col + X) so MyPosse POS and this app can
 read and write concurrently without blocking each other.
+
+Only writes to icbym (header) + sthist (line items/history).
+Does NOT write to icpom/icpos (those are pesanan tables, unused here).
 """
 
 import json
@@ -23,23 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 class POCreationError(Exception):
-    """Raised when PO creation fails."""
-
-
-async def _generate_po_number(cursor, order_date):
-    """Generate PO number: PP{YYMMDD}{5-digit-seq}."""
-    prefix = f"PP{order_date.strftime('%y%m%d')}"
-    await cursor.execute(
-        "SELECT noorder FROM icpom WHERE noorder LIKE %s ORDER BY noorder DESC LIMIT 1",
-        (f"{prefix}%",)
-    )
-    row = await cursor.fetchone()
-    if row:
-        last_seq = int(row['noorder'][-5:])
-        seq = last_seq + 1
-    else:
-        seq = 1
-    return f"{prefix}{seq:05d}"
+    """Raised when faktur pembelian creation fails."""
 
 
 async def _generate_fp_number(cursor, order_date):
@@ -67,12 +54,12 @@ def _decimal_default(obj):
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
-def _write_audit_log(po_number, po_data):
-    """Write PO data as JSON to audit log."""
+def _write_audit_log(fp_number, fp_data):
+    """Write faktur data as JSON to audit log."""
     os.makedirs(str(settings.log_folder), exist_ok=True)
-    log_file = os.path.join(str(settings.log_folder), f"{po_number}.json")
+    log_file = os.path.join(str(settings.log_folder), f"{fp_number}.json")
     with open(log_file, 'w') as f:
-        json.dump(po_data, f, indent=2, default=_decimal_default)
+        json.dump(fp_data, f, indent=2, default=_decimal_default)
     logger.info("Audit log written: %s", log_file)
 
 
@@ -95,13 +82,13 @@ async def get_stock_details(pool, artno_list):
 
 
 async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0):
-    """Build a PO preview without committing.
+    """Build a FP preview without committing.
 
     Args:
         pool: aiomysql connection pool
         supplier_id: Vendor ID
         items: List of {artno, qty, price_override (optional)}
-        order_date: Date for PO (defaults to today)
+        order_date: Date for FP (defaults to today)
         shipping_cost: Shipping cost to distribute proportionally into tax (jlhppn)
 
     Returns:
@@ -240,27 +227,17 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
 
 
 async def commit_po(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
-    """Create PO in two phases to minimise lock contention with MyPosse POS.
+    """Create Faktur Pembelian in two phases to minimise lock contention with MyPosse POS.
 
     Phase 1 (single transaction):
-        INSERT headers/lines/history, UPDATE stlastbal + nextrec, COMMIT.
-        Only new-row INSERTs and brief end-of-txn UPDATEs — minimal locks.
+        INSERT icbym header + sthist lines, UPDATE stlastbal + nextrec, COMMIT.
 
     Phase 2 (individual auto-committed updates):
-        UPDATE stock prices and bundling columns (over1/hjualo1, over2/hjualo2) per item.
+        UPDATE stock prices and bundling columns per item.
         Each is a separate ~1ms transaction so MyPosse is never blocked.
-        If any fail, the PO is already safely committed.
-
-    Args:
-        pool: aiomysql connection pool
-        supplier_id: Vendor ID
-        items: List of {artno, qty, price_override (optional)}
-        order_date: Date for PO (defaults to today)
-        userid: User creating the PO
-        shipping_cost: Shipping cost distributed into tax
 
     Returns:
-        dict with PO number and summary
+        dict with FP number and summary
     """
     if not userid:
         raise POCreationError("userid is required")
@@ -276,78 +253,34 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
-                # Lock nextrec row to serialise concurrent PO creation.
-                await cursor.execute("SELECT newpo, newpurch FROM nextrec LIMIT 1 FOR UPDATE")
+                # Lock nextrec row to serialise concurrent creation.
+                await cursor.execute("SELECT newpurch FROM nextrec LIMIT 1 FOR UPDATE")
                 nextrec = await cursor.fetchone()
                 if not nextrec:
                     raise POCreationError("nextrec table is empty")
-                becreff = nextrec['newpo']
                 fp_becreff = nextrec['newpurch']
 
-                # Generate PO and FP numbers
-                po_number = await _generate_po_number(cursor, order_date)
+                # Generate FP number
                 fp_number = await _generate_fp_number(cursor, order_date)
 
-                # Insert PO header (icpom)
-                await cursor.execute(
-                    """INSERT INTO icpom
-                       (noorder, becreff, suppid, tglorder, duedate,
-                        jlhfaktur, userid, isclosed, lastprd)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, 0, 0)""",
-                    (po_number, becreff, supplier_id, order_date,
-                     order_date, preview['grand_total'], userid)
-                )
-
-                # Insert Purchase Invoice header (icbym)
+                # Insert Faktur Pembelian header (icbym)
                 await cursor.execute(
                     """INSERT INTO icbym
                        (nofaktur, tipe, becreff, suppid, tglfaktur, duedate,
-                        jlhfaktur, lokasi, userid, noorder,
+                        jlhfaktur, lokasi, userid,
                         isupdateprice, islocked)
                        VALUES (%s, '1', %s, %s, %s, %s,
-                               %s, 'LAPANGAN', %s, %s,
+                               %s, 'LAPANGAN', %s,
                                1, 0)""",
                     (fp_number, fp_becreff, supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, po_number)
+                     preview['grand_total'], userid)
                 )
 
-                # Insert line items and update stock balances
+                # Insert line items into sthist
                 for line in preview['lines']:
-                    await cursor.execute(
-                        """INSERT INTO icpos
-                           (becreff, stockid, artpabrik, artname, qty,
-                            hbelibsr, hbelikcl, hbelinetto,
-                            pctdisc1, pctdisc2, pctdisc3,
-                            jlhdisc1, jlhdisc2, jlhdisc3,
-                            pctppn, jlhppn,
-                            packing, satuanbsr, satuankcl,
-                            hjual, hjual2, hjual3, hjual4, hjual5,
-                            amount, qtybonus)
-                           VALUES (%s, %s, %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s)""",
-                        (becreff, line['artno'], line['artpabrik'], line['artname'],
-                         line['qty'],
-                         line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
-                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                         line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
-                         line['pctppn'], line['jlhppn'],
-                         line['packing'], line['satuanbsr'], line['satuankcl'],
-                         line['hjual'], line['hjual2'], line['hjual3'],
-                         line['hjual4'], line['hjual5'],
-                         line['amount'], line.get('foc', 0))
-                    )
-
-                    # Total small units received: qty * packing + foc
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
 
-                    # Insert stock history (sthist) for purchase tracking
                     await cursor.execute(
                         """INSERT INTO sthist
                            (stockid, artpabrik, artname, tanggal,
@@ -383,9 +316,7 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
                          supplier_id, fp_number, fp_becreff)
                     )
 
-                # --- stock price + bundling updates are DEFERRED to Phase 2 ---
-
-                # Batch stock balance updates LAST, right before commit.
+                # Batch stock balance updates
                 for line in preview['lines']:
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
@@ -402,24 +333,21 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
                             (line['artno'], float(qty_small))
                         )
 
-                # Increment nextrec counters
+                # Increment nextrec counter
                 await cursor.execute(
-                    "UPDATE nextrec SET newpo = newpo + 1, newpurch = newpurch + 1"
+                    "UPDATE nextrec SET newpurch = newpurch + 1"
                 )
 
                 await conn.commit()
 
             except Exception:
                 await conn.rollback()
-                logger.exception("PO creation failed (Phase 1)")
+                logger.exception("Faktur Pembelian creation failed (Phase 1)")
                 raise
 
     # ------------------------------------------------------------------
-    # Phase 2 — Deferred updates (separate auto-committed connections).
-    # Each UPDATE/DELETE+INSERT is its own tiny transaction (~1ms lock).
-    # If any fail, the PO is already safely committed.
+    # Phase 2 — Deferred stock price + bundling updates.
     # ------------------------------------------------------------------
-    from services.db import execute_modify
     for line in preview['lines']:
         try:
             await execute_modify(
@@ -445,7 +373,6 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 
-        # Update bundling in stock table (over1/hjualo1, over2/hjualo2)
         b1 = line.get('bundling1') or {}
         b2 = line.get('bundling2') or {}
         has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
@@ -471,14 +398,11 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         except Exception:
             logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
 
-    # Invalidate stock search cache so next search reflects updated prices/packing
     from services.stock_search import invalidate_cache
     invalidate_cache()
 
     result = {
-        'po_number': po_number,
         'fp_number': fp_number,
-        'becreff': becreff,
         'fp_becreff': fp_becreff,
         'supplier_id': supplier_id,
         'order_date': order_date.isoformat(),
@@ -487,86 +411,85 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
         'lines': preview['lines'],
     }
 
-    _write_audit_log(po_number, result)
+    _write_audit_log(fp_number, result)
 
     # Save before/after snapshot
     try:
         snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
-        await save_snapshot(pool, po_number, before_state, after_state, userid or '', meta=snap_meta)
+        await save_snapshot(pool, fp_number, before_state, after_state, userid or '', meta=snap_meta)
     except Exception:
-        logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
+        logger.warning("Failed to save snapshot for %s", fp_number, exc_info=True)
 
-    logger.info("PO created: %s / FP %s (becreff=%d, fp_becreff=%d, total=%.2f)",
-                po_number, fp_number, becreff, fp_becreff, preview['grand_total'])
+    logger.info("Faktur Pembelian created: %s (becreff=%d, total=%.2f)",
+                fp_number, fp_becreff, preview['grand_total'])
     return result
 
 
-async def get_po_history(pool, page=1, per_page=20,
+async def get_fp_history(pool, page=1, per_page=20,
                          date_from=None, date_to=None, supplier=None):
-    """Retrieve recent POs with optional filters."""
+    """Retrieve recent Faktur Pembelian with optional filters."""
     offset = (page - 1) * per_page
-    where = []
+    where = ["b.tipe = '1'"]
     params = []
     if date_from:
-        where.append("m.tglorder >= %s")
+        where.append("b.tglfaktur >= %s")
         params.append(date_from)
     if date_to:
-        where.append("m.tglorder <= %s")
+        where.append("b.tglfaktur <= %s")
         params.append(date_to)
     if supplier:
-        where.append("m.suppid = %s")
+        where.append("b.suppid = %s")
         params.append(supplier)
-    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    where_sql = " WHERE " + " AND ".join(where)
     rows = await execute_query(
         pool,
-        f"""SELECT m.noorder, m.becreff, m.suppid, m.tglorder, m.jlhfaktur,
-                  m.userid, v.name AS supplier_name,
-                  (SELECT COUNT(*) FROM icpos s WHERE s.becreff = m.becreff) AS line_count,
-                  COALESCE(b.isupdateprice, 1) AS isupdateprice
-           FROM icpom m
-           LEFT JOIN vendor v ON v.id = m.suppid
-           LEFT JOIN icbym b ON b.noorder = m.noorder
+        f"""SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
+                  b.userid, v.name AS supplier_name,
+                  (SELECT COUNT(*) FROM sthist s WHERE s.becreff = b.becreff AND s.tipetrans = 1) AS line_count,
+                  b.isupdateprice
+           FROM icbym b
+           LEFT JOIN vendor v ON v.id = b.suppid
            {where_sql}
-           ORDER BY m.tglorder DESC, m.noorder DESC
+           ORDER BY b.tglfaktur DESC, b.nofaktur DESC
            LIMIT %s OFFSET %s""",
         (*params, per_page, offset)
     )
     count_row = await execute_single(
         pool,
-        f"SELECT COUNT(*) AS total FROM icpom m{where_sql}",
+        f"SELECT COUNT(*) AS total FROM icbym b{where_sql}",
         tuple(params) if params else None,
     )
     return rows, count_row['total']
 
 
-async def toggle_po_lock(pool, po_number: str) -> dict:
-    """Toggle isupdateprice on icbym for a PO. Returns new state."""
+async def toggle_fp_lock(pool, fp_number: str) -> dict:
+    """Toggle isupdateprice on icbym. Returns new state."""
     row = await execute_single(
         pool,
-        "SELECT isupdateprice FROM icbym WHERE noorder = %s",
-        (po_number,),
+        "SELECT isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
     )
     if not row:
-        return {'error': 'PO not found'}
+        return {'error': 'Faktur not found'}
     new_val = 0 if row['isupdateprice'] else 1
     await execute_modify(
         pool,
-        "UPDATE icbym SET isupdateprice = %s WHERE noorder = %s",
-        (new_val, po_number),
+        "UPDATE icbym SET isupdateprice = %s WHERE nofaktur = %s AND tipe = '1'",
+        (new_val, fp_number),
     )
-    return {'ok': True, 'po_number': po_number, 'isupdateprice': new_val}
+    return {'ok': True, 'fp_number': fp_number, 'isupdateprice': new_val}
 
 
-async def get_po_detail(pool, po_number):
-    """Get full detail of a specific PO."""
+async def get_fp_detail(pool, fp_number):
+    """Get full detail of a specific Faktur Pembelian."""
     header = await execute_single(
         pool,
-        """SELECT m.noorder, m.becreff, m.suppid, m.tglorder, m.jlhfaktur,
-                  m.userid, v.name AS supplier_name
-           FROM icpom m
-           LEFT JOIN vendor v ON v.id = m.suppid
-           WHERE m.noorder = %s""",
-        (po_number,)
+        """SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
+                  b.userid, v.name AS supplier_name
+           FROM icbym b
+           LEFT JOIN vendor v ON v.id = b.suppid
+           WHERE b.nofaktur = %s AND b.tipe = '1'""",
+        (fp_number,)
     )
     if not header:
         return None
@@ -578,9 +501,9 @@ async def get_po_detail(pool, po_number):
                   satuanbsr, satuankcl,
                   hjual, hjual2, hjual3, hjual4, hjual5,
                   amount, qtybonus
-           FROM icpos
-           WHERE becreff = %s
-           ORDER BY nourut""",
+           FROM sthist
+           WHERE becreff = %s AND tipetrans = 1
+           ORDER BY noindex""",
         (header['becreff'],)
     )
     # Fetch bundling data from stock table for each item
@@ -623,16 +546,16 @@ async def get_po_detail(pool, po_number):
         bnd = bundling_map.get(line.get('stockid'), {})
         line['bundling1'] = bnd.get('bundling1')
         line['bundling2'] = bnd.get('bundling2')
-    if header.get('tglorder') is not None:
-        header['tglorder'] = str(header['tglorder'])
+    if header.get('tglfaktur') is not None:
+        header['tglfaktur'] = str(header['tglfaktur'])
     if header.get('jlhfaktur') is not None:
         header['jlhfaktur'] = float(header['jlhfaktur'])
     header['lines'] = lines
     return header
 
 
-async def update_po(pool, po_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
-    """Update an existing PO: reverse old stock, replace lines, apply new stock.
+async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
+    """Update an existing Faktur Pembelian: reverse old stock, replace sthist lines, apply new stock.
 
     Same two-phase approach as commit_po.
     """
@@ -640,31 +563,21 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
         raise POCreationError("userid is required")
     order_date = order_date or date.today()
 
-    # Look up existing PO and FP records
+    # Look up existing FP record
     header = await execute_single(
         pool,
-        "SELECT noorder, becreff, suppid FROM icpom WHERE noorder = %s",
-        (po_number,)
+        "SELECT nofaktur, becreff, suppid FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,)
     )
     if not header:
-        raise POCreationError(f"PO not found: {po_number}")
-    po_becreff = header['becreff']
+        raise POCreationError(f"Faktur not found: {fp_number}")
+    fp_becreff = header['becreff']
 
-    fp_row = await execute_single(
-        pool,
-        "SELECT nofaktur, becreff FROM icbym WHERE noorder = %s",
-        (po_number,)
-    )
-    if not fp_row:
-        raise POCreationError(f"FP not found for PO: {po_number}")
-    fp_number = fp_row['nofaktur']
-    fp_becreff = fp_row['becreff']
-
-    # Get old lines for stlastbal reversal
+    # Get old lines from sthist for stlastbal reversal
     old_lines = await execute_query(
         pool,
-        "SELECT stockid, qty, packing, qtybonus FROM icpos WHERE becreff = %s",
-        (po_becreff,)
+        "SELECT stockid, qty, packing, qtybonus FROM sthist WHERE becreff = %s AND tipetrans = 1",
+        (fp_becreff,)
     )
 
     # Build new preview
@@ -689,60 +602,21 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
                         (old_qty_small, old['stockid'])
                     )
 
-                # Delete old lines
-                await cursor.execute("DELETE FROM icpos WHERE becreff = %s", (po_becreff,))
-                await cursor.execute("DELETE FROM sthist WHERE becreff = %s", (fp_becreff,))
+                # Delete old sthist lines
+                await cursor.execute("DELETE FROM sthist WHERE becreff = %s AND tipetrans = 1", (fp_becreff,))
 
-                # Update headers
-                await cursor.execute(
-                    """UPDATE icpom
-                       SET suppid = %s, tglorder = %s, duedate = %s,
-                           jlhfaktur = %s, userid = %s
-                       WHERE noorder = %s""",
-                    (supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, po_number)
-                )
+                # Update header
                 await cursor.execute(
                     """UPDATE icbym
                        SET suppid = %s, tglfaktur = %s, duedate = %s,
                            jlhfaktur = %s, userid = %s
-                       WHERE noorder = %s""",
+                       WHERE nofaktur = %s AND tipe = '1'""",
                     (supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, po_number)
+                     preview['grand_total'], userid, fp_number)
                 )
 
-                # Insert new lines (same as commit_po Phase 1)
+                # Insert new sthist lines
                 for line in preview['lines']:
-                    await cursor.execute(
-                        """INSERT INTO icpos
-                           (becreff, stockid, artpabrik, artname, qty,
-                            hbelibsr, hbelikcl, hbelinetto,
-                            pctdisc1, pctdisc2, pctdisc3,
-                            jlhdisc1, jlhdisc2, jlhdisc3,
-                            pctppn, jlhppn,
-                            packing, satuanbsr, satuankcl,
-                            hjual, hjual2, hjual3, hjual4, hjual5,
-                            amount, qtybonus)
-                           VALUES (%s, %s, %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s)""",
-                        (po_becreff, line['artno'], line['artpabrik'], line['artname'],
-                         line['qty'],
-                         line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
-                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                         line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
-                         line['pctppn'], line['jlhppn'],
-                         line['packing'], line['satuanbsr'], line['satuankcl'],
-                         line['hjual'], line['hjual2'], line['hjual3'],
-                         line['hjual4'], line['hjual5'],
-                         line['amount'], line.get('foc', 0))
-                    )
-
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
 
@@ -802,11 +676,10 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
 
             except Exception:
                 await conn.rollback()
-                logger.exception("PO update failed (Phase 1)")
+                logger.exception("Faktur update failed (Phase 1)")
                 raise
 
-    # Phase 2 — Deferred stock price + bundling updates (same as commit_po)
-    from services.db import execute_modify
+    # Phase 2 — Deferred stock price + bundling updates
     for line in preview['lines']:
         try:
             await execute_modify(
@@ -861,7 +734,6 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
     invalidate_cache()
 
     result = {
-        'po_number': po_number,
         'fp_number': fp_number,
         'supplier_id': supplier_id,
         'order_date': order_date.isoformat(),
@@ -870,14 +742,14 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
         'lines': preview['lines'],
     }
 
-    _write_audit_log(f"{po_number}_edit", result)
+    _write_audit_log(f"{fp_number}_edit", result)
 
     # Save before/after snapshot
     try:
         snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
-        await save_snapshot(pool, po_number, before_state, after_state, userid or '', meta=snap_meta)
+        await save_snapshot(pool, fp_number, before_state, after_state, userid or '', meta=snap_meta)
     except Exception:
-        logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
+        logger.warning("Failed to save snapshot for %s", fp_number, exc_info=True)
 
-    logger.info("PO updated: %s / FP %s (total=%.2f)", po_number, fp_number, preview['grand_total'])
+    logger.info("Faktur updated: %s (total=%.2f)", fp_number, preview['grand_total'])
     return result

@@ -73,12 +73,12 @@
   </div>
 </div>
 
-<!-- PO Detail Modal -->
-<div class="modal fade" id="poDetailModal" tabindex="-1">
+<!-- FP Detail Modal -->
+<div class="modal fade" id="fpDetailModal" tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detail PO: <span id="detailPONumber"></span></h5>
+        <h5 class="modal-title">Detail Faktur: <span id="detailFPNumber"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -108,7 +108,7 @@
   </div>
 </div>
 
-<!-- PO Edit Overlay -->
+<!-- FP Edit Overlay -->
 <div class="po-edit-overlay d-none" id="poEditOverlay">
   <div class="po-edit-header">
     <div class="d-flex align-items-center gap-3">
@@ -278,7 +278,7 @@
     if (elDateTo.value) params.set('date_to', elDateTo.value);
     if (elSupplier.value) params.set('supplier', elSupplier.value);
 
-    fetch('/api/po/list?' + params.toString())
+    fetch('/api/fp/list?' + params.toString())
       .then(function(r) { return r.json(); })
       .then(function(data) {
         elLoading.classList.add('d-none');
@@ -296,20 +296,20 @@
         elBody.innerHTML = '';
         items.forEach(function(o) {
           var tr = document.createElement('tr');
-          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.noorder + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-fp" data-fp="' + o.nofaktur + '" title="Lihat"><i class="bi bi-eye"></i></button>';
           if (canEdit) {
             var editCls = o.isupdateprice ? 'btn-outline-secondary' : 'btn-outline-warning';
             var editDis = o.isupdateprice ? ' disabled' : '';
-            actions += ' <button class="btn btn-sm btn-edit-po ' + editCls + '" data-po="' + o.noorder + '" title="Edit"' + editDis + '><i class="bi bi-pencil"></i></button>';
+            actions += ' <button class="btn btn-sm btn-edit-fp ' + editCls + '" data-fp="' + o.nofaktur + '" title="Edit"' + editDis + '><i class="bi bi-pencil"></i></button>';
           }
           if (canLock) {
             var lockCls = o.isupdateprice ? 'btn-warning' : 'btn-outline-secondary';
             var lockIcon = o.isupdateprice ? 'lock-fill' : 'unlock';
             var lockTitle = o.isupdateprice ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
-            actions += ' <button class="btn btn-sm btn-lock-po ' + lockCls + '" data-po="' + o.noorder + '" data-locked="' + (o.isupdateprice ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+            actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.isupdateprice ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
           }
-          tr.innerHTML = '<td><code>' + o.noorder + '</code></td>'
-            + '<td>' + (o.tglorder || '-') + '</td>'
+          tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
+            + '<td>' + (o.tglfaktur || '-') + '</td>'
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
@@ -367,15 +367,15 @@
 
   function bindButtons() {
     // View
-    document.querySelectorAll('#hTableBody .btn-view-po').forEach(function(btn) {
+    document.querySelectorAll('#hTableBody .btn-view-fp').forEach(function(btn) {
       btn.addEventListener('click', async function() {
-        var po = btn.dataset.po;
-        var res = await fetch('/api/po/' + po);
+        var po = btn.dataset.fp;
+        var res = await fetch('/api/fp/' + po);
         var data = await res.json();
         if (data.error) { alert(data.error); return; }
-        document.getElementById('detailPONumber').textContent = data.noorder;
+        document.getElementById('detailFPNumber').textContent = data.nofaktur;
         document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
-        document.getElementById('detailDate').textContent = data.tglorder || '';
+        document.getElementById('detailDate').textContent = data.tglfaktur || '';
         document.getElementById('detailTotal').textContent = fmtNum(data.jlhfaktur || 0);
         var tbody = document.getElementById('detailLines');
         tbody.innerHTML = '';
@@ -390,31 +390,31 @@
             + '<td class="text-end">' + fmtNum(line.amount || 0) + '</td>';
           tbody.appendChild(tr);
         });
-        new bootstrap.Modal(document.getElementById('poDetailModal')).show();
+        new bootstrap.Modal(document.getElementById('fpDetailModal')).show();
       });
     });
 
     // Lock/unlock
-    document.querySelectorAll('#hTableBody .btn-lock-po').forEach(function(btn) {
+    document.querySelectorAll('#hTableBody .btn-lock-fp').forEach(function(btn) {
       btn.addEventListener('click', async function() {
-        var po = btn.dataset.po;
+        var po = btn.dataset.fp;
         var locked = btn.dataset.locked === '1';
         var msg = locked ? 'Buka kunci faktur ' + po + '?' : 'Kunci faktur ' + po + ' agar tidak bisa diedit?';
         var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
         if (!confirmed) return;
         try {
-          var res = await fetch('/api/po/' + po + '/toggle-lock', {method: 'POST'});
+          var res = await fetch('/api/fp/' + po + '/toggle-lock', {method: 'POST'});
           var data = await res.json();
           if (data.ok) {
             var newLocked = data.isupdateprice;
             btn.dataset.locked = newLocked;
-            btn.className = 'btn btn-sm btn-lock-po ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
+            btn.className = 'btn btn-sm btn-lock-fp ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
             btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
             btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
-            var editBtn = btn.closest('td').querySelector('.btn-edit-po');
+            var editBtn = btn.closest('td').querySelector('.btn-edit-fp');
             if (editBtn) {
               editBtn.disabled = !!newLocked;
-              editBtn.className = 'btn btn-sm btn-edit-po ' + (newLocked ? 'btn-outline-secondary' : 'btn-outline-warning');
+              editBtn.className = 'btn btn-sm btn-edit-fp ' + (newLocked ? 'btn-outline-secondary' : 'btn-outline-warning');
             }
             window.showToast && showToast(newLocked ? 'Faktur dikunci' : 'Faktur dibuka kuncinya');
           }
@@ -434,5 +434,5 @@
   loadData(1);
 })();
 </script>
-<script src="{{ url_for('static', filename='js/po_edit.js') }}?v={{ range(10000,99999) | random }}"></script>
+<script src="{{ url_for('static', filename='js/fp_edit.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

@@ -256,7 +256,7 @@ async def get_price_change_report(pool, report_date: date | None = None) -> list
 
 
 async def get_price_change_from_snapshots(pool, report_date: date | None = None) -> list[dict]:
-    """Get harga jual changes from PO snapshots (faktur) for a date.
+    """Get harga jual changes from FP snapshots (faktur) for a date.
     Returns items where hjual changed, showing old→new hjual1 only."""
     report_date = report_date or date.today()
     rows = await execute_query(

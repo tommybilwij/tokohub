@@ -62,7 +62,7 @@ class POCommitRequest(BaseModel):
 
 
 class POUpdateRequest(BaseModel):
-    po_number: str
+    fp_number: str
     supplier_id: str
     userid: str
     items: list[POItem]

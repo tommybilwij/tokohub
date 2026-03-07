@@ -1,4 +1,4 @@
-"""PO snapshot service — captures before/after stock prices on faktur submission."""
+"""FP snapshot service — captures before/after stock prices on faktur submission."""
 
 import json
 import logging
@@ -72,7 +72,7 @@ def build_after(preview_lines: list[dict]) -> dict:
             'hjual3': line.get('hjual3', 0),
             'hjual4': line.get('hjual4', 0),
             'hjual5': line.get('hjual5', 0),
-            # PO line data
+            # FP line data
             'qty': line.get('qty', 0),
             'qty_besar': line.get('qty_besar', 0),
             'amount': line.get('amount', 0),
@@ -99,7 +99,7 @@ def build_after(preview_lines: list[dict]) -> dict:
     return result
 
 
-async def save_snapshot(pool, po_number: str, before: dict, after: dict,
+async def save_snapshot(pool, fp_number: str, before: dict, after: dict,
                         created_by: str = '', meta: dict | None = None) -> None:
     """Save before/after snapshot to tokohub.faktur_pembelian_snapshots."""
     items = []
@@ -117,36 +117,36 @@ async def save_snapshot(pool, po_number: str, before: dict, after: dict,
     await execute_modify(
         pool,
         "INSERT INTO tokohub.faktur_pembelian_snapshots (po_number, snapshot_json, created_by) VALUES (%s, %s, %s)",
-        (po_number, snapshot, created_by),
+        (fp_number, snapshot, created_by),
     )
-    logger.info("Snapshot saved for PO %s (%d items)", po_number, len(items))
+    logger.info("Snapshot saved for FP %s (%d items)", fp_number, len(items))
 
 
-async def get_snapshot(pool, po_number: str) -> dict | None:
-    """Get the latest snapshot for a PO."""
+async def get_snapshot(pool, fp_number: str) -> dict | None:
+    """Get the latest snapshot for a faktur."""
     row = await execute_single(
         pool,
         "SELECT snapshot_json, created_by, created_at FROM tokohub.faktur_pembelian_snapshots "
         "WHERE po_number = %s ORDER BY id DESC LIMIT 1",
-        (po_number,),
+        (fp_number,),
     )
     if not row:
         return None
     return {
-        'po_number': po_number,
+        'fp_number': fp_number,
         'created_by': row['created_by'],
         'created_at': row['created_at'].isoformat() if row['created_at'] else '',
         **json.loads(row['snapshot_json']),
     }
 
 
-async def get_snapshots_for_po(pool, po_number: str) -> list[dict]:
-    """Get all snapshots for a PO (newest first)."""
+async def get_snapshots_for_fp(pool, fp_number: str) -> list[dict]:
+    """Get all snapshots for a faktur (newest first)."""
     rows = await execute_query(
         pool,
         "SELECT id, po_number, created_by, created_at FROM tokohub.faktur_pembelian_snapshots "
         "WHERE po_number = %s ORDER BY id DESC",
-        (po_number,),
+        (fp_number,),
     )
     return rows
 

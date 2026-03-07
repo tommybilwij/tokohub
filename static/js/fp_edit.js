@@ -1,5 +1,5 @@
 /**
- * PO Edit Overlay for Faktur Pembelian page.
+ * FP Edit Overlay for Faktur Pembelian page.
  * Replicates the Daftar Barang layout from Input Faktur.
  */
 (function () {
@@ -23,7 +23,7 @@
   var elSearchResults = document.getElementById('editSearchResults');
   var elItemCount = document.getElementById('editItemCount');
 
-  var currentPO = null;
+  var currentFP = null;
   var editLines = [];
   var vendors = [];
   var beforePrices = {}; // snapshot "before" prices keyed by artno (stok sebelum input faktur)
@@ -142,9 +142,9 @@
   });
 
   // ------- Fetch snapshot data -------
-  async function fetchSnapshot(poNumber) {
+  async function fetchSnapshot(fpNumber) {
     try {
-      var res = await fetch('/api/po/' + encodeURIComponent(poNumber) + '/snapshot');
+      var res = await fetch('/api/fp/' + encodeURIComponent(fpNumber) + '/snapshot');
       if (!res.ok) return { before: {}, after: {} };
       var data = await res.json();
       var bmap = {}, amap = {};
@@ -160,20 +160,20 @@
   }
 
   // ------- Open overlay -------
-  async function openEdit(poNumber) {
+  async function openEdit(fpNumber) {
     await loadDropdowns();
 
-    var res = await fetch('/api/po/' + encodeURIComponent(poNumber));
+    var res = await fetch('/api/fp/' + encodeURIComponent(fpNumber));
     var data = await res.json();
     if (data.error) {
       if (window.showToast) window.showToast(data.error, 'danger');
       return;
     }
 
-    currentPO = data;
-    elTitle.textContent = 'Edit Faktur: ' + data.noorder;
+    currentFP = data;
+    elTitle.textContent = 'Edit Faktur: ' + data.nofaktur;
     setEditSupplier(data.suppid || '');
-    elDate.value = data.tglorder || '';
+    elDate.value = data.tglfaktur || '';
 
     editLines = (data.lines || []).map(function (l) {
       var b1 = l.bundling1 || {};
@@ -204,11 +204,11 @@
     });
 
     // Fetch snapshot data for comparison
-    var snap = await fetchSnapshot(poNumber);
+    var snap = await fetchSnapshot(fpNumber);
     beforePrices = snap.before;
     afterPrices = snap.after;
 
-    // Backfill bkirim from snapshot after data (not stored in icpos)
+    // Backfill bkirim from snapshot after data (not stored in sthist)
     editLines.forEach(function (line) {
       var af = afterPrices[line.stockid];
       if (af && af.shipping_cost) line.bkirim = af.shipping_cost;
@@ -223,7 +223,7 @@
   function closeEdit() {
     overlay.classList.add('d-none');
     document.body.style.overflow = '';
-    currentPO = null;
+    currentFP = null;
     editLines = [];
     beforePrices = {};
     afterPrices = {};
@@ -1033,8 +1033,8 @@
     }
 
     var ok = window.showConfirm
-      ? await window.showConfirm('Update faktur ' + currentPO.noorder + ' dan update stok?')
-      : confirm('Update faktur ' + currentPO.noorder + ' dan update stok?');
+      ? await window.showConfirm('Update faktur ' + currentFP.nofaktur + ' dan update stok?')
+      : confirm('Update faktur ' + currentFP.nofaktur + ' dan update stok?');
     if (!ok) return;
 
     var items = editLines.map(function (l) {
@@ -1079,7 +1079,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          po_number: currentPO.noorder,
+          fp_number: currentFP.nofaktur,
           supplier_id: elSupplier.value,
           userid: elUser.value,
           items: items,
@@ -1089,7 +1089,7 @@
       var data = await res.json();
       if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
 
-      if (window.showToast) window.showToast('Faktur ' + currentPO.noorder + ' berhasil diupdate (' + data.line_count + ' item)', 'success');
+      if (window.showToast) window.showToast('Faktur ' + currentFP.nofaktur + ' berhasil diupdate (' + data.line_count + ' item)', 'success');
       closeEdit();
       window.location.reload();
     } catch (err) {
@@ -1111,9 +1111,9 @@
 
   // ------- Wire up edit buttons (event delegation for dynamic rows) -------
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.btn-edit-po');
+    var btn = e.target.closest('.btn-edit-fp');
     if (btn && !btn.disabled) {
-      openEdit(btn.dataset.po);
+      openEdit(btn.dataset.fp);
     }
   });
 })();

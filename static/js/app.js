@@ -82,7 +82,7 @@
 
   /**
    * Calculate net purchase price after cascading discounts and tax.
-   * Mirrors the backend calculation in po_service.preview_po().
+   * Mirrors the backend calculation in fp_service.preview_po().
    */
   function calcNetPrice(hbelibsr, pctdisc1, pctdisc2, pctdisc3, pctppn) {
     const d1 = hbelibsr * (pctdisc1 || 0) / 100;
@@ -440,7 +440,7 @@
     // File uploads
     dom.btnUploadPhoto.addEventListener('click', uploadPhoto);
 
-    // PO commit
+    // FP commit
     dom.btnCommitPO.addEventListener('click', commitPO);
 
     // New receipt after success
@@ -1892,7 +1892,7 @@
     const idx = state.currentReviewIdx;
     _applyMatch(idx, match);
 
-    // Defer alias save — flag intent, actual save happens on PO commit
+    // Defer alias save — flag intent, actual save happens on FP commit
     state.items[idx]._saveAlias = dom.chkSaveAlias.checked;
 
     bootstrap.Modal.getInstance(dom.matchModal).hide();
@@ -1935,7 +1935,7 @@
   }
 
   // -----------------------------------------------------------------------
-  // PO Preview
+  // FP Preview
   // -----------------------------------------------------------------------
   function _buildBundlingPayload(b) {
     if (!b || !b.enabled || !b.minQty) return null;
@@ -2067,7 +2067,7 @@
   }
 
   // -----------------------------------------------------------------------
-  // PO Commit
+  // FP Commit
   // -----------------------------------------------------------------------
   async function commitPO() {
     if (!await showConfirm('Buat Purchase Order dan update stok? Aksi ini tidak bisa dibatalkan.')) return;
@@ -2079,7 +2079,7 @@
     // Block if any item has QTY KCL = 0
     for (const it of matched) {
       if (!it.qtyKecil || it.qtyKecil <= 0) {
-        showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim PO.`, 'danger');
+        showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim Faktur.`, 'danger');
         return;
       }
     }
@@ -2116,7 +2116,7 @@
         }
       }
 
-      dom.successPONumber.textContent = data.po_number;
+      dom.successPONumber.textContent = data.fp_number;
       dom.successTotal.textContent = formatNumber(data.grand_total);
       dom.successLineCount.textContent = data.line_count;
 
@@ -2124,7 +2124,7 @@
         new bootstrap.Modal(dom.poSuccessModal).show();
       }, 300);
     } catch (e) {
-      showToast('Commit PO gagal: ' + e.message, 'danger');
+      showToast('Commit Faktur gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }

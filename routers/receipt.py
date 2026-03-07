@@ -1,4 +1,4 @@
-"""Receipt upload, matching, alias, and PO routes."""
+"""Receipt upload, matching, alias, and FP routes."""
 
 import os
 import logging
@@ -122,11 +122,11 @@ async def preview_po(data: POPreviewRequest, db: aiomysql.Pool = Depends(get_db)
         return JSONResponse({'error': 'supplier_id and items are required'}, status_code=400)
 
     try:
-        from services.po_service import preview_po as _preview
+        from services.fp_service import preview_po as _preview
         result = await _preview(db, supplier_id, items, order_date, shipping_cost=data.shipping_cost)
         return result
     except Exception as e:
-        logger.exception("PO preview failed")
+        logger.exception("FP preview failed")
         return JSONResponse({'error': str(e)}, status_code=500)
 
 
@@ -141,78 +141,78 @@ async def commit_po(data: POCommitRequest, db: aiomysql.Pool = Depends(get_db)):
         return JSONResponse({'error': 'supplier_id, userid, and items are required'}, status_code=400)
 
     try:
-        from services.po_service import commit_po as _commit
+        from services.fp_service import commit_po as _commit
         result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
         return result
     except Exception as e:
-        logger.exception("PO commit failed")
+        logger.exception("FP commit failed")
         return JSONResponse({'error': str(e)}, status_code=500)
 
 
-@router.get('/api/po/list')
-async def api_po_list(
+@router.get('/api/fp/list')
+async def api_fp_list(
     page: int = 1,
     date_from: str = None,
     date_to: str = None,
     supplier: str = None,
     db: aiomysql.Pool = Depends(get_db),
 ):
-    from services.po_service import get_po_history
-    rows, total = await get_po_history(
+    from services.fp_service import get_fp_history
+    rows, total = await get_fp_history(
         db, page=page, date_from=date_from or None,
         date_to=date_to or None, supplier=supplier or None,
     )
     items = []
     for r in rows:
         d = dict(r)
-        d['tglorder'] = d['tglorder'].strftime('%Y-%m-%d') if d['tglorder'] else ''
+        d['tglfaktur'] = d['tglfaktur'].strftime('%Y-%m-%d') if d['tglfaktur'] else ''
         d['jlhfaktur'] = float(d['jlhfaktur'] or 0)
         items.append(d)
     return {'items': items, 'total': total, 'page': page}
 
 
-@router.get('/api/po/{po_number}')
-async def get_po(po_number: str, db: aiomysql.Pool = Depends(get_db)):
-    from services.po_service import get_po_detail
-    result = await get_po_detail(db, po_number)
+@router.get('/api/fp/{fp_number}')
+async def get_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.fp_service import get_fp_detail
+    result = await get_fp_detail(db, fp_number)
     if not result:
-        return JSONResponse({'error': 'PO not found'}, status_code=404)
+        return JSONResponse({'error': 'Faktur not found'}, status_code=404)
     return result
 
 
-@router.get('/api/po/{po_number}/snapshot')
-async def get_po_snapshot(po_number: str, db: aiomysql.Pool = Depends(get_db)):
+@router.get('/api/fp/{fp_number}/snapshot')
+async def get_fp_snapshot(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     from services.snapshot_service import get_snapshot
-    result = await get_snapshot(db, po_number)
+    result = await get_snapshot(db, fp_number)
     if not result:
         return JSONResponse({'error': 'No snapshot found'}, status_code=404)
     return result
 
 
-@router.post('/api/po/{po_number}/toggle-lock')
-async def toggle_po_lock(po_number: str, db: aiomysql.Pool = Depends(get_db)):
-    from services.po_service import toggle_po_lock as _toggle
-    result = await _toggle(db, po_number)
+@router.post('/api/fp/{fp_number}/toggle-lock')
+async def toggle_fp_lock(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.fp_service import toggle_fp_lock as _toggle
+    result = await _toggle(db, fp_number)
     if 'error' in result:
         return JSONResponse(result, status_code=404)
     return result
 
 
 @router.post('/receipt/update')
-async def update_po(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
+async def update_fp(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()
     userid = data.userid.strip()
-    po_number = data.po_number.strip()
+    fp_number = data.fp_number.strip()
     items = [item.model_dump() for item in data.items]
     order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
 
-    if not supplier_id or not items or not userid or not po_number:
-        return JSONResponse({'error': 'po_number, supplier_id, userid, and items are required'}, status_code=400)
+    if not supplier_id or not items or not userid or not fp_number:
+        return JSONResponse({'error': 'fp_number, supplier_id, userid, and items are required'}, status_code=400)
 
     try:
-        from services.po_service import update_po as _update
-        result = await _update(db, po_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
+        from services.fp_service import update_fp as _update
+        result = await _update(db, fp_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
         return result
     except Exception as e:
-        logger.exception("PO update failed")
+        logger.exception("Faktur update failed")
         return JSONResponse({'error': str(e)}, status_code=500)

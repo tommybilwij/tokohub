@@ -21,7 +21,7 @@
     </a>
   </div>
   {% endif %}
-  {% if 'entry' in nav_pages or 'history' in nav_pages %}
+  {% if 'faktur' in nav_pages or 'faktur:input' in nav_pages or 'faktur:daftar' in nav_pages %}
   <div class="col-6 col-md-4 col-xl-3">
     <a href="/history" class="card card-home text-decoration-none">
       <div class="card-body text-center py-4">
@@ -32,46 +32,24 @@
     </a>
   </div>
   {% endif %}
-  {% if 'sales' in nav_pages %}
-  <div class="col-6 col-md-4 col-xl-3">
-    <a href="/sales-history" class="card card-home text-decoration-none">
-      <div class="card-body text-center py-4">
-        <i class="bi bi-graph-up home-icon"></i>
-        <h6 class="mt-2 mb-0">Penjualan</h6>
-        <small class="text-muted">Data penjualan</small>
-      </div>
-    </a>
-  </div>
-  {% endif %}
-  {% if 'foc' in nav_pages %}
-  <div class="col-6 col-md-4 col-xl-3">
-    <a href="/foc-history" class="card card-home text-decoration-none">
-      <div class="card-body text-center py-4">
-        <i class="bi bi-gift home-icon"></i>
-        <h6 class="mt-2 mb-0">Barang Bonus</h6>
-        <small class="text-muted">Riwayat FOC</small>
-      </div>
-    </a>
-  </div>
-  {% endif %}
   {% if 'price_change' in nav_pages %}
   <div class="col-6 col-md-4 col-xl-3">
     <a href="/price-change" class="card card-home text-decoration-none">
       <div class="card-body text-center py-4">
         <i class="bi bi-tag home-icon"></i>
-        <h6 class="mt-2 mb-0">Ubah Harga</h6>
+        <h6 class="mt-2 mb-0">Perubahan Harga</h6>
         <small class="text-muted">Perubahan harga jual</small>
       </div>
     </a>
   </div>
   {% endif %}
-  {% if 'price_report' in nav_pages %}
+  {% if 'laporan' in nav_pages or 'laporan:penjualan' in nav_pages or 'laporan:perubahan_harga' in nav_pages or 'laporan:barang_bonus' in nav_pages %}
   <div class="col-6 col-md-4 col-xl-3">
-    <a href="/price-change-report" class="card card-home text-decoration-none">
+    <a href="/laporan" class="card card-home text-decoration-none">
       <div class="card-body text-center py-4">
-        <i class="bi bi-journal-text home-icon"></i>
-        <h6 class="mt-2 mb-0">Laporan Harga</h6>
-        <small class="text-muted">Laporan perubahan harga</small>
+        <i class="bi bi-bar-chart-line home-icon"></i>
+        <h6 class="mt-2 mb-0">Laporan</h6>
+        <small class="text-muted">Penjualan, harga & bonus</small>
       </div>
     </a>
   </div>

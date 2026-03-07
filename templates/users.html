@@ -38,27 +38,21 @@
     </div>
 
     <!-- User list -->
-    <div class="card">
-      <div class="card-header">
-        <i class="bi bi-list-ul"></i> Daftar User Terdaftar
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0">
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Nama</th>
-                <th>Role</th>
-                <th style="width:100px">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="userTableBody">
-              <tr id="userEmpty"><td colspan="4" class="text-center text-muted py-3">Memuat...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <h6 class="text-muted mt-4 mb-2"><i class="bi bi-list-ul"></i> Daftar User Terdaftar</h6>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Nama</th>
+            <th>Role</th>
+            <th style="width:100px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          <tr id="userEmpty"><td colspan="4" class="text-center text-muted py-3">Memuat...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -161,13 +155,23 @@
     container.innerHTML = allRoles.map(r => {
       const current = r.permissions ? r.permissions.split(',') : [];
       const checksHtml = Object.entries(PAGES).map(([key, label]) => {
-        const isSub = key.includes(':');
-        const indent = isSub ? ' ms-4' : '';
+        const parts = key.split(':');
+        const depth = parts.length - 1;
+        const parent = depth > 0 ? parts.slice(0, -1).join(':') : null;
+        const indentPx = depth * 24;
+        const indent = depth > 0 ? '" style="padding-left:' + indentPx + 'px' : '';
+        // Check all ancestors are selected
+        let ancestorsOk = true;
+        for (let i = 1; i <= depth; i++) {
+          if (!current.includes(parts.slice(0, i).join(':'))) { ancestorsOk = false; break; }
+        }
+        const disabled = depth > 0 && !ancestorsOk ? ' disabled' : '';
+        const checked = current.includes(key) && ancestorsOk ? ' checked' : '';
         return '<div class="form-check' + indent + '">' +
           '<input class="form-check-input rp-check" type="checkbox" value="' + key + '"' +
             ' data-role="' + r.role + '"' +
-            (current.includes(key) ? ' checked' : '') + '>' +
-          '<label class="form-check-label' + (isSub ? ' text-muted' : '') + ' small">' + label + '</label>' +
+            checked + disabled + '>' +
+          '<label class="form-check-label' + (depth > 0 ? ' text-muted' : '') + ' small">' + label + '</label>' +
         '</div>';
       }).join('');
       return '<div class="card mb-2">' +
@@ -181,6 +185,30 @@
         '<div class="card-body py-2" id="rp_card_' + r.role + '">' + checksHtml + '</div>' +
       '</div>';
     }).join('');
+
+    // Parent toggle: enable/disable + uncheck descendants
+    container.querySelectorAll('.rp-check').forEach(cb => {
+      cb.addEventListener('change', function() {
+        const key = this.value;
+        const role = this.dataset.role;
+        const card = document.getElementById('rp_card_' + role);
+        // Find all descendants (keys starting with this key + ':')
+        card.querySelectorAll('.rp-check').forEach(child => {
+          if (child.value.startsWith(key + ':')) {
+            if (!this.checked) {
+              child.disabled = true;
+              child.checked = false;
+            } else {
+              // Re-enable only direct children; deeper ones need their parent checked too
+              const childParts = child.value.split(':');
+              const parentKey = childParts.slice(0, -1).join(':');
+              const parentCb = card.querySelector('.rp-check[value="' + parentKey + '"]');
+              child.disabled = parentCb ? !parentCb.checked : false;
+            }
+          }
+        });
+      });
+    });
   }
 
   // Create role

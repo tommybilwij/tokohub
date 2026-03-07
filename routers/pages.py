@@ -70,7 +70,7 @@ async def entry_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'entry')
+    denied = await _check_page(request, user, 'faktur:input')
     if denied: return denied
     return templates.TemplateResponse(request, 'receipt_form.html', await _user_ctx(request, user))
 
@@ -81,7 +81,7 @@ async def receipt_new(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'entry')
+    denied = await _check_page(request, user, 'faktur:input')
     if denied: return denied
     return templates.TemplateResponse(request, 'receipt_form.html', await _user_ctx(request, user))
 
@@ -94,7 +94,7 @@ async def aliases_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'aliases')
+    denied = await _check_page(request, user, 'faktur:input:aliases')
     if denied: return denied
     rows, total = await list_aliases(db, page=page)
     return templates.TemplateResponse(request, 'aliases.html', {
@@ -111,13 +111,13 @@ async def history_page(
 ):
     # Allow access if user has either entry or history permission
     pool = request.app.state.db_pool
-    has_entry = await has_page_access(pool, user['role'], 'entry')
-    has_history = await has_page_access(pool, user['role'], 'history')
+    has_entry = await has_page_access(pool, user['role'], 'faktur:input')
+    has_history = await has_page_access(pool, user['role'], 'faktur:daftar')
     if not has_entry and not has_history:
-        denied = await _check_page(request, user, 'history')
+        denied = await _check_page(request, user, 'faktur')
         if denied: return denied
-    can_edit = await has_page_access(pool, user['role'], 'history:edit')
-    can_lock = await has_page_access(pool, user['role'], 'ph:lock_history')
+    can_edit = await has_page_access(pool, user['role'], 'faktur:edit')
+    can_lock = await has_page_access(pool, user['role'], 'faktur:lock')
     return templates.TemplateResponse(request, 'history.html', {
         'can_entry': has_entry, 'can_edit': can_edit, 'can_lock': can_lock,
         **await _user_ctx(request, user),
@@ -135,18 +135,40 @@ async def scanner_page(
     return templates.TemplateResponse(request, 'scanner.html', await _user_ctx(request, user))
 
 
+@router.get('/laporan')
+async def laporan_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    # Allow if user has any report permission
+    pool = request.app.state.db_pool
+    has_sales = await has_page_access(pool, user['role'], 'laporan:penjualan')
+    has_price_report = await has_page_access(pool, user['role'], 'laporan:perubahan_harga')
+    has_foc = await has_page_access(pool, user['role'], 'laporan:barang_bonus')
+    if not has_sales and not has_price_report and not has_foc:
+        denied = await _check_page(request, user, 'laporan')
+        if denied: return denied
+    return templates.TemplateResponse(request, 'laporan.html', {
+        'has_sales': has_sales,
+        'has_price_report': has_price_report,
+        'has_foc': has_foc,
+        **await _user_ctx(request, user),
+    })
+
+
 @router.get('/sales-history')
 async def sales_history_page(
     request: Request,
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'sales')
+    denied = await _check_page(request, user, 'laporan:penjualan')
     if denied: return denied
     ctx = await _user_ctx(request, user)
     pool = request.app.state.db_pool
-    ctx['show_harga'] = await has_page_access(pool, user['role'], 'sales:harga')
-    ctx['show_total'] = await has_page_access(pool, user['role'], 'sales:total')
+    ctx['show_harga'] = await has_page_access(pool, user['role'], 'laporan:penjualan:harga')
+    ctx['show_total'] = await has_page_access(pool, user['role'], 'laporan:penjualan:total')
     return templates.TemplateResponse(request, 'sales_history.html', ctx)
 
 
@@ -156,7 +178,7 @@ async def foc_history_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'foc')
+    denied = await _check_page(request, user, 'laporan:barang_bonus')
     if denied: return denied
     return templates.TemplateResponse(request, 'foc_history.html', await _user_ctx(request, user))
 
@@ -171,8 +193,8 @@ async def price_change_page(
     if denied: return denied
     pool = request.app.state.db_pool
     ctx = await _user_ctx(request, user)
-    ctx['can_update_purch_price'] = await has_page_access(pool, user['role'], 'ph:update_purch_price')
-    ctx['can_lock_history'] = await has_page_access(pool, user['role'], 'ph:lock_history')
+    ctx['can_update_purch_price'] = await has_page_access(pool, user['role'], 'price_change:update_beli')
+    ctx['can_lock_history'] = await has_page_access(pool, user['role'], 'price_change:lock')
     return templates.TemplateResponse(request, 'price_change.html', ctx)
 
 
@@ -182,7 +204,7 @@ async def price_change_report_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'price_report')
+    denied = await _check_page(request, user, 'laporan:perubahan_harga')
     if denied: return denied
     return templates.TemplateResponse(request, 'price_change_report.html', await _user_ctx(request, user))
 

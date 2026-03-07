@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request, Depends, Response
 from fastapi.responses import JSONResponse
 
 from dependencies import get_db
+from services.db import execute_query
 from services.auth import (
     get_user_list, get_auth_record, get_all_auth,
     verify_password, set_password, update_role, delete_auth,
@@ -226,6 +227,18 @@ async def api_delete_user(username: str, request: Request, db: aiomysql.Pool = D
 
     if username == user['username']:
         return JSONResponse({'error': 'Tidak bisa menghapus akun sendiri'}, status_code=400)
+
+    # Prevent deleting last user
+    all_users = await execute_query(db, "SELECT username, role FROM tokohub.auth")
+    if len(all_users) <= 1:
+        return JSONResponse({'error': 'Tidak bisa menghapus user terakhir'}, status_code=400)
+
+    # Prevent deleting last admin
+    target = next((u for u in all_users if u['username'] == username), None)
+    if target and target['role'] == 'admin':
+        admin_count = sum(1 for u in all_users if u['role'] == 'admin')
+        if admin_count <= 1:
+            return JSONResponse({'error': 'Tidak bisa menghapus admin terakhir'}, status_code=400)
 
     await delete_auth(db, username)
     return {'ok': True}

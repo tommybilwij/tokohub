@@ -17,22 +17,25 @@ SESSION_COOKIE = 'tokohub_session'
 SESSION_MAX_AGE = 86400 * 7  # 7 days
 
 # All pages that can be permission-controlled
+# Keys with ':' are rendered as indented sub-items in the permissions UI.
 PAGES = {
-    'scanner':      'Scanner',
-    'entry':        'Input Faktur Pembelian',
-    'history':      'Daftar Faktur Pembelian',
-    'history:edit': 'Edit Faktur',
-    'sales':        'Penjualan',
-    'sales:harga':  'Harga Jual',
-    'sales:total':  'Total',
-    'foc':          'Barang Bonus',
-    'aliases':      'Alias',
-    'price_change': 'Perubahan Harga',
-    'ph:update_purch_price': 'Update Harga Beli',
-    'ph:lock_history': 'Kunci Riwayat',
-    'price_report': 'Laporan Harga',
+    'scanner':                  'Scanner',
+    'faktur':                   'Faktur Pembelian',
+    'faktur:input':             'Input Faktur Pembelian',
+    'faktur:input:aliases':     'Alias',
+    'faktur:daftar':            'Daftar Faktur Pembelian',
+    'faktur:edit':              'Edit Faktur',
+    'faktur:lock':              'Kunci Faktur',
+    'price_change':             'Perubahan Harga',
+    'price_change:update_beli': 'Update Harga Beli',
+    'price_change:lock':        'Kunci Riwayat',
+    'laporan':                  'Laporan',
+    'laporan:penjualan':        'Laporan Penjualan',
+    'laporan:penjualan:harga':  'Harga Jual',
+    'laporan:penjualan:total':  'Total Harga Jual',
+    'laporan:perubahan_harga':  'Laporan Perubahan Harga',
+    'laporan:barang_bonus':     'Laporan Barang Bonus',
 }
-
 # Pages restricted to admin only (not configurable)
 ADMIN_PAGES = {'settings', 'users'}
 
@@ -187,10 +190,23 @@ async def delete_auth(pool, username: str) -> None:
 
 
 async def has_page_access(pool, role: str, page: str) -> bool:
-    """Check if a role can access a given page."""
+    """Check if a role can access a given page.
+
+    A parent permission (e.g. 'faktur') also grants access to all
+    children (e.g. 'faktur:input', 'faktur:daftar').
+    """
     if role == 'admin':
         return True
     if page in ADMIN_PAGES:
         return False
     perms = await get_role_permissions(pool, role)
-    return page in perms.split(',')
+    perm_list = perms.split(',')
+    if page in perm_list:
+        return True
+    # Check if any ancestor is granted (e.g. 'laporan' grants 'laporan:penjualan:harga')
+    parts = page.split(':')
+    for i in range(1, len(parts)):
+        ancestor = ':'.join(parts[:i])
+        if ancestor in perm_list:
+            return True
+    return False

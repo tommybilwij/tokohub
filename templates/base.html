@@ -31,7 +31,7 @@
             </a>
           </li>
           {% endif %}
-          {% if nav_pages is defined and ('entry' in nav_pages or 'history' in nav_pages) %}
+          {% if nav_pages is defined and ('faktur' in nav_pages or 'faktur:input' in nav_pages or 'faktur:daftar' in nav_pages) %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path in ['/history', '/entry'] %}active{% endif %}"
                href="/history">
@@ -39,35 +39,19 @@
             </a>
           </li>
           {% endif %}
-          {% if nav_pages is defined and 'sales' in nav_pages %}
-          <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/sales-history' %}active{% endif %}"
-               href="/sales-history">
-              <i class="bi bi-graph-up"></i> Penjualan
-            </a>
-          </li>
-          {% endif %}
-          {% if nav_pages is defined and 'foc' in nav_pages %}
-          <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/foc-history' %}active{% endif %}"
-               href="/foc-history">
-              <i class="bi bi-gift"></i> Barang Bonus
-            </a>
-          </li>
-          {% endif %}
           {% if nav_pages is defined and 'price_change' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/price-change' %}active{% endif %}"
                href="/price-change">
-              <i class="bi bi-tag"></i> Ubah Harga
+              <i class="bi bi-tag"></i> Perubahan Harga
             </a>
           </li>
           {% endif %}
-          {% if nav_pages is defined and 'price_report' in nav_pages %}
+          {% if nav_pages is defined and ('laporan' in nav_pages or 'laporan:penjualan' in nav_pages or 'laporan:perubahan_harga' in nav_pages or 'laporan:barang_bonus' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/price-change-report' %}active{% endif %}"
-               href="/price-change-report">
-              <i class="bi bi-journal-text"></i> Laporan Harga
+            <a class="nav-link {% if request.url.path in ['/laporan', '/sales-history', '/price-change-report', '/foc-history'] %}active{% endif %}"
+               href="/laporan">
+              <i class="bi bi-bar-chart-line"></i> Laporan
             </a>
           </li>
           {% endif %}

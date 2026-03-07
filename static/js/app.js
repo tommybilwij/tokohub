@@ -764,12 +764,26 @@
     });
   }
 
-  // Price recalculation helper (used by render and event handlers)
+  // Price recalculation helper: total changed → derive priceBsr from total
   function _recalcFromTotal(idx) {
     const item = state.items[idx];
     const qty = computeQty(item) || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
+    _updateDetailLabels(idx);
+    _updateComputedPrices(idx);
+    _saveStateDebounced();
+  }
+
+  // Qty changed → keep priceBsr, recalc total
+  function _recalcFromQty(idx) {
+    const item = state.items[idx];
+    const qty = computeQty(item) || 1;
+    item.priceTotal = item.priceBsr * qty;
+    item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
+    // Update total harga input in the main row
+    const totalEl = document.querySelector(`.edit-price-total[data-idx="${idx}"]`);
+    if (totalEl) totalEl.value = item.priceTotal ? formatNumber(item.priceTotal) : '';
     _updateDetailLabels(idx);
     _updateComputedPrices(idx);
     _saveStateDebounced();
@@ -1284,7 +1298,7 @@
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
         state.items[idx].qtyBesar = parseFloat(el.value) || 0;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
 
@@ -1295,7 +1309,7 @@
         state.items[idx].qtyBesar = (state.items[idx].qtyBesar || 0) + 1;
         const input = btn.parentElement.querySelector('.edit-qty-besar');
         input.value = state.items[idx].qtyBesar;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
     $$('.qtybsr-down').forEach((btn) => {
@@ -1306,7 +1320,7 @@
         state.items[idx].qtyBesar = current - 1;
         const input = btn.parentElement.querySelector('.edit-qty-besar');
         input.value = state.items[idx].qtyBesar;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
 

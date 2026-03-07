@@ -332,9 +332,6 @@ body {
 #itemTable .col-num      { width: 32px; text-align: center; }
 #itemTable .col-name     { min-width: 180px; }
 #itemTable .col-barcode  { width: 140px; }
-#itemTable .col-satbsr   { width: 185px; }
-#itemTable .col-qtykcl   { width: 110px; }
-#itemTable .col-price    { width: 140px; }
 #itemTable .col-match    { min-width: 240px; }
 #itemTable .col-actions  { width: 36px; }
 
@@ -509,6 +506,33 @@ body {
 /* -----------------------------------------------------------------------
    Harga Beli — values & inputs
    ----------------------------------------------------------------------- */
+/* Qty / Sat Besar / Total Harga inputs row (moved from main row) */
+.dp-input-row {
+  display: flex;
+  gap: 1.25rem;
+  align-items: stretch;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+}
+.dp-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.dp-input-group > :last-child {
+  margin-top: auto;
+}
+.dp-input-label {
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  color: var(--clr-accent-800);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dp-input-group .w-fixed-72 { width: 90px; }
+.dp-input-group .edit-qty-besar { width: 60px; }
+
 /* Beli/Netto standalone rows */
 .dp-beli-row,
 .dp-netto-row {

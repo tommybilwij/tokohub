@@ -418,7 +418,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       const target = e.target;
-      if (!target.matches('#itemTable .item-main input, #itemTable .item-main select')) return;
+      if (!target.matches('#itemTable .item-main input, #itemTable .item-main select, #itemTable .item-detail input, #itemTable .item-detail select')) return;
       e.preventDefault();
       const row = target.closest('tr');
       const inputs = Array.from(row.querySelectorAll('input, select'));
@@ -995,7 +995,7 @@
 
     if (state.items.length === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="8" class="text-center text-muted py-5">
+        <tr><td colspan="5" class="text-center text-muted py-5">
           <i class="bi bi-inbox empty-state-icon"></i><br>
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
@@ -1051,31 +1051,6 @@
           <input type="text" class="form-control edit-barcode" data-idx="${idx}"
                  value="${(item.barcode || '').replace(/"/g, '&quot;')}" placeholder="—" inputmode="numeric">
         </td>
-        <td>
-          <div class="d-flex gap-1 align-items-center">
-            <div class="qty-stepper">
-              <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
-              <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
-                     value="${item.qtyBesar}" min="0" step="0.01">
-              <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
-            </div>
-            <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
-              ${unitOpts}
-            </select>
-          </div>
-        </td>
-        <td>
-          <div class="qty-stepper">
-            <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
-            <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
-                   value="${item.qtyKecil}" min="0" step="0.01">
-            <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
-          </div>
-        </td>
-        <td>
-          <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
-                 value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
-        </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="${idx}" title="Hapus">
@@ -1094,12 +1069,42 @@
       const mainJualVals = { hjual1: item.hjual1, hjual2: item.hjual2, hjual3: item.hjual3, hjual4: item.hjual4, hjual5: item.hjual5, _enabled: true };
 
       detailTr.innerHTML = `
-        <td colspan="8">
+        <td colspan="5">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
             <!-- Row 1: Harga Beli (full width) -->
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
+              <div class="dp-input-row">
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Sat. Besar</label>
+                  <div class="d-flex gap-1 align-items-center">
+                    <div class="qty-stepper">
+                      <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+                      <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
+                             value="${item.qtyBesar}" min="0" step="0.01">
+                      <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                    </div>
+                    <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
+                      ${unitOpts}
+                    </select>
+                  </div>
+                </div>
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Qty Kcl (Pcs)</label>
+                  <div class="qty-stepper">
+                    <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+                    <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
+                           value="${item.qtyKecil}" min="0" step="0.01">
+                    <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                  </div>
+                </div>
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Total Harga</label>
+                  <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
+                         value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
+                </div>
+              </div>
               <div class="dp-beli-row">
                 <span class="dp-label">Beli</span>
                 <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit dp-unit-bsr">/${satuanBsr}</span>
@@ -1197,15 +1202,9 @@
           </div>
         </td>
       `;
-      // Auto-expand detail row if matched or has disc/hjual/bundling data
-      const isMatched = item.status === 'auto' && item.matches.length;
-      const hasDetail = isMatched || item.disc1 || item.disc2 || item.disc3 || item.ppn ||
-                        item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5 ||
-                        item.bundling1.enabled || item.bundling2.enabled;
-      if (hasDetail) {
-        detailTr.classList.add('open');
-        tr.classList.add('has-detail-open');
-      }
+      // Always expand detail row (qty/price inputs are inside)
+      detailTr.classList.add('open');
+      tr.classList.add('has-detail-open');
 
       tbody.appendChild(detailTr);
     });

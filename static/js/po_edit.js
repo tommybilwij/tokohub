@@ -1,5 +1,5 @@
 /**
- * PO Edit Overlay for Daftar Faktur Pembelian page.
+ * PO Edit Overlay for Faktur Pembelian page.
  * Replicates the Daftar Barang layout from Input Faktur.
  */
 (function () {

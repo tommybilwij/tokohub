@@ -19,7 +19,7 @@ SESSION_MAX_AGE = 86400 * 7  # 7 days
 # All pages that can be permission-controlled
 PAGES = {
     'scanner':      'Scanner',
-    'entry':        'Input Faktur',
+    'entry':        'Input Faktur Pembelian',
     'history':      'Daftar Faktur Pembelian',
     'history:edit': 'Edit Faktur',
     'sales':        'Penjualan',

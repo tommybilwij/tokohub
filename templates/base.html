@@ -31,19 +31,11 @@
             </a>
           </li>
           {% endif %}
-          {% if nav_pages is defined and 'entry' in nav_pages %}
+          {% if nav_pages is defined and ('entry' in nav_pages or 'history' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/entry' %}active{% endif %}"
-               href="/entry">
-              <i class="bi bi-receipt"></i> Input Faktur
-            </a>
-          </li>
-          {% endif %}
-          {% if nav_pages is defined and 'history' in nav_pages %}
-          <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/history' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path in ['/history', '/entry'] %}active{% endif %}"
                href="/history">
-              <i class="bi bi-clock-history"></i> Daftar Faktur Pembelian
+              <i class="bi bi-receipt-cutoff"></i> Faktur Pembelian
             </a>
           </li>
           {% endif %}

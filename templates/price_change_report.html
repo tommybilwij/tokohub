@@ -18,19 +18,16 @@
   </div>
 
   <!-- Riwayat Input Faktur -->
-  <div class="px-3 pt-3 pb-1"><h6 class="text-muted mb-0"><i class="bi bi-receipt"></i> Riwayat Input Faktur</h6></div>
-  <div class="table-responsive">
-    <table class="table table-sm table-hover mb-0 pc-report-table">
-      <colgroup>
-        <col style="width:15%"><col style="width:5%"><col style="width:14%"><col><col style="width:12%">
-      </colgroup>
-      <thead class="table-light">
+  <h6 class="text-muted mt-3 mb-2"><i class="bi bi-receipt"></i> Riwayat Input Faktur</h6>
+  <div class="table-responsive mb-4">
+    <table class="sh-table" id="fakturTable">
+      <thead>
         <tr>
-          <th>No. Faktur</th>
-          <th>Dept</th>
-          <th>Barcode</th>
+          <th style="width:15%">No. Faktur</th>
+          <th style="width:5%">Dept</th>
+          <th style="width:14%">Barcode</th>
           <th>Nama</th>
-          <th class="text-end">HJual Baru</th>
+          <th class="text-end" style="width:12%">HJual Baru</th>
         </tr>
       </thead>
       <tbody id="fakturBody"></tbody>
@@ -38,19 +35,16 @@
   </div>
 
   <!-- Riwayat Perubahan Harga -->
-  <div class="px-3 pt-3 pb-1 border-top"><h6 class="text-muted mb-0"><i class="bi bi-pencil-square"></i> Riwayat Perubahan Harga</h6></div>
+  <h6 class="text-muted mb-2"><i class="bi bi-pencil-square"></i> Riwayat Perubahan Harga</h6>
   <div class="table-responsive">
-    <table class="table table-sm table-hover mb-0 pc-report-table">
-      <colgroup>
-        <col style="width:15%"><col style="width:5%"><col style="width:14%"><col><col style="width:12%">
-      </colgroup>
-      <thead class="table-light">
+    <table class="sh-table" id="manualTable">
+      <thead>
         <tr>
-          <th>No. PH</th>
-          <th>Dept</th>
-          <th>Barcode</th>
+          <th style="width:15%">No. PH</th>
+          <th style="width:5%">Dept</th>
+          <th style="width:14%">Barcode</th>
           <th>Nama</th>
-          <th class="text-end">HJual Baru</th>
+          <th class="text-end" style="width:12%">HJual Baru</th>
         </tr>
       </thead>
       <tbody id="manualBody"></tbody>

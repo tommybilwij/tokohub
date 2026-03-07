@@ -1,11 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Input Faktur{% endblock %}
+{% block title %}Input Faktur Pembelian{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex align-items-center justify-content-between mb-2">
-  <div>
-    <h4 class="page-title mb-0">Input Faktur</h4>
-    <small class="text-muted">Tambah item, cocokkan stok, lalu kirim PO</small>
+  <div class="d-flex align-items-center gap-3">
+    <a href="/history" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <div>
+      <h4 class="page-title mb-0">Input Faktur Pembelian</h4>
+      <small class="text-muted">Tambah item, cocokkan stok, lalu kirim PO</small>
+    </div>
   </div>
   <div class="d-none d-md-block">
     <kbd class="me-1">Esc</kbd> <small class="text-muted">Tutup detail</small>

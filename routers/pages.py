@@ -109,13 +109,17 @@ async def history_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'history')
-    if denied: return denied
+    # Allow access if user has either entry or history permission
     pool = request.app.state.db_pool
+    has_entry = await has_page_access(pool, user['role'], 'entry')
+    has_history = await has_page_access(pool, user['role'], 'history')
+    if not has_entry and not has_history:
+        denied = await _check_page(request, user, 'history')
+        if denied: return denied
     can_edit = await has_page_access(pool, user['role'], 'history:edit')
     can_lock = await has_page_access(pool, user['role'], 'ph:lock_history')
     return templates.TemplateResponse(request, 'history.html', {
-        'can_edit': can_edit, 'can_lock': can_lock,
+        'can_entry': has_entry, 'can_edit': can_edit, 'can_lock': can_lock,
         **await _user_ctx(request, user),
     })
 

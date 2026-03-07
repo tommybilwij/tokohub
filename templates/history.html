@@ -441,6 +441,22 @@
               editBtn.disabled = !!newLocked;
               editBtn.className = 'btn btn-sm btn-edit-fp ' + (newLocked ? 'btn-outline-secondary' : 'btn-outline-warning');
             }
+            if (canDelete) {
+              var td = btn.closest('td');
+              var delBtn = td.querySelector('.btn-delete-fp');
+              if (newLocked && delBtn) {
+                delBtn.remove();
+              } else if (!newLocked && !delBtn) {
+                var newDel = document.createElement('button');
+                newDel.className = 'btn btn-sm btn-outline-danger btn-delete-fp';
+                newDel.dataset.fp = fp;
+                newDel.title = 'Hapus';
+                newDel.innerHTML = '<i class="bi bi-trash"></i>';
+                td.insertBefore(newDel, btn);
+                newDel.insertAdjacentText('afterend', ' ');
+                bindButtons();
+              }
+            }
             window.showToast && showToast(newLocked ? 'Faktur dikunci' : 'Faktur dibuka kuncinya');
           }
         } catch(e) {

@@ -286,6 +286,22 @@
             btn.className = 'btn btn-sm btn-lock-ph ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
             btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
             btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
+            if (canDelete) {
+              var td = btn.closest('td');
+              var delBtn = td.querySelector('.btn-delete-ph');
+              if (newLocked && delBtn) {
+                delBtn.remove();
+              } else if (!newLocked && !delBtn) {
+                var newDel = document.createElement('button');
+                newDel.className = 'btn btn-sm btn-outline-danger btn-delete-ph';
+                newDel.dataset.ph = ph;
+                newDel.title = 'Hapus';
+                newDel.innerHTML = '<i class="bi bi-trash"></i>';
+                td.insertBefore(newDel, btn);
+                newDel.insertAdjacentText('afterend', ' ');
+                bindButtons();
+              }
+            }
             window.showToast && showToast(newLocked ? 'Perubahan harga dikunci' : 'Perubahan harga dibuka kuncinya');
           }
         } catch(e) {

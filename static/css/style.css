@@ -2258,6 +2258,19 @@ body {
   color: #664d03;
 }
 
+/* Edit overlay: value changed highlight */
+.value-changed { background: #fff3cd; border-radius: 3px; }
+.value-changed input { background: #fff3cd !important; }
+.sblm-hint {
+  font-size: 0.7rem;
+  color: #996600;
+  font-style: italic;
+  line-height: 1;
+  margin-top: 2px;
+}
+.sblm-inline { display: inline-block; margin-left: 8px; }
+.sblm-inline .sblm-hint { display: inline; }
+
 /* Home page cards */
 .card-home {
   border: 1px solid #e0e0e0;

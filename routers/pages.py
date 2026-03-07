@@ -113,8 +113,13 @@ async def history_page(
     denied = await _check_page(request, user, 'history')
     if denied: return denied
     rows, total = await get_po_history(db, page=page)
+    pool = request.app.state.db_pool
+    can_edit = await has_page_access(pool, user['role'], 'history:edit')
+    can_lock = await has_page_access(pool, user['role'], 'ph:lock_history')
     return templates.TemplateResponse(request, 'history.html', {
-        'orders': rows, 'total': total, 'page': page, **await _user_ctx(request, user),
+        'orders': rows, 'total': total, 'page': page,
+        'can_edit': can_edit, 'can_lock': can_lock,
+        **await _user_ctx(request, user),
     })
 
 
@@ -163,7 +168,11 @@ async def price_change_page(
 ):
     denied = await _check_page(request, user, 'price_change')
     if denied: return denied
-    return templates.TemplateResponse(request, 'price_change.html', await _user_ctx(request, user))
+    pool = request.app.state.db_pool
+    ctx = await _user_ctx(request, user)
+    ctx['can_update_purch_price'] = await has_page_access(pool, user['role'], 'ph:update_purch_price')
+    ctx['can_lock_history'] = await has_page_access(pool, user['role'], 'ph:lock_history')
+    return templates.TemplateResponse(request, 'price_change.html', ctx)
 
 
 @router.get('/price-change-report')

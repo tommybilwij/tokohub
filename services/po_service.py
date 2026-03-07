@@ -17,7 +17,7 @@ import aiomysql
 warnings.filterwarnings('ignore', message='Data truncated', module='aiomysql')
 
 from config import settings
-from services.db import execute_query, execute_single
+from services.db import execute_query, execute_single, execute_modify
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +210,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
             'hjual4': float(item['hjual4_override']) if item.get('hjual4_override') is not None else float(stock['hjual4'] or 0),
             'hjual5': float(item['hjual5_override']) if item.get('hjual5_override') is not None else float(stock['hjual5'] or 0),
             'foc': int(item.get('foc', 0)),
+            'shipping_cost': float(item_shipping),
             'amount': float(amount_with_ship),
             'bundling1': item.get('bundling1'),
             'bundling2': item.get('bundling2'),
@@ -507,9 +508,11 @@ async def get_po_history(pool, page=1, per_page=20):
         pool,
         """SELECT m.noorder, m.becreff, m.suppid, m.tglorder, m.jlhfaktur,
                   m.userid, v.name AS supplier_name,
-                  (SELECT COUNT(*) FROM icpos s WHERE s.becreff = m.becreff) AS line_count
+                  (SELECT COUNT(*) FROM icpos s WHERE s.becreff = m.becreff) AS line_count,
+                  COALESCE(b.isupdateprice, 1) AS isupdateprice
            FROM icpom m
            LEFT JOIN vendor v ON v.id = m.suppid
+           LEFT JOIN icbym b ON b.noorder = m.noorder
            ORDER BY m.tglorder DESC, m.noorder DESC
            LIMIT %s OFFSET %s""",
         (per_page, offset)
@@ -519,6 +522,24 @@ async def get_po_history(pool, page=1, per_page=20):
         "SELECT COUNT(*) AS total FROM icpom"
     )
     return rows, count_row['total']
+
+
+async def toggle_po_lock(pool, po_number: str) -> dict:
+    """Toggle isupdateprice on icbym for a PO. Returns new state."""
+    row = await execute_single(
+        pool,
+        "SELECT isupdateprice FROM icbym WHERE noorder = %s",
+        (po_number,),
+    )
+    if not row:
+        return {'error': 'PO not found'}
+    new_val = 0 if row['isupdateprice'] else 1
+    await execute_modify(
+        pool,
+        "UPDATE icbym SET isupdateprice = %s WHERE noorder = %s",
+        (new_val, po_number),
+    )
+    return {'ok': True, 'po_number': po_number, 'isupdateprice': new_val}
 
 
 async def get_po_detail(pool, po_number):

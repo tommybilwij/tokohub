@@ -77,6 +77,7 @@ def build_after(preview_lines: list[dict]) -> dict:
             'qty_besar': line.get('qty_besar', 0),
             'amount': line.get('amount', 0),
             'foc': line.get('foc', 0),
+            'shipping_cost': line.get('shipping_cost', 0),
             'jlhppn': line.get('jlhppn', 0),  # includes biaya kirim (shipping added to ppn in DB)
         }
         b1 = line.get('bundling1') or {}

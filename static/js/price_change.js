@@ -504,11 +504,14 @@
         }
         return p;
       });
-      const updatePurchPrice = document.getElementById('pcUpdatePurchPrice').checked;
+      const purchEl = document.getElementById('pcUpdatePurchPrice');
+      const lockEl = document.getElementById('pcLockHistory');
+      const updatePurchPrice = purchEl ? purchEl.checked : true;
+      const lockHistory = lockEl ? lockEl.checked : true;
       const res = await fetch('/api/price-change/commit', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({items: payload, update_purch_price: updatePurchPrice}),
+        body: JSON.stringify({items: payload, update_purch_price: updatePurchPrice, lock_history: lockHistory}),
       });
       const data = await res.json();
       if (data.ok) {

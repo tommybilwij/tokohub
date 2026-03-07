@@ -66,10 +66,18 @@
           <button class="btn btn-sm btn-cta" id="pcBtnCommit" disabled>
             <i class="bi bi-check-lg"></i> Simpan Perubahan Harga
           </button>
+          {% if can_update_purch_price %}
           <div class="form-check ms-3">
             <input type="checkbox" class="form-check-input" id="pcUpdatePurchPrice" checked>
             <label class="form-check-label small" for="pcUpdatePurchPrice">Update Harga Beli</label>
           </div>
+          {% endif %}
+          {% if can_lock_history %}
+          <div class="form-check ms-3">
+            <input type="checkbox" class="form-check-input" id="pcLockHistory" checked>
+            <label class="form-check-label small" for="pcLockHistory">Kunci Riwayat</label>
+          </div>
+          {% endif %}
           <div class="ms-auto"></div>
           <button class="btn btn-outline-danger btn-sm" id="pcBtnClear" disabled>
             <i class="bi bi-trash"></i> Hapus

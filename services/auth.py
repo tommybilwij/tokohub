@@ -21,12 +21,15 @@ PAGES = {
     'scanner':      'Scanner',
     'entry':        'Input Faktur',
     'history':      'Daftar Faktur',
+    'history:edit': 'Edit Faktur',
     'sales':        'Penjualan',
     'sales:harga':  'Harga Jual',
     'sales:total':  'Total',
     'foc':          'Barang Bonus',
     'aliases':      'Alias',
     'price_change': 'Perubahan Harga',
+    'ph:update_purch_price': 'Update Harga Beli',
+    'ph:lock_history': 'Kunci Riwayat',
     'price_report': 'Laporan Harga',
 }
 

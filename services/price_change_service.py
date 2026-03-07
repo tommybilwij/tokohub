@@ -63,7 +63,8 @@ async def _generate_ph_number(cursor, order_date):
 
 
 async def commit_price_change(pool, items: list[dict], userid: str = '',
-                              update_purch_price: bool = True) -> dict:
+                              update_purch_price: bool = True,
+                              lock_history: bool = True) -> dict:
     """Commit price changes.
 
     Each item: {artno, hjual, hjual2, hjual3, hjual4, hjual5}
@@ -173,7 +174,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                         %s, %s, %s,
                         %s, %s, %s,
                         %s, 0, %s,
-                        1, %s,
+                        %s, %s,
                         %s, %s, %s, %s, %s, %s,
                         '1'
                     )""",
@@ -188,6 +189,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                         stock['over1'], stock['over2'], stock['ispaketprc'],
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
+                        1 if lock_history else 0,
                         1 if update_purch_price else 0,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
                     )

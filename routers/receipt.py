@@ -167,6 +167,15 @@ async def get_po_snapshot(po_number: str, db: aiomysql.Pool = Depends(get_db)):
     return result
 
 
+@router.post('/api/po/{po_number}/toggle-lock')
+async def toggle_po_lock(po_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.po_service import toggle_po_lock as _toggle
+    result = await _toggle(db, po_number)
+    if 'error' in result:
+        return JSONResponse(result, status_code=404)
+    return result
+
+
 @router.post('/receipt/update')
 async def update_po(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()

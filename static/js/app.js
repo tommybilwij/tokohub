@@ -1098,7 +1098,7 @@
             ${_renderStockInfo(idx, item)}
             <!-- Qty & Harga inputs -->
             <div class="dp-section dp-qty">
-              <div class="dp-section-header">Qty & Harga</div>
+              <div class="dp-section-header">Qty & Total Harga Beli</div>
               <div class="dp-input-row">
                 <div class="dp-input-group">
                   <label class="dp-input-label">Sat. Besar</label>
@@ -1127,7 +1127,7 @@
                   </div>
                 </div>
                 <div class="dp-input-group">
-                  <label class="dp-input-label">Total Harga</label>
+                  <label class="dp-input-label">Total Harga Beli</label>
                   <div class="d-flex align-items-center" style="height:100%">
                     <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
                            value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">

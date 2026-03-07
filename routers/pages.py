@@ -167,7 +167,6 @@ async def sales_history_page(
     if denied: return denied
     ctx = await _user_ctx(request, user)
     pool = request.app.state.db_pool
-    ctx['show_harga'] = await has_page_access(pool, user['role'], 'laporan:penjualan:harga')
     ctx['show_total'] = await has_page_access(pool, user['role'], 'laporan:penjualan:total')
     return templates.TemplateResponse(request, 'sales_history.html', ctx)
 

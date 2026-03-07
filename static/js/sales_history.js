@@ -28,7 +28,6 @@
   if (!elFrom) return;
 
   var pageEl = document.querySelector('.sh-page');
-  var showHarga = pageEl.dataset.showHarga === 'true';
   var showTotal = pageEl.dataset.showTotal === 'true';
   var rows = [];
   var sortCol = showTotal ? 'total_amount' : 'total_qty';
@@ -249,7 +248,6 @@
         '<td><code>' + esc(r.barcode || '') + '</code></td>' +
         '<td class="text-center">' + esc(r.deptid || '') + '</td>' +
         '<td>' + esc(r.artname) + '</td>' +
-        (showHarga ? '<td class="text-end">' + fmt(r.hjual) + '</td>' : '') +
         '<td class="text-end">' + fmtInt(r.total_qty) + '</td>' +
         (showTotal ? '<td class="text-end fw-semibold">' + fmt(r.total_amount) + '</td>' : '') +
         '</tr>';
@@ -298,7 +296,6 @@
     });
 
     var header = ['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang'];
-    if (showHarga) header.push('Harga Jual');
     header.push('Qty');
     if (showTotal) header.push('Total');
     var csvRows = [header];
@@ -310,7 +307,6 @@
         r.deptid || '',
         r.artname || '',
       ];
-      if (showHarga) row.push(r.hjual || 0);
       row.push(r.total_qty || 0);
       if (showTotal) row.push(r.total_amount || 0);
       csvRows.push(row);
@@ -367,20 +363,16 @@
       totalQty += Number(r.total_qty) || 0;
       totalAmount += Number(r.total_amount) || 0;
       var row = [i + 1, r.artno || '', r.barcode || '', r.deptid || '', r.artname || ''];
-      if (showHarga) row.push(fmt(r.hjual));
       row.push(fmtInt(r.total_qty));
       if (showTotal) row.push(fmt(r.total_amount));
       return row;
     });
-    var footerRow = ['', '', '', '', ''];
-    if (showHarga) footerRow.push('TOTAL');
-    else footerRow[footerRow.length - 1] = 'TOTAL';
+    var footerRow = ['', '', '', '', 'TOTAL'];
     footerRow.push(fmtInt(totalQty));
     if (showTotal) footerRow.push(fmt(totalAmount));
     tableRows.push(footerRow);
 
     var pdfHeadRow = ['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang'];
-    if (showHarga) pdfHeadRow.push('Harga Jual');
     pdfHeadRow.push('Qty');
     if (showTotal) pdfHeadRow.push('Total');
     var pdfHead = [pdfHeadRow];

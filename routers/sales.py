@@ -85,12 +85,12 @@ async def _query_sales(db, dt_from, dt_to, dept=None):
             params.extend(dept_ids)
 
     sql = (
-        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, st.hjual, "
+        f"SELECT s.artno, st.deptid, st.artname, st.artpabrik AS barcode, "
         f"SUM(s.qty) AS total_qty, SUM(s.netamount) AS total_amount "
         f"FROM ({unions}) s "
         f"JOIN stock st ON st.artno = s.artno "
         f"WHERE s.transtime BETWEEN %s AND %s{dept_filter} "
-        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik, st.hjual "
+        f"GROUP BY s.artno, st.deptid, st.artname, st.artpabrik "
         f"ORDER BY total_amount DESC"
     )
 
@@ -109,7 +109,7 @@ async def api_sales_history(request: Request, db: aiomysql.Pool = Depends(get_db
     dept = request.query_params.get('dept', '')
     rows = await _query_sales(db, dt_from, dt_to, dept=dept or None)
     for r in rows:
-        for k in ('hjual', 'total_qty', 'total_amount'):
+        for k in ('total_qty', 'total_amount'):
             if r.get(k) is not None:
                 r[k] = float(r[k])
     return rows
@@ -128,7 +128,7 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total'])
+    writer.writerow(['Artno', 'Barcode', 'Dept', 'Nama Barang', 'Qty', 'Total'])
     for r in rows:
         barcode = r.get('barcode', '') or ''
         writer.writerow([
@@ -136,7 +136,6 @@ async def api_sales_export(request: Request, db: aiomysql.Pool = Depends(get_db)
             f"'{barcode}" if barcode else '',
             r.get('deptid', ''),
             r.get('artname', ''),
-            r.get('hjual', 0),
             r.get('total_qty', 0),
             r.get('total_amount', 0),
         ])

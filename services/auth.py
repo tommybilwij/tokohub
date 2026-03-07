@@ -36,7 +36,6 @@ PAGES = {
     'price_change:lock':        'Kunci Riwayat',
     'laporan':                  'Laporan',
     'laporan:penjualan':        'Laporan Penjualan',
-    'laporan:penjualan:harga':  'Harga Jual',
     'laporan:penjualan:total':  'Total Harga Jual',
     'laporan:perubahan_harga':  'Laporan Perubahan Harga',
     'laporan:barang_bonus':     'Laporan Barang Bonus',

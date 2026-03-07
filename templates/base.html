@@ -11,6 +11,7 @@
   <link href="{{ url_for('static', filename='css/style.css') }}?v={{ range(10000,99999) | random }}" rel="stylesheet">
 </head>
 <body>
+  <div id="appRoot">
   <nav class="navbar navbar-expand-lg navbar-dark navbar-app">
     <div class="container-fluid">
       <a class="navbar-brand fw-bold" href="/">
@@ -98,23 +99,32 @@
   <main class="container-fluid py-3">
     {% block content %}{% endblock %}
   </main>
+  </div><!-- /appRoot -->
 
   <!-- Toast container -->
   <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
 
   <script>
   // Zoom support for Tauri WebView (Cmd/Ctrl + Plus/Minus/0)
+  // Zoom applied to #appRoot wrapper so modals (position:fixed) are unaffected.
   (function(){
+    var root = document.getElementById('appRoot');
     var z = parseFloat(localStorage.getItem('_zoom') || '1');
-    document.documentElement.style.zoom = z;
+    root.style.zoom = z;
     document.addEventListener('keydown', function(e){
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key === '=' || e.key === '+') { e.preventDefault(); z = Math.min(z + 0.1, 2); }
       else if (e.key === '-') { e.preventDefault(); z = Math.max(z - 0.1, 0.5); }
       else if (e.key === '0') { e.preventDefault(); z = 1; }
       else return;
-      document.documentElement.style.zoom = z;
+      root.style.zoom = z;
       localStorage.setItem('_zoom', z.toFixed(1));
+    });
+    // Move all modals outside zoomed wrapper so backdrop covers full viewport
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.modal').forEach(function(m) {
+        document.body.appendChild(m);
+      });
     });
   })();
   </script>

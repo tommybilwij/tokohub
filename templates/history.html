@@ -238,6 +238,7 @@ function formatNumber(n) {
 
 // Snapshot comparison
 function fmtN(v) { return v != null && v !== '' ? new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(v) : '—'; }
+function fmtNz(v) { return v != null && v !== '' && Number(v) !== 0 ? new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(v) : '—'; }
 function fmtPct(v) { return v != null && v !== '' && v != 0 ? Number(v) + '%' : '—'; }
 function diffCell(bv, av, fmt) {
   const bStr = fmt(bv);
@@ -359,27 +360,27 @@ document.querySelectorAll('.btn-snapshot-po').forEach(btn => {
               <tbody>
                 <tr>
                   <td class="fw-semibold text-muted">Satuan</td>
-                  ${diffCell(b.hjual, a.hjual, fmtN)}
-                  ${diffCell(b.hjual2, a.hjual2, fmtN)}
-                  ${diffCell(b.hjual3, a.hjual3, fmtN)}
-                  ${diffCell(b.hjual4, a.hjual4, fmtN)}
-                  ${diffCell(b.hjual5, a.hjual5, fmtN)}
+                  ${diffCell(b.hjual, a.hjual, fmtNz)}
+                  ${diffCell(b.hjual2, a.hjual2, fmtNz)}
+                  ${diffCell(b.hjual3, a.hjual3, fmtNz)}
+                  ${diffCell(b.hjual4, a.hjual4, fmtNz)}
+                  ${diffCell(b.hjual5, a.hjual5, fmtNz)}
                 </tr>
                 ${(a.over1 || b.over1) ? `<tr>
                   <td class="fw-semibold text-muted">Bundling 1 (≥${a.over1 || b.over1})</td>
-                  ${diffCell(b.hjualo1, a.hjualo1, fmtN)}
-                  ${diffCell(b.hjual2o1, a.hjual2o1, fmtN)}
-                  ${diffCell(b.hjual3o1, a.hjual3o1, fmtN)}
-                  ${diffCell(b.hjual4o1, a.hjual4o1, fmtN)}
-                  ${diffCell(b.hjual5o1, a.hjual5o1, fmtN)}
+                  ${diffCell(b.hjualo1, a.hjualo1, fmtNz)}
+                  ${diffCell(b.hjual2o1, a.hjual2o1, fmtNz)}
+                  ${diffCell(b.hjual3o1, a.hjual3o1, fmtNz)}
+                  ${diffCell(b.hjual4o1, a.hjual4o1, fmtNz)}
+                  ${diffCell(b.hjual5o1, a.hjual5o1, fmtNz)}
                 </tr>` : ''}
                 ${(a.over2 || b.over2) ? `<tr>
                   <td class="fw-semibold text-muted">Bundling 2 (≥${a.over2 || b.over2})</td>
-                  ${diffCell(b.hjualo2, a.hjualo2, fmtN)}
-                  ${diffCell(b.hjual2o2, a.hjual2o2, fmtN)}
-                  ${diffCell(b.hjual3o2, a.hjual3o2, fmtN)}
-                  ${diffCell(b.hjual4o2, a.hjual4o2, fmtN)}
-                  ${diffCell(b.hjual5o2, a.hjual5o2, fmtN)}
+                  ${diffCell(b.hjualo2, a.hjualo2, fmtNz)}
+                  ${diffCell(b.hjual2o2, a.hjual2o2, fmtNz)}
+                  ${diffCell(b.hjual3o2, a.hjual3o2, fmtNz)}
+                  ${diffCell(b.hjual4o2, a.hjual4o2, fmtNz)}
+                  ${diffCell(b.hjual5o2, a.hjual5o2, fmtNz)}
                 </tr>` : ''}
               </tbody>
             </table>

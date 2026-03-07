@@ -33,6 +33,10 @@
                       data-po="{{ o.noorder }}" title="Lihat">
                 <i class="bi bi-eye"></i>
               </button>
+              <button class="btn btn-sm btn-outline-success btn-snapshot-po"
+                      data-po="{{ o.noorder }}" title="Perubahan Harga">
+                <i class="bi bi-check2-square"></i>
+              </button>
               <button class="btn btn-sm btn-outline-warning btn-edit-po"
                       data-po="{{ o.noorder }}" title="Edit">
                 <i class="bi bi-pencil"></i>
@@ -102,6 +106,60 @@
               </tr>
             </thead>
             <tbody id="detailLines"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Snapshot Comparison Modal -->
+<div class="modal fade" id="snapshotModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Perubahan Harga: <span id="snapPONumber"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted small" id="snapMeta"></div>
+        <div id="snapNoData" class="text-center text-muted py-4 d-none">Belum ada data perubahan harga untuk faktur ini.</div>
+        <div class="table-responsive" id="snapTableWrap">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="table-light">
+              <tr>
+                <th rowspan="2">#</th>
+                <th rowspan="2">Artno</th>
+                <th rowspan="2">Nama</th>
+                <th colspan="2" class="text-center">Harga Beli Bsr</th>
+                <th colspan="2" class="text-center">Harga Beli Kcl</th>
+                <th colspan="2" class="text-center">Disc1%</th>
+                <th colspan="2" class="text-center">Disc2%</th>
+                <th colspan="2" class="text-center">PPN%</th>
+                <th colspan="2" class="text-center">HJual 1</th>
+                <th colspan="2" class="text-center">HJual 2</th>
+                <th colspan="2" class="text-center">HJual 3</th>
+              </tr>
+              <tr>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+                <th class="text-center"><small>Before</small></th>
+                <th class="text-center"><small>After</small></th>
+              </tr>
+            </thead>
+            <tbody id="snapBody"></tbody>
           </table>
         </div>
       </div>
@@ -211,6 +269,65 @@ document.querySelectorAll('.btn-view-po').forEach(btn => {
 function formatNumber(n) {
   return new Intl.NumberFormat('id-ID').format(Math.round(n));
 }
+
+// Snapshot comparison
+document.querySelectorAll('.btn-snapshot-po').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const po = btn.dataset.po;
+    document.getElementById('snapPONumber').textContent = po;
+    document.getElementById('snapMeta').textContent = '';
+    document.getElementById('snapBody').innerHTML = '';
+    document.getElementById('snapNoData').classList.add('d-none');
+    document.getElementById('snapTableWrap').classList.remove('d-none');
+
+    try {
+      const res = await fetch(`/api/po/${po}/snapshot`);
+      if (!res.ok) {
+        document.getElementById('snapNoData').classList.remove('d-none');
+        document.getElementById('snapTableWrap').classList.add('d-none');
+        new bootstrap.Modal(document.getElementById('snapshotModal')).show();
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('snapMeta').textContent =
+        `Oleh: ${data.created_by || '-'} — ${data.created_at || ''}`;
+
+      const tbody = document.getElementById('snapBody');
+      const fields = [
+        ['hbelibsr', 'hbelibsr'],
+        ['hbelikcl', 'hbelikcl'],
+        ['pctdisc1', 'pctdisc1'],
+        ['pctdisc2', 'pctdisc2'],
+        ['pctppn', 'pctppn'],
+        ['hjual', 'hjual'],
+        ['hjual2', 'hjual2'],
+        ['hjual3', 'hjual3'],
+      ];
+
+      (data.items || []).forEach((item, i) => {
+        const b = item.before || {};
+        const a = item.after || {};
+        const tr = document.createElement('tr');
+        let cells = `<td>${i + 1}</td><td><code>${item.artno}</code></td><td>${a.artname || b.artname || ''}</td>`;
+        fields.forEach(([key]) => {
+          const bv = b[key] ?? '';
+          const av = a[key] ?? '';
+          const bFmt = bv !== '' ? formatNumber(bv) : '-';
+          const aFmt = av !== '' ? formatNumber(av) : '-';
+          const changed = bv !== '' && av !== '' && Number(bv) !== Number(av);
+          cells += `<td class="text-end">${bFmt}</td>`;
+          cells += `<td class="text-end ${changed ? 'table-warning fw-bold' : ''}">${aFmt}</td>`;
+        });
+        tr.innerHTML = cells;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      document.getElementById('snapNoData').classList.remove('d-none');
+      document.getElementById('snapTableWrap').classList.add('d-none');
+    }
+    new bootstrap.Modal(document.getElementById('snapshotModal')).show();
+  });
+});
 </script>
 <script src="{{ url_for('static', filename='js/po_edit.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

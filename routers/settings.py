@@ -5,8 +5,10 @@ import sys
 import logging
 import threading
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
+
+from dependencies import get_db
 
 import config
 from config import save_to_envrc, _ENVRC_PATH
@@ -116,3 +118,13 @@ async def api_restart():
 
     threading.Thread(target=_restart, daemon=True).start()
     return {'ok': True}
+
+
+@router.post('/api/snapshots/cleanup')
+async def api_cleanup_snapshots(request: Request, db=Depends(get_db)):
+    user = getattr(request.state, 'user', None)
+    if not user or user['role'] != 'admin':
+        return JSONResponse({'error': 'Forbidden'}, status_code=403)
+    from services.snapshot_service import delete_all_snapshots
+    count = await delete_all_snapshots(db)
+    return {'ok': True, 'deleted': count}

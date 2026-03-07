@@ -266,6 +266,12 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     order_date = order_date or date.today()
     preview = await preview_po(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
+    # Capture before-state for snapshot
+    from services.snapshot_service import capture_before, build_after, save_snapshot
+    artnos = [line['artno'] for line in preview['lines']]
+    before_state = await capture_before(pool, artnos)
+    after_state = build_after(preview['lines'])
+
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
@@ -481,6 +487,13 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     }
 
     _write_audit_log(po_number, result)
+
+    # Save before/after snapshot
+    try:
+        await save_snapshot(pool, po_number, before_state, after_state, userid or '')
+    except Exception:
+        logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
+
     logger.info("PO created: %s / FP %s (becreff=%d, fp_becreff=%d, total=%.2f)",
                 po_number, fp_number, becreff, fp_becreff, preview['grand_total'])
     return result
@@ -619,6 +632,12 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
 
     # Build new preview
     preview = await preview_po(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
+
+    # Capture before-state for snapshot
+    from services.snapshot_service import capture_before, build_after, save_snapshot
+    artnos = [line['artno'] for line in preview['lines']]
+    before_state = await capture_before(pool, artnos)
+    after_state = build_after(preview['lines'])
 
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
@@ -815,5 +834,12 @@ async def update_po(pool, po_number, supplier_id, items, order_date=None, userid
     }
 
     _write_audit_log(f"{po_number}_edit", result)
+
+    # Save before/after snapshot
+    try:
+        await save_snapshot(pool, po_number, before_state, after_state, userid or '')
+    except Exception:
+        logger.warning("Failed to save snapshot for %s", po_number, exc_info=True)
+
     logger.info("PO updated: %s / FP %s (total=%.2f)", po_number, fp_number, preview['grand_total'])
     return result

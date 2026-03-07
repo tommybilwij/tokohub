@@ -158,6 +158,15 @@ async def get_po(po_number: str, db: aiomysql.Pool = Depends(get_db)):
     return result
 
 
+@router.get('/api/po/{po_number}/snapshot')
+async def get_po_snapshot(po_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.snapshot_service import get_snapshot
+    result = await get_snapshot(db, po_number)
+    if not result:
+        return JSONResponse({'error': 'No snapshot found'}, status_code=404)
+    return result
+
+
 @router.post('/receipt/update')
 async def update_po(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()

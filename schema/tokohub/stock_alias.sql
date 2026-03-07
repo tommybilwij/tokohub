@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS stock_alias (
+CREATE TABLE IF NOT EXISTS tokohub.stock_alias (
   id INT(11) NOT NULL AUTO_INCREMENT,
   alias_name VARCHAR(200) NOT NULL DEFAULT '',
   artno VARCHAR(30) NOT NULL DEFAULT '',
@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS stock_alias (
   PRIMARY KEY (id),
   UNIQUE KEY alias_name_idx (alias_name),
   KEY artno_idx (artno)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;

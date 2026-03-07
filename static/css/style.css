@@ -330,11 +330,8 @@ body {
 
 /* Column widths */
 #itemTable .col-num      { width: 32px; text-align: center; }
-#itemTable .col-name     { min-width: 220px; }
-#itemTable .col-barcode  { width: 110px; }
-#itemTable .col-satbsr   { width: 185px; }
-#itemTable .col-qtykcl   { width: 110px; }
-#itemTable .col-price    { width: 110px; }
+#itemTable .col-name     { min-width: 180px; }
+#itemTable .col-barcode  { width: 140px; }
 #itemTable .col-match    { min-width: 240px; }
 #itemTable .col-actions  { width: 36px; }
 
@@ -509,6 +506,52 @@ body {
 /* -----------------------------------------------------------------------
    Harga Beli — values & inputs
    ----------------------------------------------------------------------- */
+/* Qty / Sat Besar / Total Harga inputs row (moved from main row) */
+/* Qty & Harga panel — same style as dp-beli */
+.dp-qty {
+  border-color: var(--clr-accent-100);
+  border-left: 4px solid var(--clr-accent-600);
+  background: var(--clr-card-bg);
+}
+.dp-qty .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--clr-accent-800);
+  border-bottom-color: var(--clr-accent-100);
+}
+
+.dp-input-row {
+  display: flex;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+.dp-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.dp-input-group > :last-child {
+  margin-top: auto;
+}
+.dp-input-label {
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  color: var(--clr-accent-800);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dp-input-group .w-fixed-72 { width: 90px; }
+.dp-input-group .edit-qty-besar { width: 60px; }
+.dp-unit-label {
+  display: inline-flex;
+  align-items: center;
+  height: calc(1.5em + 0.5rem + calc(var(--bs-border-width) * 2));
+  padding: 0.25rem 0.5rem;
+  font-size: var(--fs-base);
+  color: #6c757d;
+}
+
 /* Beli/Netto standalone rows */
 .dp-beli-row,
 .dp-netto-row {
@@ -733,7 +776,7 @@ body {
 }
 
 .jual-table .jual-input {
-  width: 100px;
+  width: 120px;
   font-size: var(--fs-base);
   padding: var(--sp-1) var(--sp-1);
   border: 1px solid var(--clr-accent-100);
@@ -751,7 +794,7 @@ body {
 }
 
 .jual-table .jual-pct-input {
-  width: 72px;
+  width: 65px;
   font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
   padding: var(--sp-1) var(--sp-1);
@@ -769,6 +812,28 @@ body {
 .jual-table .jual-pct-input.negative {
   color: var(--clr-danger);
 }
+
+.jual-table .jt-margin {
+  min-width: 90px;
+}
+.jual-table td:nth-child(2) .sblm-hint {
+  text-align: right;
+  display: block;
+  margin: 0 auto;
+  width: 120px;
+}
+.jual-table .jt-pct .sblm-hint,
+.jual-table .jt-margin .sblm-hint {
+  text-align: right;
+}
+.beli-table td .sblm-hint {
+  text-align: right;
+  display: block;
+  margin: 0 auto;
+}
+.beli-table td:nth-child(2) .sblm-hint { width: 140px; }
+.beli-table td:nth-child(3) .sblm-hint { width: 120px; }
+.beli-table td:nth-child(4) .sblm-hint { width: 90px; }
 
 .jual-table .jual-margin {
   font-weight: var(--fw-bold);
@@ -1278,7 +1343,7 @@ body {
 .dsi-val-sm {
   font-size: var(--fs-base);
   font-weight: var(--fw-semibold);
-  color: var(--clr-neutral-500);
+  color: var(--clr-neutral-800);
 }
 
 .dsi-unit {
@@ -1296,6 +1361,10 @@ body {
   border: 1px solid var(--clr-neutral-300);
   border-radius: var(--radius-md);
   padding: 0.1rem 0.5rem;
+}
+
+.dsi-disc-empty {
+  opacity: 0.45;
 }
 
 .dsi-netto-val {
@@ -1464,11 +1533,11 @@ body {
 }
 
 /* -----------------------------------------------------------------------
-   PO Preview Modal — Table & Summary
+   FP Preview Modal — Table & Summary
    ----------------------------------------------------------------------- */
 
 /* Summary card */
-.po-summary {
+.fp-summary {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
@@ -1480,13 +1549,13 @@ body {
   margin-bottom: var(--sp-4);
 }
 
-.po-summary-item {
+.fp-summary-item {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
 }
 
-.po-summary-label {
+.fp-summary-label {
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
@@ -1494,30 +1563,30 @@ body {
   color: var(--clr-neutral-500);
 }
 
-.po-summary-value {
+.fp-summary-value {
   font-size: var(--fs-md);
   font-weight: var(--fw-bold);
   color: var(--clr-neutral-800);
 }
 
-.po-summary-total {
+.fp-summary-total {
   margin-left: auto;
 }
 
-.po-summary-total .po-summary-value {
+.fp-summary-total .fp-summary-value {
   font-size: var(--fs-xl);
   font-weight: 800;
   color: var(--clr-accent-800);
 }
 
 /* Table */
-.po-preview-table {
+.fp-preview-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-base);
 }
 
-.po-preview-table thead th {
+.fp-preview-table thead th {
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   text-transform: uppercase;
@@ -1529,43 +1598,43 @@ body {
   white-space: nowrap;
 }
 
-.po-preview-table thead th:first-child {
+.fp-preview-table thead th:first-child {
   border-radius: var(--radius-md) 0 0 0;
 }
 
-.po-preview-table thead th:last-child {
+.fp-preview-table thead th:last-child {
   border-radius: 0 var(--radius-md) 0 0;
 }
 
-.po-preview-table tbody td {
+.fp-preview-table tbody td {
   padding: var(--sp-2) var(--sp-2);
   border-bottom: 1px solid var(--clr-neutral-200);
   vertical-align: middle;
 }
 
-.po-preview-table tbody tr:nth-child(odd) {
+.fp-preview-table tbody tr:nth-child(odd) {
   background: var(--clr-neutral-50);
 }
 
-.po-preview-table tbody tr:nth-child(even) {
+.fp-preview-table tbody tr:nth-child(even) {
   background: var(--clr-card-bg);
 }
 
 /* Number columns — monospace, right-aligned */
-.po-preview-table .po-num {
+.fp-preview-table .fp-num {
   text-align: right;
   font-family: 'SFMono-Regular', 'Menlo', monospace;
   font-size: var(--fs-base);
 }
 
 /* Amount column — bold */
-.po-preview-table .po-amount {
+.fp-preview-table .fp-amount {
   font-weight: var(--fw-bold);
   color: var(--clr-neutral-800);
 }
 
 /* Row number */
-.po-preview-table .po-rownum {
+.fp-preview-table .fp-rownum {
   text-align: center;
   color: var(--clr-neutral-500);
   font-weight: var(--fw-semibold);
@@ -1573,7 +1642,7 @@ body {
 }
 
 /* Artno code */
-.po-preview-table .po-artno {
+.fp-preview-table .fp-artno {
   font-family: 'SFMono-Regular', 'Menlo', monospace;
   font-size: var(--fs-sm);
   color: var(--clr-primary-700);
@@ -1581,12 +1650,12 @@ body {
 }
 
 /* Disc values — muted when zero */
-.po-preview-table .po-disc-zero {
+.fp-preview-table .fp-disc-zero {
   color: var(--clr-neutral-300);
 }
 
 /* Shipping row */
-.po-preview-table .po-row-shipping td {
+.fp-preview-table .fp-row-shipping td {
   background: var(--clr-accent-50);
   border-top: 1px dashed var(--clr-accent-300);
   border-bottom: 1px dashed var(--clr-accent-300);
@@ -1595,7 +1664,7 @@ body {
 }
 
 /* Grand total row */
-.po-preview-table .po-row-grand-total td {
+.fp-preview-table .fp-row-grand-total td {
   background: var(--clr-accent-50);
   border-top: 2px solid var(--clr-accent-600);
   font-weight: var(--fw-bold);
@@ -1604,7 +1673,7 @@ body {
   padding: var(--sp-3) var(--sp-2);
 }
 
-.po-preview-table .po-grand-total-value {
+.fp-preview-table .fp-grand-total-value {
   font-size: var(--fs-lg);
   font-weight: 800;
   color: var(--clr-accent-800);
@@ -1850,7 +1919,7 @@ body {
    Sales History Page
    ----------------------------------------------------------------------- */
 .sh-page {
-  max-width: 720px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
@@ -1908,9 +1977,96 @@ body {
   color: var(--clr-neutral-500);
 }
 
-.sh-date-label input {
+.sh-date-label input,
+.sh-date-label .sh-dept-dropdown {
   margin-top: 2px;
   font-size: var(--fs-sm);
+}
+
+/* Dept multi-select dropdown */
+.sh-dept-dropdown {
+  position: relative;
+  display: block;
+}
+
+.sh-dept-btn {
+  min-width: 100px;
+  text-align: left;
+}
+
+.sh-dept-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  padding: var(--sp-2) 0;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.sh-dept-menu.open {
+  display: block;
+}
+
+.sh-dept-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sh-dept-item:hover {
+  background: var(--clr-primary-50);
+}
+
+/* Supplier searchable dropdown */
+.h-supp-dropdown {
+  position: relative;
+  margin-top: 2px;
+}
+.h-supp-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background: var(--clr-card-bg);
+  border: 1px solid var(--clr-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  padding: var(--sp-1) 0;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.h-supp-item {
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.h-supp-item:hover {
+  background: var(--clr-primary-50);
+}
+
+/* Laporan icon */
+.laporan-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
 }
 
 /* Summary banner */
@@ -2019,4 +2175,182 @@ body {
   .sh-custom-range .btn {
     align-self: flex-start;
   }
+}
+
+/* -----------------------------------------------------------------------
+   FP Edit Overlay (Faktur Pembelian)
+   ----------------------------------------------------------------------- */
+.fp-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: var(--clr-neutral-50, #f8f9fa);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fp-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--clr-primary-700, #1565c0);
+  color: #fff;
+  flex-shrink: 0;
+}
+.fp-edit-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Edit table — mirror #itemTable styles */
+#editItemTable .item-main td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: none;
+  border-top: 1px solid #e9ecef;
+}
+#editItemTable .item-main {
+  cursor: pointer;
+  transition: background-color var(--ease-default);
+  border-left: 3px solid var(--clr-primary-500);
+}
+#editItemTable .item-main:hover { background-color: #eaf0fb; }
+#editItemTable .item-main .row-num {
+  font-weight: var(--fw-semibold);
+  color: #adb5bd;
+  font-size: var(--fs-base);
+  text-align: center;
+}
+#editItemTable .item-main .form-control,
+#editItemTable .item-main .form-select {
+  font-size: var(--fs-base);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--clr-input-border);
+}
+#editItemTable .item-main .form-control:focus,
+#editItemTable .item-main .form-select:focus {
+  border-color: var(--clr-primary-500);
+  box-shadow: var(--shadow-focus-primary);
+}
+#editItemTable .item-main code { color: inherit; }
+#editItemTable .item-main.has-detail-open td { border-bottom: none; }
+#editItemTable .item-detail { display: none; }
+#editItemTable .item-detail.open {
+  display: table-row;
+  animation: fadeSlideIn var(--ease-expand) ease both;
+}
+#editItemTable .item-detail td {
+  padding: 0;
+  border-bottom: 2px solid var(--clr-card-border);
+  background: var(--clr-neutral-50);
+}
+
+/* -----------------------------------------------------------------------
+   Perubahan Harga table (mirrors #itemTable expand/collapse)
+   ----------------------------------------------------------------------- */
+#pcTable .pc-main td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-top: 1px solid #e9ecef;
+}
+#pcTable .pc-main {
+  cursor: pointer;
+  transition: background-color var(--ease-default);
+  border-left: 3px solid var(--clr-primary-500);
+}
+#pcTable .pc-main:hover { background-color: #eaf0fb; }
+#pcTable .pc-main .row-num {
+  font-weight: var(--fw-semibold);
+  color: #adb5bd;
+  width: 40px;
+  text-align: center;
+}
+#pcTable .pc-main.has-detail-open td { border-bottom: none; }
+#pcTable .pc-main.has-detail-open .expand-toggle {
+  transform: rotate(90deg);
+  color: var(--clr-primary-700);
+}
+#pcTable .pc-detail { display: none; }
+#pcTable .pc-detail.open {
+  display: table-row;
+  animation: fadeSlideIn var(--ease-expand) ease both;
+}
+#pcTable .pc-detail td {
+  padding: 0;
+  border-bottom: 2px solid var(--clr-card-border);
+  background: var(--clr-neutral-50);
+}
+#pcTable .pc-detail .dp-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+#pcTable .pc-detail .dp-section-header {
+  font-weight: var(--fw-semibold);
+  font-size: 0.85rem;
+  color: var(--clr-primary-700);
+  margin-bottom: 0.35rem;
+}
+#pcTable .pc-detail .pc-hjual {
+  width: 110px;
+}
+
+/* -----------------------------------------------------------------------
+   Snapshot Comparison Cards
+   ----------------------------------------------------------------------- */
+.snap-item-card { border-color: var(--clr-card-border); }
+.snap-item-card .card-header {
+  background: var(--clr-neutral-50);
+  border-bottom: 1px solid var(--clr-card-border);
+  font-size: 0.9rem;
+}
+.snap-item-card .table { font-size: 0.85rem; margin-bottom: 0; }
+.snap-item-card .table td,
+.snap-item-card .table th { vertical-align: middle; padding: 0.35rem 0.5rem; }
+.snap-changed {
+  background: #fff3cd !important;
+  font-weight: 600;
+  color: #664d03;
+}
+
+/* Edit overlay: value changed highlight */
+.value-changed { background: #fff3cd !important; border-radius: 3px; padding: 1px 4px; }
+.sblm-hint {
+  font-size: 0.8rem;
+  color: #c62828;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 1px;
+}
+.sblm-inline { display: inline-block; margin-left: 8px; }
+.sblm-inline .sblm-hint { display: inline; }
+.sblm-right {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c62828;
+  white-space: nowrap;
+  margin-left: var(--sp-2);
+}
+
+/* Home page cards */
+.card-home {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  transition: transform 0.15s, box-shadow 0.15s;
+  color: inherit;
+}
+.card-home:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  border-color: var(--clr-accent-600, #388e3c);
+  color: inherit;
+}
+.card-home .home-icon {
+  font-size: 2.5rem;
+  color: var(--clr-accent-700, #2e7d32);
 }

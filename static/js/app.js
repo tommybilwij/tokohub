@@ -34,12 +34,10 @@
     itemTableBody:   $('#itemTableBody'),
     itemCount:       $('#itemCount'),
     emptyRow:        $('#emptyRow'),
-    btnPreviewPO:    $('#btnPreviewPO'),
+    btnPreviewFP:    $('#btnPreviewFP'),
     btnClearAll:     $('#btnClearAll'),
     btnUploadPhoto:  $('#btnUploadPhoto'),
-    btnUploadCSV:    $('#btnUploadCSV'),
     photoInput:      $('#photoInput'),
-    csvInput:        $('#csvInput'),
     ocrStatus:       $('#ocrStatus'),
     // Modals
     matchModal:      $('#matchModal'),
@@ -47,14 +45,14 @@
     matchCandidates: $('#matchCandidates'),
     matchFilter:     $('#matchFilter'),
     chkSaveAlias:    $('#chkSaveAlias'),
-    poPreviewModal:  $('#poPreviewModal'),
-    poSupplierName:  $('#poSupplierName'),
-    poDate:          $('#poDate'),
-    poGrandTotal:    $('#poGrandTotal'),
-    poPreviewBody:   $('#poPreviewBody'),
-    btnCommitPO:     $('#btnCommitPO'),
-    poSuccessModal:  $('#poSuccessModal'),
-    successPONumber: $('#successPONumber'),
+    fpPreviewModal:  $('#fpPreviewModal'),
+    fpSupplierName:  $('#fpSupplierName'),
+    fpDate:          $('#fpDate'),
+    fpGrandTotal:    $('#fpGrandTotal'),
+    fpPreviewBody:   $('#fpPreviewBody'),
+    btnCommitFP:     $('#btnCommitFP'),
+    fpSuccessModal:  $('#fpSuccessModal'),
+    successFPNumber: $('#successFPNumber'),
     successTotal:    $('#successTotal'),
     successLineCount:$('#successLineCount'),
     btnNewReceipt:   $('#btnNewReceipt'),
@@ -84,17 +82,19 @@
 
   /**
    * Calculate net purchase price after cascading discounts and tax.
-   * Mirrors the backend calculation in po_service.preview_po().
+   * Mirrors the backend calculation in fp_service.preview_fp().
    */
   function calcNetPrice(hbelibsr, pctdisc1, pctdisc2, pctdisc3, pctppn) {
     const d1 = hbelibsr * (pctdisc1 || 0) / 100;
     const afterD1 = hbelibsr - d1;
     const d2 = afterD1 * (pctdisc2 || 0) / 100;
     const afterD2 = afterD1 - d2;
-    const d3 = afterD2 * (pctdisc3 || 0) / 100;
-    const netto = afterD2 - d3;
-    const ppnAmt = netto * (pctppn || 0) / 100;
-    return { d1, d2, d3, ppnAmt, netto, final: netto + ppnAmt };
+    // PPN applied before D3
+    const ppnAmt = afterD2 * (pctppn || 0) / 100;
+    const afterPPN = afterD2 + ppnAmt;
+    const d3 = afterPPN * (pctdisc3 || 0) / 100;
+    const final = afterPPN - d3;
+    return { d1, d2, d3, ppnAmt, final };
   }
 
   function debounce(fn, ms) {
@@ -194,7 +194,10 @@
       // Restore header fields after dropdowns are populated
       if (draft.header) {
         if (draft.header.user && dom.userSelect) dom.userSelect.value = draft.header.user;
-        if (draft.header.vendor && dom.vendorSelect) dom.vendorSelect.value = draft.header.vendor;
+        if (draft.header.vendor && dom.vendorSelect) {
+          dom.vendorSelect.value = draft.header.vendor;
+          if (window._setVendorInput) window._setVendorInput(draft.header.vendor);
+        }
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
       }
 
@@ -279,8 +282,15 @@
     });
   }
 
+  // Logout handler (global)
+  window._logout = async function() {
+    await fetch('/api/auth/logout', {method: 'POST'});
+    window.location.href = '/login';
+  };
+
   // Show a Bootstrap toast notification (expose globally for other pages)
   window.showToast = showToast;
+  window.showConfirm = showConfirm;
   function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     if (!container) return;
@@ -321,31 +331,66 @@
     if (_restoreState()) {
       renderItemTable();
     }
+
+    // Re-zoom table on window resize
+    window.addEventListener('resize', debounce(_autoZoomTable, 200));
   }
 
   async function loadUsers() {
-    try {
-      const users = await api('/api/users');
-      users.forEach((u) => {
-        const opt = document.createElement('option');
-        opt.value = u.nouser;
-        opt.textContent = u.usrname || u.nouser;
-        dom.userSelect.appendChild(opt);
-      });
-    } catch (e) {
-      console.error('Failed to load users:', e);
-    }
+    // User is pre-filled from login session — no need to load
   }
 
   async function loadVendors() {
     try {
       state.vendors = await api('/api/vendors');
-      state.vendors.forEach((v) => {
-        const opt = document.createElement('option');
-        opt.value = v.id;
-        opt.textContent = `${v.id} - ${v.name || ''}`;
-        dom.vendorSelect.appendChild(opt);
+      const vendorInput = document.getElementById('vendorInput');
+      const vendorMenu = document.getElementById('vendorSuppMenu');
+      let vendorSelected = '';
+
+      function renderVendorMenu(filter) {
+        const q = (filter || '').toLowerCase();
+        const items = state.vendors.filter(v => {
+          const label = `${v.id} - ${v.name || ''}`;
+          return !q || label.toLowerCase().indexOf(q) >= 0;
+        });
+        vendorMenu.innerHTML = '';
+        items.slice(0, 50).forEach(v => {
+          const div = document.createElement('div');
+          div.className = 'h-supp-item';
+          div.textContent = `${v.id} - ${v.name || ''}`;
+          div.addEventListener('mousedown', e => {
+            e.preventDefault();
+            dom.vendorSelect.value = v.id;
+            vendorInput.value = `${v.id} - ${v.name || ''}`;
+            vendorSelected = vendorInput.value;
+            vendorMenu.classList.add('d-none');
+            _saveStateDebounced();
+          });
+          vendorMenu.appendChild(div);
+        });
+        vendorMenu.classList.remove('d-none');
+      }
+
+      vendorInput.addEventListener('focus', () => {
+        vendorSelected = vendorInput.value;
+        vendorInput.value = '';
+        renderVendorMenu('');
       });
+      vendorInput.addEventListener('input', () => renderVendorMenu(vendorInput.value));
+      vendorInput.addEventListener('blur', () => {
+        vendorMenu.classList.add('d-none');
+        if (!vendorInput.value && vendorSelected) vendorInput.value = vendorSelected;
+      });
+      vendorInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { vendorMenu.classList.add('d-none'); vendorInput.blur(); }
+      });
+
+      // Expose setter for draft restore
+      window._setVendorInput = function(suppid) {
+        const v = state.vendors.find(x => x.id === suppid);
+        vendorInput.value = v ? `${v.id} - ${v.name || ''}` : (suppid || '');
+        vendorSelected = vendorInput.value;
+      };
     } catch (e) {
       console.error('Failed to load vendors:', e);
     }
@@ -373,7 +418,7 @@
     });
 
     // Action buttons
-    dom.btnPreviewPO.addEventListener('click', previewPO);
+    dom.btnPreviewFP.addEventListener('click', previewFP);
     dom.btnClearAll.addEventListener('click', clearAllItems);
 
     // Header fields — persist on change
@@ -394,14 +439,13 @@
 
     // File uploads
     dom.btnUploadPhoto.addEventListener('click', uploadPhoto);
-    dom.btnUploadCSV.addEventListener('click', uploadCSV);
 
-    // PO commit
-    dom.btnCommitPO.addEventListener('click', commitPO);
+    // FP commit
+    dom.btnCommitFP.addEventListener('click', commitFP);
 
     // New receipt after success
     dom.btnNewReceipt.addEventListener('click', () => {
-      bootstrap.Modal.getInstance(dom.poSuccessModal).hide();
+      bootstrap.Modal.getInstance(dom.fpSuccessModal).hide();
       clearAllItems();
     });
 
@@ -419,7 +463,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
       const target = e.target;
-      if (!target.matches('#itemTable .item-main input, #itemTable .item-main select')) return;
+      if (!target.matches('#itemTable .item-main input, #itemTable .item-main select, #itemTable .item-detail input, #itemTable .item-detail select')) return;
       e.preventDefault();
       const row = target.closest('tr');
       const inputs = Array.from(row.querySelectorAll('input, select'));
@@ -441,11 +485,16 @@
       return;
     }
 
+    // Show loading indicator
+    dom.searchResults.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div> <small class="text-muted">Mencari...</small></div>';
+    dom.searchResults.classList.remove('d-none');
+
     try {
       const results = await api(`/api/stock/search?q=${encodeURIComponent(query)}`);
       renderSearchResults(results);
     } catch (e) {
       console.error('Search error:', e);
+      dom.searchResults.classList.add('d-none');
     }
   }
 
@@ -488,11 +537,27 @@
   // -----------------------------------------------------------------------
   // Item Management
   // -----------------------------------------------------------------------
-  function addItemFromInput() {
+  async function addItemFromInput() {
     if (!requireHeaderFields()) return;
 
     const name = dom.itemNameInput.value.trim();
     if (!name) return;
+
+    // Search immediately and auto-add if 100% match
+    try {
+      const results = await api(`/api/stock/search?q=${encodeURIComponent(name)}&limit=5`);
+      if (results.length && results[0].score >= 100) {
+        const item = results[0];
+        dom.searchResults.classList.add('d-none');
+        addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto', [item], item.artno,
+                parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
+        dom.itemNameInput.value = '';
+        dom.itemNameInput.focus();
+        return;
+      }
+    } catch (e) {
+      console.warn('Search on enter failed:', e.message);
+    }
 
     addItem(name, '', 1, 0, 'CTN', 1, 0);
     dom.itemNameInput.value = '';
@@ -565,6 +630,12 @@
       added._refHjual = { hjual1: added.hjual1, hjual2: added.hjual2, hjual3: added.hjual3, hjual4: added.hjual4, hjual5: added.hjual5 };
     }
     renderItemTable();
+    // Scroll to newly added item
+    const newIdx = state.items.length - 1;
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`.item-main[data-idx="${newIdx}"]`);
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
     showToast(`"${name}" ditambahkan`, 'success');
   }
 
@@ -589,10 +660,10 @@
     const dis = tier != null && !values._enabled ? 'disabled' : '';
     const rows = [
       { label: 'Jual 1', field: 'hjual1' },
+      { label: 'Member', field: 'hjual2' },
       { label: 'Jual 3', field: 'hjual3' },
       { label: 'Jual 4', field: 'hjual4' },
       { label: 'Jual 5', field: 'hjual5' },
-      { label: 'Member', field: 'hjual2' },
     ];
     const rowsHTML = rows.map(r => {
       const val = values[r.field];
@@ -744,12 +815,26 @@
     });
   }
 
-  // Price recalculation helper (used by render and event handlers)
+  // Price recalculation helper: total changed → derive priceBsr from total
   function _recalcFromTotal(idx) {
     const item = state.items[idx];
     const qty = computeQty(item) || 1;
     item.priceBsr = qty ? item.priceTotal / qty : item.priceTotal;
     item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
+    _updateDetailLabels(idx);
+    _updateComputedPrices(idx);
+    _saveStateDebounced();
+  }
+
+  // Qty changed → keep priceBsr, recalc total
+  function _recalcFromQty(idx) {
+    const item = state.items[idx];
+    const qty = computeQty(item) || 1;
+    item.priceTotal = item.priceBsr * qty;
+    item.priceKcl = item.packing > 0 ? item.priceBsr / item.packing : 0;
+    // Update total harga input in the main row
+    const totalEl = document.querySelector(`.edit-price-total[data-idx="${idx}"]`);
+    if (totalEl) totalEl.value = item.priceTotal ? formatNumber(item.priceTotal) : '';
     _updateDetailLabels(idx);
     _updateComputedPrices(idx);
     _saveStateDebounced();
@@ -857,43 +942,55 @@
     const packNum = m.packing ? parseInt(m.packing) : '';
     const hbelikcl = m.hbelikcl || (m.hbelibsr && packNum ? trunc2(m.hbelibsr / packNum) : 0);
 
-    // Disc pills (only non-zero — parseFloat to handle string "0.0000")
-    const discItems = [];
-    if (parseFloat(m.pctdisc1)) discItems.push({ label: 'D1', val: parseFloat(m.pctdisc1) });
-    if (parseFloat(m.pctdisc2)) discItems.push({ label: 'D2', val: parseFloat(m.pctdisc2) });
-    if (parseFloat(m.pctdisc3)) discItems.push({ label: 'D3', val: parseFloat(m.pctdisc3) });
-    if (parseFloat(m.pctppn)) discItems.push({ label: 'PPN', val: parseFloat(m.pctppn) });
-    const discHTML = discItems.length
-      ? discItems.map(d => `<span class="dsi-disc">${d.label} <b>${d.val}%</b></span>`).join('')
-      : '';
+    // Disc rows (always show all four)
+    const discItems = [
+      { label: 'Diskon 1', val: parseFloat(m.pctdisc1) || 0 },
+      { label: 'Diskon 2', val: parseFloat(m.pctdisc2) || 0 },
+      { label: 'PPN', val: parseFloat(m.pctppn) || 0 },
+      { label: 'Diskon 3', val: parseFloat(m.pctdisc3) || 0 },
+    ];
+    const discHTML = discItems.map(d =>
+      `<span class="dsi-disc${d.val ? '' : ' dsi-disc-empty'}">${d.label} <b>${d.val ? d.val + '%' : '—'}</b></span>`
+    ).join('');
 
-    // Netto
-    const hasDiscOrPpn = parseFloat(m.pctdisc1) || parseFloat(m.pctdisc2) || parseFloat(m.pctdisc3) || parseFloat(m.pctppn);
-    const netPrices = hasDiscOrPpn ? calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn) : null;
+    // Netto (always compute — falls back to hbelibsr if no disc/ppn)
+    const netPrices = calcNetPrice(m.hbelibsr || 0, m.pctdisc1, m.pctdisc2, m.pctdisc3, m.pctppn);
 
     // Netto per pcs for margin calc
-    const dsiNettoPcs = netPrices && packNum ? netPrices.final / packNum
-                      : (m.hbelibsr && packNum ? m.hbelibsr / packNum : 0);
+    const dsiNettoPcs = packNum ? netPrices.final / packNum : 0;
 
-    // Build price table rows: main + bundlings
+    // Build price table: columns = tiers (Satuan, Bundling), rows = price types (Jual 1, Member, etc.)
     const bundlings = m._bundlings || [];
-    const priceHeaders = ['Jual 1', 'Jual 3', 'Jual 4', 'Jual 5', 'Member'];
-    const mainPrices = [m.hjual, m.hjual3, m.hjual4, m.hjual5, m.hjual2];
-    const priceRows = [{ label: 'Satuan', prices: mainPrices, isMain: true }];
-    bundlings.forEach(b => {
-      priceRows.push({ label: `Bundling \u2265${b.qty}`, prices: [b.hjual1, b.hjual3, b.hjual4, b.hjual5, b.hjual2], isMain: false });
-    });
+    // Column headers: always Satuan + Bundling 1 + Bundling 2
+    const tierCols = [
+      { label: 'Satuan', prices: { hjual1: m.hjual, hjual2: m.hjual2, hjual3: m.hjual3, hjual4: m.hjual4, hjual5: m.hjual5 } },
+      { label: bundlings[0] ? `Bundling 1 \u2265${bundlings[0].qty}` : 'Bundling 1', prices: bundlings[0] || {} },
+      { label: bundlings[1] ? `Bundling 2 \u2265${bundlings[1].qty}` : 'Bundling 2', prices: bundlings[1] || {} },
+    ];
+    // Row definitions: only show if at least one tier has a non-zero value
+    const priceTypes = [
+      { label: 'Jual 1', field: 'hjual1' },
+      { label: 'Member', field: 'hjual2' },
+      { label: 'Jual 3', field: 'hjual3' },
+      { label: 'Jual 4', field: 'hjual4' },
+      { label: 'Jual 5', field: 'hjual5' },
+    ];
+    const visiblePriceTypes = priceTypes.filter(pt =>
+      tierCols.some(tc => parseFloat(tc.prices[pt.field]) > 0)
+    );
+    // Always show Jual 1
+    if (!visiblePriceTypes.find(pt => pt.field === 'hjual1')) {
+      visiblePriceTypes.unshift(priceTypes[0]);
+    }
 
-    const numCols = priceHeaders.length + 1;
-    const jualHeaderRow = `<tr class="dsi-jual-head-row"><th class="dsi-pt-tier"><span class="dsi-section-lbl">Tier</span></th>${priceHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-    const jualBodyRows = priceRows.map(row => {
-      const rowCls = row.isMain ? '' : ' class="dsi-pt-bundling"';
-      const cells = row.prices.map(p => {
-        const val = parseFloat(p) || 0;
+    const jualHeaderRow = `<tr class="dsi-jual-head-row"><th class="dsi-pt-tier"></th>${tierCols.map(tc => `<th>${tc.label}</th>`).join('')}</tr>`;
+    const jualBodyRows = visiblePriceTypes.map(pt => {
+      const cells = tierCols.map(tc => {
+        const val = parseFloat(tc.prices[pt.field]) || 0;
         let marginHTML = '';
         if (val > 0 && dsiNettoPcs) {
           const mg = val - dsiNettoPcs;
-          const pct = (mg / dsiNettoPcs * 100).toFixed(1);
+          const pct = (mg / dsiNettoPcs * 100).toFixed(2);
           const isNeg = mg < 0;
           marginHTML = `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '' : '+'}${pct}%</span>`
                      + `<span class="dsi-pt-margin${isNeg ? ' negative' : ''}">${isNeg ? '-' : '+'}${formatNumber(Math.abs(mg))}</span>`;
@@ -901,7 +998,7 @@
         const emptyCls = val ? '' : ' dsi-pt-empty';
         return `<td><span class="dsi-pt-val${emptyCls}">${val ? formatNumber(val) : '—'}</span>${marginHTML}</td>`;
       }).join('');
-      return `<tr${rowCls}><td class="dsi-pt-tier">${row.label}</td>${cells}</tr>`;
+      return `<tr><td class="dsi-pt-tier">${pt.label}</td>${cells}</tr>`;
     }).join('');
 
     return `
@@ -921,14 +1018,14 @@
           <div class="dsi-beli-line">
             <span class="dsi-beli-label">Beli</span>
             <span class="dsi-val">${formatNumber(m.hbelibsr || 0)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-            <span class="dsi-val dsi-val-sm">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+            <span class="dsi-val">${formatNumber(hbelikcl)}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
           </div>
-          ${discHTML ? `<div class="dsi-disc-pills">${discHTML}</div>` : ''}
-          ${netPrices ? `<div class="dsi-netto-bar">
+          <div class="dsi-disc-pills">${discHTML}</div>
+          <div class="dsi-netto-bar">
             <span class="dsi-lbl">Netto</span>
             <span class="dsi-netto-val">${formatNumber(netPrices.final)}</span><span class="dsi-unit">/${m.satbesar || 'Bsr'}</span>
-            <span class="dsi-netto-val dsi-val-sm">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
-          </div>` : ''}
+            <span class="dsi-netto-val">${packNum ? formatNumber(netPrices.final / packNum) : '—'}</span><span class="dsi-unit">/${m.satkecil || 'Pcs'}</span>
+          </div>
         </div>
 
         <div class="dsi-jual-header"><span class="dsi-section-lbl">Harga Jual</span></div>
@@ -949,12 +1046,12 @@
 
     if (state.items.length === 0) {
       tbody.innerHTML = `
-        <tr><td colspan="8" class="text-center text-muted py-5">
+        <tr><td colspan="5" class="text-center text-muted py-5">
           <i class="bi bi-inbox empty-state-icon"></i><br>
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
-      dom.btnPreviewPO.disabled = true;
+      dom.btnPreviewFP.disabled = true;
       dom.btnClearAll.disabled = true;
       _saveState();
       return;
@@ -1005,31 +1102,6 @@
           <input type="text" class="form-control edit-barcode" data-idx="${idx}"
                  value="${(item.barcode || '').replace(/"/g, '&quot;')}" placeholder="—" inputmode="numeric">
         </td>
-        <td>
-          <div class="d-flex gap-1 align-items-center">
-            <div class="qty-stepper">
-              <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
-              <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
-                     value="${item.qtyBesar}" min="0" step="0.01">
-              <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
-            </div>
-            <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
-              ${unitOpts}
-            </select>
-          </div>
-        </td>
-        <td>
-          <div class="qty-stepper">
-            <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
-            <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
-                   value="${item.qtyKecil}" min="0" step="0.01">
-            <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
-          </div>
-        </td>
-        <td>
-          <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
-                 value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
-        </td>
         <td>${matchHTML}</td>
         <td>
           <button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="${idx}" title="Hapus">
@@ -1048,10 +1120,49 @@
       const mainJualVals = { hjual1: item.hjual1, hjual2: item.hjual2, hjual3: item.hjual3, hjual4: item.hjual4, hjual5: item.hjual5, _enabled: true };
 
       detailTr.innerHTML = `
-        <td colspan="8">
+        <td colspan="5">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
-            <!-- Row 1: Harga Beli (full width) -->
+            <!-- Qty & Harga inputs -->
+            <div class="dp-section dp-qty">
+              <div class="dp-section-header">Qty & Total Harga Beli</div>
+              <div class="dp-input-row">
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Sat. Besar</label>
+                  <div class="d-flex gap-1 align-items-center">
+                    <div class="qty-stepper">
+                      <button type="button" class="qty-stepper-btn qtybsr-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+                      <input type="number" class="form-control edit-qty-besar" data-idx="${idx}"
+                             value="${item.qtyBesar}" min="0" step="0.01">
+                      <button type="button" class="qty-stepper-btn qtybsr-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                    </div>
+                    <select class="form-select edit-satuan-bsr w-fixed-72" data-idx="${idx}">
+                      ${unitOpts}
+                    </select>
+                  </div>
+                </div>
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Qty Kcl</label>
+                  <div class="d-flex gap-1 align-items-center">
+                    <div class="qty-stepper">
+                      <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+                      <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
+                             value="${item.qtyKecil}" min="0" step="0.01">
+                      <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                    </div>
+                    <span class="dp-unit-label">Pcs</span>
+                  </div>
+                </div>
+                <div class="dp-input-group">
+                  <label class="dp-input-label">Total Harga Beli</label>
+                  <div class="d-flex align-items-center" style="height:100%">
+                    <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
+                           value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Harga Beli -->
             <div class="dp-section dp-beli">
               <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
@@ -1070,7 +1181,7 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="bt-label">D1</td>
+                    <td class="bt-label">Diskon 1</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
@@ -1079,22 +1190,13 @@
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
-                    <td class="bt-label">D2</td>
+                    <td class="bt-label">Diskon 2</td>
                     <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
-                  </tr>
-                  <tr>
-                    <td class="bt-label">D3</td>
-                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="decimal"></td>
-                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
-                               value="" placeholder="0" inputmode="decimal"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
-                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">PPN</td>
@@ -1104,6 +1206,15 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                  </tr>
+                  <tr>
+                    <td class="bt-label">Diskon 3</td>
+                    <td><input type="text" class="amt-total edit-disc-total" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="decimal"></td>
+                    <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
+                               value="" placeholder="0" inputmode="decimal"></td>
+                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
+                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
                 </tbody>
               </table>
@@ -1151,16 +1262,7 @@
           </div>
         </td>
       `;
-      // Auto-expand detail row if matched or has disc/hjual/bundling data
-      const isMatched = item.status === 'auto' && item.matches.length;
-      const hasDetail = isMatched || item.disc1 || item.disc2 || item.disc3 || item.ppn ||
-                        item.hjual1 || item.hjual2 || item.hjual3 || item.hjual4 || item.hjual5 ||
-                        item.bundling1.enabled || item.bundling2.enabled;
-      if (hasDetail) {
-        detailTr.classList.add('open');
-        tr.classList.add('has-detail-open');
-      }
-
+      // Start collapsed — user can click the row to expand
       tbody.appendChild(detailTr);
     });
 
@@ -1174,9 +1276,25 @@
     dom.btnClearAll.disabled = false;
 
     const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
-    dom.btnPreviewPO.disabled = !allMatched;
+    dom.btnPreviewFP.disabled = !allMatched;
 
     _saveState();
+    _autoZoomTable();
+  }
+
+  function _autoZoomTable() {
+    const table = document.getElementById('itemTable');
+    const wrapper = table.closest('.table-responsive');
+    if (!wrapper) return;
+    // Reset zoom to measure natural width
+    wrapper.style.zoom = '';
+    const containerW = wrapper.parentElement.clientWidth;
+    const tableW = table.scrollWidth;
+    if (tableW > containerW && containerW > 0) {
+      wrapper.style.zoom = (containerW / tableW).toFixed(4);
+    } else {
+      wrapper.style.zoom = '';
+    }
   }
 
   function _bindItemEvents() {
@@ -1236,7 +1354,7 @@
       el.addEventListener('change', () => {
         const idx = parseInt(el.dataset.idx);
         state.items[idx].qtyBesar = parseFloat(el.value) || 0;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
 
@@ -1247,7 +1365,7 @@
         state.items[idx].qtyBesar = (state.items[idx].qtyBesar || 0) + 1;
         const input = btn.parentElement.querySelector('.edit-qty-besar');
         input.value = state.items[idx].qtyBesar;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
     $$('.qtybsr-down').forEach((btn) => {
@@ -1258,7 +1376,7 @@
         state.items[idx].qtyBesar = current - 1;
         const input = btn.parentElement.querySelector('.edit-qty-besar');
         input.value = state.items[idx].qtyBesar;
-        _recalcFromTotal(idx);
+        _recalcFromQty(idx);
       });
     });
 
@@ -1330,8 +1448,8 @@
       const net = calcNetPrice(hbelibsr, item.disc1, item.disc2, item.disc3, item.ppn);
       if (field === 'disc1') return hbelibsr;
       if (field === 'disc2') return hbelibsr - net.d1;
-      if (field === 'disc3') return hbelibsr - net.d1 - net.d2;
-      if (field === 'ppn') return net.netto;
+      if (field === 'ppn') return hbelibsr - net.d1 - net.d2;
+      if (field === 'disc3') return hbelibsr - net.d1 - net.d2 + net.ppnAmt;
       return hbelibsr;
     }
     // Percentage input → update state + recalc amt (live on input + change)
@@ -1771,7 +1889,7 @@
     const idx = state.currentReviewIdx;
     _applyMatch(idx, match);
 
-    // Defer alias save — flag intent, actual save happens on PO commit
+    // Defer alias save — flag intent, actual save happens on FP commit
     state.items[idx]._saveAlias = dom.chkSaveAlias.checked;
 
     bootstrap.Modal.getInstance(dom.matchModal).hide();
@@ -1814,35 +1932,7 @@
   }
 
   // -----------------------------------------------------------------------
-  // CSV Upload
-  // -----------------------------------------------------------------------
-  async function uploadCSV() {
-    if (!requireHeaderFields()) return;
-    const file = dom.csvInput.files[0];
-    if (!file) { showToast('Pilih file CSV/Excel terlebih dahulu.', 'warning'); return; }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    showSpinner();
-    try {
-      const data = await api('/receipt/upload-csv', { method: 'POST', body: formData });
-      (data.items || []).forEach((item) => {
-        addItem(item.name, '', item.qty, 0, 'CTN', 1, item.price || 0);
-      });
-      dom.csvInput.value = '';
-
-      // Auto-match all added items
-      await _doMatch();
-    } catch (e) {
-      showToast('Import gagal: ' + e.message, 'danger');
-    } finally {
-      hideSpinner();
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // PO Preview
+  // FP Preview
   // -----------------------------------------------------------------------
   function _buildBundlingPayload(b) {
     if (!b || !b.enabled || !b.minQty) return null;
@@ -1883,10 +1973,22 @@
     return payload;
   }
 
-  async function previewPO() {
+  async function previewFP() {
     if (!requireHeaderFields()) return;
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
+
+    // Validate bundling: if enabled, minQty must be > 0
+    for (const item of state.items) {
+      if (!item.selectedArtno) continue;
+      for (const tier of [1, 2]) {
+        const b = item['bundling' + tier];
+        if (b && b.enabled && !b.minQty) {
+          showToast(`${item.artname || item.selectedArtno}: Bundling ${tier} aktif tapi Qty belum diisi.`, 'warning');
+          return;
+        }
+      }
+    }
 
     const items = state.items
       .filter((i) => i.selectedArtno)
@@ -1905,8 +2007,8 @@
         },
       });
 
-      renderPOPreview(data);
-      new bootstrap.Modal(dom.poPreviewModal).show();
+      renderFPPreview(data);
+      new bootstrap.Modal(dom.fpPreviewModal).show();
     } catch (e) {
       showToast('Preview gagal: ' + e.message, 'danger');
     } finally {
@@ -1914,57 +2016,57 @@
     }
   }
 
-  function renderPOPreview(data) {
+  function renderFPPreview(data) {
     const vendor = state.vendors.find((v) => v.id === data.supplier_id);
-    dom.poSupplierName.textContent = vendor ? `${vendor.id} - ${vendor.name}` : data.supplier_id;
-    dom.poDate.textContent = data.order_date;
-    dom.poGrandTotal.textContent = formatNumber(data.grand_total);
+    dom.fpSupplierName.textContent = vendor ? `${vendor.id} - ${vendor.name}` : data.supplier_id;
+    dom.fpDate.textContent = data.order_date;
+    dom.fpGrandTotal.textContent = formatNumber(data.grand_total);
 
     const fmtDisc = (v) => {
-      if (!v) return '<span class="po-disc-zero">-</span>';
+      if (!v) return '<span class="fp-disc-zero">-</span>';
       const n = parseFloat(v);
-      if (n === 0) return '<span class="po-disc-zero">-</span>';
+      if (n === 0) return '<span class="fp-disc-zero">-</span>';
       return Number.isInteger(n) ? n.toString() : n.toFixed(2);
     };
 
-    dom.poPreviewBody.innerHTML = '';
+    dom.fpPreviewBody.innerHTML = '';
     let totalAmount = 0;
     data.lines.forEach((line, i) => {
       totalAmount += line.amount || 0;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="po-rownum">${i + 1}</td>
-        <td class="po-artno">${line.artno}</td>
+        <td class="fp-rownum">${i + 1}</td>
+        <td class="fp-artno">${line.artno}</td>
         <td>${line.artname}</td>
-        <td class="po-num">${line.qty_besar || line.qty}</td>
+        <td class="fp-num">${line.qty_besar || line.qty}</td>
         <td>${line.satuanbsr}</td>
-        <td class="po-num">${formatNumber(line.hbelibsr)}</td>
-        <td class="po-num">${formatNumber(line.hbelikcl)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc1)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc2)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc3)}</td>
-        <td class="po-num">${fmtDisc(line.pctppn)}</td>
-        <td class="po-num">${formatNumber(line.netto_full)}</td>
-        <td class="po-num">${formatNumber(line.netto_full * (line.qty_besar || line.qty))}</td>
-        <td class="po-num po-amount">${formatNumber(line.amount)}</td>
+        <td class="fp-num">${formatNumber(line.hbelibsr)}</td>
+        <td class="fp-num">${formatNumber(line.hbelikcl)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc1)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc2)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc3)}</td>
+        <td class="fp-num">${fmtDisc(line.pctppn)}</td>
+        <td class="fp-num">${formatNumber(line.netto_full)}</td>
+        <td class="fp-num">${formatNumber(line.netto_full * (line.qty_besar || line.qty))}</td>
+        <td class="fp-num fp-amount">${formatNumber(line.amount)}</td>
       `;
-      dom.poPreviewBody.appendChild(tr);
+      dom.fpPreviewBody.appendChild(tr);
     });
 
     // Grand total row
     const trTotal = document.createElement('tr');
-    trTotal.className = 'po-row-grand-total';
+    trTotal.className = 'fp-row-grand-total';
     trTotal.innerHTML = `
       <td colspan="13" class="text-end">Grand Total</td>
-      <td class="po-num po-grand-total-value">${formatNumber(data.grand_total)}</td>
+      <td class="fp-num fp-grand-total-value">${formatNumber(data.grand_total)}</td>
     `;
-    dom.poPreviewBody.appendChild(trTotal);
+    dom.fpPreviewBody.appendChild(trTotal);
   }
 
   // -----------------------------------------------------------------------
-  // PO Commit
+  // FP Commit
   // -----------------------------------------------------------------------
-  async function commitPO() {
+  async function commitFP() {
     if (!await showConfirm('Buat Purchase Order dan update stok? Aksi ini tidak bisa dibatalkan.')) return;
 
     const userId = dom.userSelect.value;
@@ -1974,7 +2076,7 @@
     // Block if any item has QTY KCL = 0
     for (const it of matched) {
       if (!it.qtyKecil || it.qtyKecil <= 0) {
-        showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim PO.`, 'danger');
+        showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim Faktur.`, 'danger');
         return;
       }
     }
@@ -1994,7 +2096,7 @@
       });
 
       // Close preview, show success — clear draft
-      bootstrap.Modal.getInstance(dom.poPreviewModal).hide();
+      bootstrap.Modal.getInstance(dom.fpPreviewModal).hide();
       _clearSavedState();
 
       // Save aliases for items that were flagged during match selection
@@ -2011,15 +2113,15 @@
         }
       }
 
-      dom.successPONumber.textContent = data.po_number;
+      dom.successFPNumber.textContent = data.fp_number;
       dom.successTotal.textContent = formatNumber(data.grand_total);
       dom.successLineCount.textContent = data.line_count;
 
       setTimeout(() => {
-        new bootstrap.Modal(dom.poSuccessModal).show();
+        new bootstrap.Modal(dom.fpSuccessModal).show();
       }, 300);
     } catch (e) {
-      showToast('Commit PO gagal: ' + e.message, 'danger');
+      showToast('Commit Faktur gagal: ' + e.message, 'danger');
     } finally {
       hideSpinner();
     }

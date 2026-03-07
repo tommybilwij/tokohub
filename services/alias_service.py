@@ -1,4 +1,4 @@
-"""CRUD operations for the stock_alias table (async)."""
+"""CRUD operations for the tokohub.stock_alias table (async)."""
 
 import logging
 import re
@@ -23,12 +23,16 @@ def normalize_alias(name):
 async def find_by_alias(pool, name):
     """Look up an artno by alias name. Returns artno or None."""
     normalized = normalize_alias(name)
-    row = await execute_single(
-        pool,
-        "SELECT artno FROM stock_alias WHERE alias_name = %s",
-        (normalized,)
-    )
-    return row['artno'] if row else None
+    try:   
+        row = await execute_single(
+            pool,
+            "SELECT artno FROM tokohub.stock_alias WHERE alias_name = %s",
+            (normalized,)
+        )
+        return row['artno'] if row else None
+    except Exception:
+        logger.debug("tokohub.stock_alias table not available, skipping alias lookup")
+        return None
 
 
 async def save_alias(pool, alias_name, artno, created_by='RECEIPT_APP'):
@@ -36,7 +40,7 @@ async def save_alias(pool, alias_name, artno, created_by='RECEIPT_APP'):
     normalized = normalize_alias(alias_name)
     await execute_modify(
         pool,
-        """INSERT INTO stock_alias (alias_name, artno, created_by)
+        """INSERT INTO tokohub.stock_alias (alias_name, artno, created_by)
            VALUES (%s, %s, %s)
            ON DUPLICATE KEY UPDATE artno = VALUES(artno), created_by = VALUES(created_by), created_at = CURRENT_TIMESTAMP""",
         (normalized, artno, created_by)
@@ -47,7 +51,7 @@ async def save_alias(pool, alias_name, artno, created_by='RECEIPT_APP'):
 
 async def delete_alias(pool, alias_id):
     """Delete an alias by ID."""
-    return await execute_modify(pool, "DELETE FROM stock_alias WHERE id = %s", (alias_id,))
+    return await execute_modify(pool, "DELETE FROM tokohub.stock_alias WHERE id = %s", (alias_id,))
 
 
 async def list_aliases(pool, page=1, per_page=50):
@@ -57,11 +61,11 @@ async def list_aliases(pool, page=1, per_page=50):
         pool,
         """SELECT a.id, a.alias_name, a.artno, a.created_at, a.created_by,
                   s.artname
-           FROM stock_alias a
+           FROM tokohub.stock_alias a
            LEFT JOIN stock s ON s.artno = a.artno
            ORDER BY a.created_at DESC
            LIMIT %s OFFSET %s""",
         (per_page, offset)
     )
-    count_row = await execute_single(pool, "SELECT COUNT(*) AS total FROM stock_alias")
+    count_row = await execute_single(pool, "SELECT COUNT(*) AS total FROM tokohub.stock_alias")
     return rows, count_row['total']

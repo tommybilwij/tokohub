@@ -239,7 +239,24 @@
         .then(r => r.json())
         .then(res => {
           if (res.ok) {
-            window.location.href = '/scanner';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memulai ulang server...';
+            // Trigger server restart, then poll until ready
+            fetch('/api/restart', { method: 'POST' }).catch(() => {});
+            setTimeout(function pollReady(attempts) {
+              attempts = attempts || 0;
+              fetch('/health').then(r => {
+                if (r.ok) window.location.href = '/';
+                else throw new Error();
+              }).catch(() => {
+                if (attempts < 30) {
+                  setTimeout(() => pollReady(attempts + 1), 1000);
+                } else {
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="bi bi-play-fill"></i> Mulai';
+                  alert('Server tidak merespons. Coba refresh halaman.');
+                }
+              });
+            }, 1500);
           } else {
             alert('Gagal menyimpan: ' + (res.error || 'Unknown error'));
             btn.disabled = false;

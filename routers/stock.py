@@ -26,11 +26,17 @@ async def api_stock_search(
     limit: int | None = None,
     min_score: int | None = None,
     score_against: str = '',
+    mode: str = '',
     db: aiomysql.Pool = Depends(get_db),
 ):
     query = q.strip()
     if not query:
         return []
+    # Use Perubahan Harga search settings when mode=pc
+    if mode == 'pc':
+        from config import settings
+        limit = limit or settings.pc_top_n
+        min_score = min_score if min_score is not None else settings.pc_min_score
     results = await search_stock(
         db, query,
         top_n=limit,

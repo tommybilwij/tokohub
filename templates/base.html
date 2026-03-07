@@ -11,9 +11,10 @@
   <link href="{{ url_for('static', filename='css/style.css') }}?v={{ range(10000,99999) | random }}" rel="stylesheet">
 </head>
 <body>
+  <div id="appRoot">
   <nav class="navbar navbar-expand-lg navbar-dark navbar-app">
     <div class="container-fluid">
-      <a class="navbar-brand fw-bold" href="/">
+      <a class="navbar-brand fw-bold" href="/" title="Home">
         <i class="bi bi-shop"></i> {% if store_name %}{{ store_name | upper }}{% else %}TOKOHUB{% endif %}
       </a>
       <button class="navbar-toggler" type="button"
@@ -22,37 +23,67 @@
       </button>
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav me-auto">
+          {% if nav_pages is defined and 'scanner' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/scanner' %}active{% endif %}"
                href="/scanner">
               <i class="bi bi-upc-scan"></i> Scanner
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and ('faktur' in nav_pages or 'faktur:input' in nav_pages or 'faktur:daftar' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/entry' %}active{% endif %}"
-               href="/entry">
-              <i class="bi bi-receipt"></i> Entry Barang
+            <a class="nav-link {% if request.url.path.startswith('/faktur-pembelian') %}active{% endif %}"
+               href="/faktur-pembelian">
+              <i class="bi bi-receipt-cutoff"></i> Faktur Pembelian
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and ('price_change' in nav_pages or 'price_change:daftar' in nav_pages or 'price_change:input' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/history' %}active{% endif %}"
-               href="/history">
-              <i class="bi bi-clock-history"></i> Riwayat PO
+            <a class="nav-link {% if request.url.path.startswith('/perubahan-harga') %}active{% endif %}"
+               href="/perubahan-harga">
+              <i class="bi bi-tag"></i> Perubahan Harga
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and ('laporan' in nav_pages or 'laporan:penjualan' in nav_pages or 'laporan:perubahan_harga' in nav_pages or 'laporan:barang_bonus' in nav_pages) %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/sales-history' %}active{% endif %}"
-               href="/sales-history">
-              <i class="bi bi-graph-up"></i> Penjualan
+            <a class="nav-link {% if request.url.path.startswith('/laporan') %}active{% endif %}"
+               href="/laporan">
+              <i class="bi bi-bar-chart-line"></i> Laporan
             </a>
           </li>
+          {% endif %}
+          {% if user and user.role == 'admin' %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}"
                href="/settings">
               <i class="bi bi-gear"></i> Settings
             </a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path == '/users' %}active{% endif %}"
+               href="/users">
+              <i class="bi bi-people"></i> Users
+            </a>
+          </li>
+          {% endif %}
         </ul>
+        {% if user %}
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle"></i> {{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><span class="dropdown-item-text small text-muted">Role: {{ user.role }}</span></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="#" onclick="window._logout()"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+            </ul>
+          </li>
+        </ul>
+        {% endif %}
       </div>
     </div>
   </nav>
@@ -60,23 +91,32 @@
   <main class="container-fluid py-3">
     {% block content %}{% endblock %}
   </main>
+  </div><!-- /appRoot -->
 
   <!-- Toast container -->
   <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
 
   <script>
   // Zoom support for Tauri WebView (Cmd/Ctrl + Plus/Minus/0)
+  // Zoom applied to #appRoot wrapper so modals (position:fixed) are unaffected.
   (function(){
+    var root = document.getElementById('appRoot');
     var z = parseFloat(localStorage.getItem('_zoom') || '1');
-    document.documentElement.style.zoom = z;
+    root.style.zoom = z;
     document.addEventListener('keydown', function(e){
       if (!(e.metaKey || e.ctrlKey)) return;
       if (e.key === '=' || e.key === '+') { e.preventDefault(); z = Math.min(z + 0.1, 2); }
       else if (e.key === '-') { e.preventDefault(); z = Math.max(z - 0.1, 0.5); }
       else if (e.key === '0') { e.preventDefault(); z = 1; }
       else return;
-      document.documentElement.style.zoom = z;
+      root.style.zoom = z;
       localStorage.setItem('_zoom', z.toFixed(1));
+    });
+    // Move all modals outside zoomed wrapper so backdrop covers full viewport
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.modal').forEach(function(m) {
+        document.body.appendChild(m);
+      });
     });
   })();
   </script>

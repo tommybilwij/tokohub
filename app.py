@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import settings, _ENVRC_PATH
+from services.encryption import ensure_enc_file
 
 # Resolve base directory (supports PyInstaller frozen builds)
 if getattr(sys, 'frozen', False):
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('zeroconf').setLevel(logging.ERROR)
 
 os.makedirs(settings.upload_folder, exist_ok=True)
+ensure_enc_file()
 
 _lifespan_lock = asyncio.Lock()
 _lifespan_count = 0
@@ -36,15 +38,25 @@ _lifespan_count = 0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup/shutdown: create and close DB pool (safe for dual servers)."""
+    """Startup/shutdown: create and close DB pool (safe for dual servers).
+
+    If .envrc doesn't exist yet (fresh install) or DB is unreachable,
+    the app still starts so the /setup page can be served.
+    """
     global _lifespan_count
     from services.db import create_pool, close_pool, get_pool
     async with _lifespan_lock:
         _lifespan_count += 1
         if get_pool() is None:
-            await create_pool()
-    app.state.db_pool = get_pool()
-    await _ensure_schema(app.state.db_pool)
+            try:
+                await create_pool()
+            except Exception:
+                logger.warning("Could not connect to database — running in setup mode")
+    pool = get_pool()
+    app.state.db_pool = pool
+    if pool is not None:
+        from services.schema import ensure_tokohub_schema
+        await ensure_tokohub_schema(pool)
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1
@@ -65,17 +77,18 @@ app.state.templates = templates
 app.state.lan_active = settings.lan_mode
 app.state.https_port = None
 
-# Middleware (order matters: last added = outermost)
-from middleware import SetupGateMiddleware
+# Middleware (order matters: last added = outermost = runs first)
+from middleware import SetupGateMiddleware, AuthMiddleware
 app.add_middleware(SetupGateMiddleware)
+app.add_middleware(AuthMiddleware)
 
 if settings.lan_mode:
     from middleware import LANAuthMiddleware
     app.add_middleware(LANAuthMiddleware)
 
 # Routers
-from routers import pages, settings as settings_router, stock, receipt, sales, health
-for r in [pages, settings_router, stock, receipt, sales, health]:
+from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth, price_change
+for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, price_change]:
     app.include_router(r.router)
 
 
@@ -84,19 +97,6 @@ for r in [pages, settings_router, stock, receipt, sales, health]:
 async def inject_branding(request, call_next):
     templates.env.globals['store_name'] = settings.store_name
     return await call_next(request)
-
-
-async def _ensure_schema(pool):
-    """Create stock_alias table if it doesn't exist."""
-    try:
-        from services.db import execute_modify
-        schema_path = _BASE_DIR / 'schema' / 'stock_alias.sql'
-        with open(schema_path) as f:
-            sql = f.read()
-        await execute_modify(pool, sql)
-        logger.info("stock_alias table ensured")
-    except Exception as e:
-        logger.warning("Could not ensure stock_alias table: %s", e)
 
 
 def _parse_args():

@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Laporan Perubahan Harga{% endblock %}
+
+{% block content %}
+<div class="sh-page">
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <a href="/laporan" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Kembali</a>
+    <h5 class="mb-0"><i class="bi bi-journal-text"></i> Laporan Perubahan Harga</h5>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Tanggal
+        <input type="date" id="reportDate" class="form-control form-control-sm">
+      </label>
+      <button class="btn btn-sm btn-primary" id="btnLoadReport">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end align-items-center mb-2 d-none" id="pcExportBtns">
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-success" id="pcBtnCsv">
+        <i class="bi bi-filetype-csv"></i> CSV
+      </button>
+      <button class="btn btn-sm btn-outline-danger" id="pcBtnPdf">
+        <i class="bi bi-filetype-pdf"></i> PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Riwayat Input Faktur -->
+  <h6 class="text-muted mt-3 mb-2"><i class="bi bi-receipt"></i> Riwayat Input Faktur</h6>
+  <div class="table-responsive mb-4">
+    <table class="sh-table" id="fakturTable">
+      <thead>
+        <tr>
+          <th style="width:15%">No. Faktur</th>
+          <th style="width:5%">Dept</th>
+          <th style="width:14%">Barcode</th>
+          <th>Nama</th>
+          <th class="text-end" style="width:12%">HJual Lama</th>
+          <th class="text-end" style="width:12%">HJual Baru</th>
+        </tr>
+      </thead>
+      <tbody id="fakturBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Riwayat Perubahan Harga -->
+  <h6 class="text-muted mb-2"><i class="bi bi-pencil-square"></i> Riwayat Perubahan Harga</h6>
+  <div class="table-responsive">
+    <table class="sh-table" id="manualTable">
+      <thead>
+        <tr>
+          <th style="width:15%">No. PH</th>
+          <th style="width:5%">Dept</th>
+          <th style="width:14%">Barcode</th>
+          <th>Nama</th>
+          <th class="text-end" style="width:12%">HJual Lama</th>
+          <th class="text-end" style="width:12%">HJual Baru</th>
+        </tr>
+      </thead>
+      <tbody id="manualBody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/jspdf.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/jspdf.plugin.autotable.min.js') }}"></script>
+<script>
+(function() {
+  var dateInput = document.getElementById('reportDate');
+  var elExportBtns = document.getElementById('pcExportBtns');
+  var elBtnCsv = document.getElementById('pcBtnCsv');
+  var elBtnPdf = document.getElementById('pcBtnPdf');
+  dateInput.value = new Date().toISOString().split('T')[0];
+
+  var lastData = null;
+
+  function fmt(n) { return new Intl.NumberFormat('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2}).format(n); }
+
+  function esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function loadReport() {
+    var d = dateInput.value;
+    fetch('/api/price-change/report?report_date=' + d)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        lastData = data;
+        var hasFaktur = data.from_faktur && data.from_faktur.length > 0;
+        var hasManual = data.manual && data.manual.length > 0;
+
+        // Show export buttons if there's data
+        if (hasFaktur || hasManual) {
+          elExportBtns.classList.remove('d-none');
+        } else {
+          elExportBtns.classList.add('d-none');
+        }
+
+        // Faktur changes
+        var fb = document.getElementById('fakturBody');
+        fb.innerHTML = '';
+        if (!hasFaktur) {
+          fb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada riwayat input faktur.</td></tr>';
+        } else {
+          data.from_faktur.forEach(function(r) {
+            fb.innerHTML += '<tr>'
+              + '<td><code>' + esc(r.ref_number) + '</code></td>'
+              + '<td>' + esc(r.department || '') + '</td>'
+              + '<td><code>' + esc(r.barcode || '') + '</code></td>'
+              + '<td>' + esc(r.artname) + '</td>'
+              + '<td class="text-end">' + fmt(r.old_hjual) + '</td>'
+              + '<td class="text-end fw-bold">' + fmt(r.new_hjual) + '</td>'
+              + '</tr>';
+          });
+        }
+
+        // Manual changes
+        var mb = document.getElementById('manualBody');
+        mb.innerHTML = '';
+        if (!hasManual) {
+          mb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada riwayat perubahan harga.</td></tr>';
+        } else {
+          data.manual.forEach(function(r) {
+            mb.innerHTML += '<tr>'
+              + '<td><code>' + esc(r.ph_number) + '</code></td>'
+              + '<td>' + esc(r.department || '') + '</td>'
+              + '<td><code>' + esc(r.barcode || '') + '</code></td>'
+              + '<td>' + esc(r.artname) + '</td>'
+              + '<td class="text-end">' + fmt(r.old_hjual) + '</td>'
+              + '<td class="text-end fw-bold">' + fmt(r.new_hjual) + '</td>'
+              + '</tr>';
+          });
+        }
+      });
+  }
+
+  // Collect all rows for export (both sections combined)
+  function getAllRows() {
+    if (!lastData) return [];
+    var all = [];
+    (lastData.from_faktur || []).forEach(function(r) {
+      all.push({ source: 'Faktur', ref: r.ref_number || '', dept: r.department || '', barcode: r.barcode || '', artname: r.artname || '', old_hjual: r.old_hjual || 0, new_hjual: r.new_hjual || 0 });
+    });
+    (lastData.manual || []).forEach(function(r) {
+      all.push({ source: 'Perubahan Harga', ref: r.ph_number || '', dept: r.department || '', barcode: r.barcode || '', artname: r.artname || '', old_hjual: r.old_hjual || 0, new_hjual: r.new_hjual || 0 });
+    });
+    return all;
+  }
+
+  // CSV Export
+  elBtnCsv.addEventListener('click', function() {
+    var all = getAllRows();
+    if (!all.length) return;
+
+    var csvRows = [['#', 'Sumber', 'No. Referensi', 'Dept', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']];
+    all.forEach(function(r, i) {
+      csvRows.push([i + 1, r.source, r.ref, r.dept, '\t' + r.barcode, r.artname, Number(r.old_hjual).toFixed(2), Number(r.new_hjual).toFixed(2)]);
+    });
+
+    var csv = csvRows.map(function(row) {
+      return row.map(function(cell) {
+        var s = String(cell);
+        if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      }).join(',');
+    }).join('\n');
+
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'perubahan_harga_' + dateInput.value + '.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+
+  // PDF Export
+  elBtnPdf.addEventListener('click', function() {
+    var all = getAllRows();
+    if (!all.length) return;
+
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    doc.setFontSize(14);
+    doc.text('Laporan Perubahan Harga', 14, 15);
+    doc.setFontSize(9);
+    doc.text('Tanggal: ' + dateInput.value, 14, 21);
+
+    var tableRows = all.map(function(r, i) {
+      return [i + 1, r.source, r.ref, r.dept, r.barcode, r.artname, fmt(r.old_hjual), fmt(r.new_hjual)];
+    });
+
+    doc.autoTable({
+      startY: 25,
+      head: [['#', 'Sumber', 'No. Referensi', 'Dept', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']],
+      body: tableRows,
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      headStyles: { fillColor: [255, 193, 7] , textColor: [0, 0, 0] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10 },
+        6: { halign: 'right' },
+        7: { halign: 'right' },
+      },
+    });
+
+    doc.save('perubahan_harga_' + dateInput.value + '.pdf');
+  });
+
+  document.getElementById('btnLoadReport').addEventListener('click', loadReport);
+  dateInput.addEventListener('change', loadReport);
+  loadReport();
+})();
+</script>
+{% endblock %}

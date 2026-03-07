@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Laporan{% endblock %}
+
+{% block content %}
+<div class="sh-page">
+  <h5 class="mb-4"><i class="bi bi-bar-chart-line"></i> Laporan</h5>
+
+  <div class="row g-3">
+    {% if has_sales | default(false) %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="/laporan/penjualan" class="card card-home text-decoration-none h-100">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div class="laporan-icon bg-primary-subtle text-primary">
+            <i class="bi bi-graph-up"></i>
+          </div>
+          <div>
+            <h6 class="mb-1">Laporan Penjualan</h6>
+            <small class="text-muted">Data penjualan per periode</small>
+          </div>
+          <i class="bi bi-chevron-right ms-auto text-muted"></i>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+    {% if has_price_report | default(false) %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="/laporan/perubahan-harga" class="card card-home text-decoration-none h-100">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div class="laporan-icon bg-warning-subtle text-warning">
+            <i class="bi bi-journal-text"></i>
+          </div>
+          <div>
+            <h6 class="mb-1">Laporan Perubahan Harga</h6>
+            <small class="text-muted">Riwayat perubahan harga jual</small>
+          </div>
+          <i class="bi bi-chevron-right ms-auto text-muted"></i>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+    {% if has_foc | default(false) %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="/laporan/barang-bonus" class="card card-home text-decoration-none h-100">
+        <div class="card-body d-flex align-items-center gap-3 py-4">
+          <div class="laporan-icon bg-success-subtle text-success">
+            <i class="bi bi-gift"></i>
+          </div>
+          <div>
+            <h6 class="mb-1">Laporan Barang Bonus</h6>
+            <small class="text-muted">Riwayat barang bonus / FOC</small>
+          </div>
+          <i class="bi bi-chevron-right ms-auto text-muted"></i>
+        </div>
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

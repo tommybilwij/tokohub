@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}Kelola User{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <h4 class="mb-3"><i class="bi bi-people"></i> Kelola User</h4>
+
+    <!-- Register new user -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-person-plus"></i> Daftarkan User Baru
+      </div>
+      <div class="card-body">
+        <form id="registerForm" class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">User</label>
+            <select class="form-select form-select-sm" id="regUsername" required>
+              <option value="">Pilih user...</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control form-control-sm" id="regPassword"
+                   placeholder="Min 4 karakter" required minlength="4">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Role</label>
+            <select class="form-select form-select-sm" id="regRole"></select>
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="bi bi-plus-lg"></i> Daftar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- User list -->
+    <h6 class="text-muted mt-4 mb-2"><i class="bi bi-list-ul"></i> Daftar User Terdaftar</h6>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Nama</th>
+            <th>Role</th>
+            <th style="width:100px">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          <tr id="userEmpty"><td colspan="4" class="text-center text-muted py-3">Memuat...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <!-- Role management -->
+    <h4 class="mb-3"><i class="bi bi-shield-lock"></i> Akses Role</h4>
+
+    <!-- Create new role -->
+    <div class="input-group input-group-sm mb-3">
+      <input type="text" class="form-control" id="newRoleName" placeholder="Nama role baru...">
+      <button class="btn btn-primary" id="btnCreateRole"><i class="bi bi-plus-lg"></i> Tambah</button>
+    </div>
+
+    <!-- Admin (fixed) -->
+    <div class="card mb-2">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span class="badge bg-primary">admin</span>
+      </div>
+      <div class="card-body py-2">
+        <span class="text-success small"><i class="bi bi-check-circle"></i> Semua halaman</span>
+      </div>
+    </div>
+
+    <!-- Dynamic roles -->
+    <div id="roleCards"></div>
+  </div>
+</div>
+
+<!-- Reset password modal -->
+<div class="modal fade" id="pwdModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reset Password — <span id="pwdUser"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="password" class="form-control form-control-sm" id="newPassword"
+               placeholder="Password baru (min 4)" minlength="4">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSavePwd">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const PAGES = {{ pages | tojson }};
+  let allUsers = [];
+  let allRoles = [];
+  let userMap = {};
+  let editingUser = null;
+
+  async function apiFetch(url, opts = {}) {
+    opts.headers = {'Content-Type': 'application/json', ...opts.headers};
+    const r = await fetch(url, opts);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  // --- Roles ---
+
+  async function loadRoles() {
+    try {
+      allRoles = await apiFetch('/api/auth/roles');
+    } catch(e) {
+      allRoles = [];
+    }
+    renderRoleCards();
+    populateRoleDropdowns();
+  }
+
+  function roleOptions(selectedRole) {
+    let html = '<option value="admin"' + (selectedRole === 'admin' ? ' selected' : '') + '>admin</option>';
+    allRoles.forEach(r => {
+      html += '<option value="' + r.role + '"' + (selectedRole === r.role ? ' selected' : '') + '>' + r.role + '</option>';
+    });
+    return html;
+  }
+
+  function populateRoleDropdowns() {
+    // Registration dropdown
+    const regSel = document.getElementById('regRole');
+    const prev = regSel.value;
+    regSel.innerHTML = roleOptions(prev || (allRoles.length ? allRoles[0].role : 'admin'));
+  }
+
+  function renderRoleCards() {
+    const container = document.getElementById('roleCards');
+    if (!allRoles.length) {
+      container.innerHTML = '<p class="text-muted small">Belum ada role custom.</p>';
+      return;
+    }
+    container.innerHTML = allRoles.map(r => {
+      const current = r.permissions ? r.permissions.split(',') : [];
+      const checksHtml = Object.entries(PAGES).map(([key, label]) => {
+        const parts = key.split(':');
+        const depth = parts.length - 1;
+        const parent = depth > 0 ? parts.slice(0, -1).join(':') : null;
+        const indentPx = depth * 44;
+        const indent = depth > 0 ? '" style="padding-left:' + indentPx + 'px' : '';
+        // Check all ancestors are selected
+        let ancestorsOk = true;
+        for (let i = 1; i <= depth; i++) {
+          if (!current.includes(parts.slice(0, i).join(':'))) { ancestorsOk = false; break; }
+        }
+        const disabled = depth > 0 && !ancestorsOk ? ' disabled' : '';
+        const checked = current.includes(key) && ancestorsOk ? ' checked' : '';
+        return '<div class="form-check' + indent + '">' +
+          '<input class="form-check-input rp-check" type="checkbox" value="' + key + '"' +
+            ' data-role="' + r.role + '"' +
+            checked + disabled + '>' +
+          '<label class="form-check-label' + (depth > 0 ? ' text-muted' : '') + ' small">' + label + '</label>' +
+        '</div>';
+      }).join('');
+      return '<div class="card mb-2">' +
+        '<div class="card-header py-2 d-flex justify-content-between align-items-center">' +
+          '<span class="badge bg-info text-dark">' + r.role + '</span>' +
+          '<div>' +
+            '<button class="btn btn-sm btn-outline-primary me-1" onclick="window._saveRolePerms(\'' + r.role + '\')" title="Simpan"><i class="bi bi-check-lg"></i></button>' +
+            '<button class="btn btn-sm btn-outline-danger" onclick="window._deleteRole(\'' + r.role + '\')" title="Hapus role"><i class="bi bi-trash"></i></button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="card-body py-2" id="rp_card_' + r.role + '">' + checksHtml + '</div>' +
+      '</div>';
+    }).join('');
+
+    // Parent toggle: enable/disable + uncheck descendants
+    container.querySelectorAll('.rp-check').forEach(cb => {
+      cb.addEventListener('change', function() {
+        const key = this.value;
+        const role = this.dataset.role;
+        const card = document.getElementById('rp_card_' + role);
+        // Find all descendants (keys starting with this key + ':')
+        card.querySelectorAll('.rp-check').forEach(child => {
+          if (child.value.startsWith(key + ':')) {
+            if (!this.checked) {
+              child.disabled = true;
+              child.checked = false;
+            } else {
+              // Re-enable only direct children; deeper ones need their parent checked too
+              const childParts = child.value.split(':');
+              const parentKey = childParts.slice(0, -1).join(':');
+              const parentCb = card.querySelector('.rp-check[value="' + parentKey + '"]');
+              child.disabled = parentCb ? !parentCb.checked : false;
+            }
+          }
+        });
+      });
+    });
+  }
+
+  // Create role
+  document.getElementById('btnCreateRole').addEventListener('click', async () => {
+    const input = document.getElementById('newRoleName');
+    const name = input.value.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!name) { window.showToast('Nama role harus diisi', 'danger'); return; }
+    if (name === 'admin') { window.showToast('Nama "admin" tidak bisa digunakan', 'danger'); return; }
+    try {
+      await apiFetch('/api/auth/role-permissions/' + encodeURIComponent(name), {
+        method: 'POST', body: JSON.stringify({permissions: []}),
+      });
+      input.value = '';
+      window.showToast('Role "' + name + '" dibuat');
+      loadRoles();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  });
+
+  // Save role permissions
+  window._saveRolePerms = async (role) => {
+    const checks = document.querySelectorAll('#rp_card_' + role + ' input.rp-check:checked');
+    const permissions = Array.from(checks).map(c => c.value);
+    try {
+      await apiFetch('/api/auth/role-permissions/' + encodeURIComponent(role), {
+        method: 'POST', body: JSON.stringify({permissions}),
+      });
+      window.showToast('Akses "' + role + '" diperbarui');
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  };
+
+  // Delete role
+  window._deleteRole = async (role) => {
+    if (typeof window.showConfirm === 'function') {
+      const ok = await window.showConfirm('Hapus role "' + role + '"? User dengan role ini akan dipindah ke karyawan.');
+      if (!ok) return;
+    }
+    try {
+      await apiFetch('/api/auth/roles/' + encodeURIComponent(role), {method: 'DELETE'});
+      window.showToast('Role "' + role + '" dihapus');
+      loadRoles();
+      loadUsers();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  };
+
+  // --- User list ---
+
+  async function loadUserList() {
+    try {
+      const list = await apiFetch('/api/auth/user-list');
+      const sel = document.getElementById('regUsername');
+      list.forEach(u => {
+        userMap[u.nouser] = u.usrname;
+        const opt = document.createElement('option');
+        opt.value = u.nouser;
+        opt.textContent = u.usrname + ' (' + u.nouser + ')';
+        sel.appendChild(opt);
+      });
+    } catch(e) {}
+  }
+
+  async function loadUsers() {
+    try {
+      allUsers = await apiFetch('/api/auth/users');
+      renderUsers();
+    } catch(e) {
+      document.getElementById('userEmpty').innerHTML =
+        '<td colspan="4" class="text-center text-danger">' + e.message + '</td>';
+    }
+  }
+
+  function renderUsers() {
+    const tbody = document.getElementById('userTableBody');
+    if (!allUsers.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Belum ada user terdaftar</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allUsers.map(u => {
+      return '<tr>' +
+        '<td><code>' + u.username + '</code></td>' +
+        '<td>' + u.usrname + '</td>' +
+        '<td>' +
+          '<select class="form-select form-select-sm d-inline-block" style="width:auto" onchange="window._setRole(\'' + u.username + '\', this.value)">' +
+            roleOptions(u.role) +
+          '</select>' +
+        '</td>' +
+        '<td>' +
+          '<button class="btn btn-outline-warning btn-sm me-1" onclick="window._resetPwd(\'' + u.username + '\')" title="Reset password"><i class="bi bi-key"></i></button>' +
+          '<button class="btn btn-outline-danger btn-sm" onclick="window._deleteUser(\'' + u.username + '\')" title="Hapus"><i class="bi bi-trash"></i></button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // --- Register ---
+
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('regUsername').value;
+    const password = document.getElementById('regPassword').value;
+    const role = document.getElementById('regRole').value;
+    try {
+      await apiFetch('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({username, password, role}),
+      });
+      window.showToast('User berhasil didaftarkan');
+      document.getElementById('registerForm').reset();
+      loadUsers();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  });
+
+  // --- Actions ---
+
+  window._setRole = async (username, role) => {
+    try {
+      await apiFetch('/api/auth/users/' + username + '/role', {
+        method: 'POST', body: JSON.stringify({role}),
+      });
+      window.showToast('Role diperbarui');
+      loadUsers();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+      loadUsers();
+    }
+  };
+
+  window._resetPwd = (username) => {
+    editingUser = username;
+    document.getElementById('pwdUser').textContent = userMap[username] || username;
+    document.getElementById('newPassword').value = '';
+    new bootstrap.Modal(document.getElementById('pwdModal')).show();
+  };
+
+  document.getElementById('btnSavePwd').addEventListener('click', async () => {
+    const password = document.getElementById('newPassword').value;
+    if (password.length < 4) { window.showToast('Password minimal 4 karakter', 'danger'); return; }
+    try {
+      await apiFetch('/api/auth/users/' + editingUser + '/password', {
+        method: 'POST', body: JSON.stringify({password}),
+      });
+      window.showToast('Password direset');
+      bootstrap.Modal.getInstance(document.getElementById('pwdModal')).hide();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  });
+
+  window._deleteUser = async (username) => {
+    if (typeof window.showConfirm === 'function') {
+      const ok = await window.showConfirm('Hapus user ' + username + '?');
+      if (!ok) return;
+    }
+    try {
+      await apiFetch('/api/auth/users/' + username, {method: 'DELETE'});
+      window.showToast('User dihapus');
+      loadUsers();
+    } catch(e) {
+      window.showToast(e.message, 'danger');
+    }
+  };
+
+  // Init — load roles first, then users (role dropdowns need role data)
+  loadRoles().then(() => {
+    loadUserList();
+    loadUsers();
+  });
+})();
+</script>
+{% endblock %}

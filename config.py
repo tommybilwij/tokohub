@@ -86,13 +86,17 @@ class Settings(BaseSettings):
 
     upload_folder: Path = _USER_DATA_DIR / 'uploads'
     log_folder: Path = _USER_DATA_DIR / 'logs'
-    allowed_extensions: set[str] = {'png', 'jpg', 'jpeg', 'csv', 'xlsx'}
+    allowed_extensions: set[str] = {'png', 'jpg', 'jpeg'}
     max_content_length: int = 16 * 1024 * 1024
 
-    # Fuzzy matching
+    # Fuzzy matching (Input Barang)
     fuzzy_cache_ttl: int = 300
     fuzzy_top_n: int = 5
     fuzzy_min_score: int = 40
+
+    # Fuzzy matching (Perubahan Harga)
+    pc_top_n: int = 10
+    pc_min_score: int = 30
 
     # Server
     server_port: int = 5000
@@ -101,6 +105,9 @@ class Settings(BaseSettings):
     # LAN mode
     lan_mode: bool = True
     mdns_hostname: str = 'tokohub'
+
+    # Session
+    session_max_age: int = 86400  # 1 day in seconds
 
     # Branding
     store_name: str = ''
@@ -172,18 +179,17 @@ _KEY_TO_ENV = {
     'db.password': 'DB_PASSWORD',
     'db.name': 'DB_NAME',
     'db.pool_size': 'DB_POOL_SIZE',
-    'openai.api_base': 'OPENAI_API_BASE',
-    'openai.api_key': 'OPENAI_API_KEY',
-    'openai.deployment_id': 'OPENAI_DEPLOYMENT_ID',
-    'openai.api_version': 'OPENAI_API_VERSION',
     'fuzzy_cache_ttl': 'FUZZY_CACHE_TTL',
     'fuzzy_top_n': 'FUZZY_TOP_N',
     'fuzzy_min_score': 'FUZZY_MIN_SCORE',
+    'pc_top_n': 'PC_TOP_N',
+    'pc_min_score': 'PC_MIN_SCORE',
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
     'store_name': 'STORE_NAME',
+    'session_max_age': 'SESSION_MAX_AGE',
 }
 
 

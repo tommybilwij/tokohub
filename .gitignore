@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 .env
 .envrc
+.enc
 .direnv/
 .venv/
 venv/

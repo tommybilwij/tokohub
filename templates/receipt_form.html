@@ -1,11 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Entry Barang{% endblock %}
+{% block title %}Input Faktur Pembelian{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex align-items-center justify-content-between mb-2">
-  <div>
-    <h4 class="page-title mb-0">Entry Barang</h4>
-    <small class="text-muted">Tambah item, cocokkan stok, lalu kirim PO</small>
+  <div class="d-flex align-items-center gap-3">
+    <a href="/faktur-pembelian" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <div>
+      <h4 class="page-title mb-0">Input Faktur Pembelian</h4>
+      <small class="text-muted">Tambah item, cocokkan stok, lalu kirim Faktur</small>
+    </div>
   </div>
   <div class="d-none d-md-block">
     <kbd class="me-1">Esc</kbd> <small class="text-muted">Tutup detail</small>
@@ -14,7 +19,7 @@
 </div>
 <div class="row g-3">
   <!-- Left: Input Panel -->
-  <div class="col-lg-4">
+  <div class="col-xl-3">
     <a href="/aliases" class="btn btn-primary-app w-100 mb-2 d-flex align-items-center justify-content-between">
       <span><i class="bi bi-link-45deg"></i> Kelola Alias</span>
       <i class="bi bi-chevron-right"></i>
@@ -27,17 +32,18 @@
         <!-- User Selection -->
         <div class="mb-3">
           <label class="form-label fw-semibold">User</label>
-          <select id="userSelect" class="form-select">
-            <option value="">-- Pilih User --</option>
-          </select>
+          <input type="text" id="userDisplay" class="form-control" value="{{ user.username if user else '' }}" readonly>
+          <input type="hidden" id="userSelect" value="{{ user.username if user else '' }}">
         </div>
 
         <!-- Supplier Selection -->
         <div class="mb-3">
           <label class="form-label fw-semibold">Supplier</label>
-          <select id="vendorSelect" class="form-select">
-            <option value="">-- Pilih Supplier --</option>
-          </select>
+          <div class="h-supp-dropdown">
+            <input type="text" id="vendorInput" class="form-control" placeholder="Ketik untuk cari supplier..." autocomplete="off">
+            <input type="hidden" id="vendorSelect" value="">
+            <div class="h-supp-menu d-none" id="vendorSuppMenu"></div>
+          </div>
         </div>
 
         <!-- Order Date -->
@@ -60,12 +66,6 @@
             <button class="nav-link" data-bs-toggle="tab"
                     data-bs-target="#tabPhoto" type="button">
               <i class="bi bi-camera"></i> Foto
-            </button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab"
-                    data-bs-target="#tabCSV" type="button">
-              <i class="bi bi-file-earmark-spreadsheet"></i> CSV/Excel
             </button>
           </li>
         </ul>
@@ -97,36 +97,13 @@
             <div id="ocrStatus" class="mt-2 text-muted small"></div>
           </div>
 
-          <!-- CSV Upload -->
-          <div class="tab-pane fade" id="tabCSV">
-            <div class="mb-2">
-              <input type="file" id="csvInput" class="form-control"
-                     accept=".csv,.xlsx">
-            </div>
-            <div class="alert alert-light border small py-2 mb-2">
-              <strong>Format file:</strong> CSV atau Excel (.xlsx) dengan kolom:<br>
-              <code>nama_barang</code>, <code>qty</code>, <code>harga</code><br>
-              <span class="text-muted">Contoh:</span>
-              <table class="table table-sm table-bordered mb-0 mt-1 small">
-                <thead><tr><th>nama_barang</th><th>qty</th><th>harga</th></tr></thead>
-                <tbody>
-                  <tr><td>DIAMOND UHT 200ML</td><td>2</td><td>85000</td></tr>
-                  <tr><td>TANGO CO 5G</td><td>10</td><td>5000</td></tr>
-                </tbody>
-              </table>
-              <span class="text-muted mt-1 d-block">Header juga bisa: <code>nama</code>, <code>item</code>, <code>jumlah</code>, <code>harga_beli</code>, dll.</span>
-            </div>
-            <button class="btn btn-outline-secondary w-100" type="button" id="btnUploadCSV">
-              <i class="bi bi-upload"></i> Import File
-            </button>
-          </div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Right: Item List & Actions -->
-  <div class="col-lg-8">
+  <div class="col-xl-9">
     <div class="card">
       <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
@@ -140,16 +117,13 @@
                 <th class="col-num">#</th>
                 <th class="col-name">Nama Barang</th>
                 <th class="col-barcode">Barcode</th>
-                <th class="col-satbsr">Sat. Besar</th>
-                <th class="col-qtykcl">Qty Kcl <span style="text-transform:none">(Pcs)</span></th>
-                <th class="col-price">Total Harga</th>
                 <th class="col-match">Match</th>
                 <th class="col-actions"></th>
               </tr>
             </thead>
             <tbody id="itemTableBody">
               <tr id="emptyRow">
-                <td colspan="8" class="text-center text-muted py-5">
+                <td colspan="5" class="text-center text-muted py-5">
                   <i class="bi bi-inbox empty-state-icon"></i><br>
                   <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
                 </td>
@@ -161,8 +135,8 @@
       <div class="card-footer">
         <div class="d-flex gap-3 align-items-center flex-wrap">
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-cta" id="btnPreviewPO" disabled>
-              <i class="bi bi-send"></i> Kirim PO
+            <button class="btn btn-sm btn-cta" id="btnPreviewFP" disabled>
+              <i class="bi bi-send"></i> Kirim Faktur
             </button>
           </div>
           <div class="ms-auto"></div>
@@ -200,31 +174,31 @@
   </div>
 </div>
 
-<!-- PO Preview Modal -->
-<div class="modal fade" id="poPreviewModal" tabindex="-1">
+<!-- FP Preview Modal -->
+<div class="modal fade" id="fpPreviewModal" tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header modal-header-primary">
-        <h5 class="modal-title"><i class="bi bi-eye"></i> Preview Purchase Order</h5>
+        <h5 class="modal-title"><i class="bi bi-eye"></i> Preview Faktur Pembelian</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="po-summary">
-          <div class="po-summary-item">
-            <span class="po-summary-label">Supplier</span>
-            <span class="po-summary-value" id="poSupplierName"></span>
+        <div class="fp-summary">
+          <div class="fp-summary-item">
+            <span class="fp-summary-label">Supplier</span>
+            <span class="fp-summary-value" id="fpSupplierName"></span>
           </div>
-          <div class="po-summary-item">
-            <span class="po-summary-label">Tanggal</span>
-            <span class="po-summary-value" id="poDate"></span>
+          <div class="fp-summary-item">
+            <span class="fp-summary-label">Tanggal</span>
+            <span class="fp-summary-value" id="fpDate"></span>
           </div>
-          <div class="po-summary-item po-summary-total">
-            <span class="po-summary-label">Total</span>
-            <span class="po-summary-value" id="poGrandTotal"></span>
+          <div class="fp-summary-item fp-summary-total">
+            <span class="fp-summary-label">Total</span>
+            <span class="fp-summary-value" id="fpGrandTotal"></span>
           </div>
         </div>
         <div class="table-responsive">
-          <table class="po-preview-table">
+          <table class="fp-preview-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -243,30 +217,30 @@
                 <th class="text-end">Amount</th>
               </tr>
             </thead>
-            <tbody id="poPreviewBody"></tbody>
+            <tbody id="fpPreviewBody"></tbody>
           </table>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn btn-primary-app" id="btnCommitPO">
-          <i class="bi bi-check-circle"></i> Buat PO & Update Stok
+        <button type="button" class="btn btn-primary-app" id="btnCommitFP">
+          <i class="bi bi-check-circle"></i> Buat Faktur & Update Stok
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- PO Success Modal -->
-<div class="modal fade" id="poSuccessModal" tabindex="-1">
+<!-- FP Success Modal -->
+<div class="modal fade" id="fpSuccessModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header modal-header-primary">
-        <h5 class="modal-title"><i class="bi bi-check-circle"></i> PO Berhasil Dibuat!</h5>
+        <h5 class="modal-title"><i class="bi bi-check-circle"></i> Faktur Berhasil Dibuat!</h5>
       </div>
       <div class="modal-body text-center">
         <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-        <h4>No. PO: <span id="successPONumber" class="text-primary"></span></h4>
+        <h4>No. Faktur: <span id="successFPNumber" class="text-primary"></span></h4>
         <p>Total: <span id="successTotal" class="fw-bold"></span></p>
         <p class="text-muted"><span id="successLineCount"></span> item, stok telah diperbarui.</p>
       </div>
@@ -274,7 +248,7 @@
         <button type="button" class="btn btn-primary-app" id="btnNewReceipt">
           <i class="bi bi-plus-circle"></i> Entry Baru
         </button>
-        <a href="/history" class="btn btn-outline-secondary">
+        <a href="/faktur-pembelian" class="btn btn-outline-secondary">
           <i class="bi bi-clock-history"></i> Lihat Riwayat
         </a>
       </div>

@@ -6,45 +6,6 @@
   <div class="col-lg-7">
     <h4 class="mb-4"><i class="bi bi-gear"></i> Pengaturan</h4>
 
-    <!-- Database -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-database"></i> Database</h5>
-        <form id="formDb" class="row g-2">
-          <div class="col-md-8">
-            <label class="form-label">Host</label>
-            <input type="text" class="form-control form-control-sm" name="db.host">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Port</label>
-            <input type="number" class="form-control form-control-sm" name="db.port">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">User</label>
-            <input type="text" class="form-control form-control-sm" name="db.user">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Password</label>
-            <input type="password" class="form-control form-control-sm" name="db.password"
-                   placeholder="••••••••">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Database</label>
-            <input type="text" class="form-control form-control-sm" name="db.name">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Pool Size</label>
-            <input type="number" class="form-control form-control-sm" name="db.pool_size" min="1" max="50">
-          </div>
-          <div class="col-12 mt-2">
-            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formDb">
-              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
     <!-- Azure OpenAI -->
     <div class="card mb-3">
       <div class="card-body">
@@ -68,8 +29,8 @@
             <input type="text" class="form-control form-control-sm" name="openai.api_version">
           </div>
           <div class="col-12 mt-2">
-            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formOpenai">
-              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg"></i> Simpan
             </button>
           </div>
         </form>
@@ -81,6 +42,9 @@
       <div class="card-body">
         <h5 class="card-title"><i class="bi bi-search"></i> Fuzzy Matching</h5>
         <form id="formFuzzy" class="row g-2">
+          <div class="col-12">
+            <h6 class="text-muted small mb-1">Input Faktur Pembelian</h6>
+          </div>
           <div class="col-md-4">
             <label class="form-label">Cache TTL (detik)</label>
             <input type="number" class="form-control form-control-sm" name="fuzzy_cache_ttl" min="0">
@@ -92,6 +56,17 @@
           <div class="col-md-4">
             <label class="form-label">Min Score</label>
             <input type="number" class="form-control form-control-sm" name="fuzzy_min_score" min="0" max="100">
+          </div>
+          <div class="col-12 mt-2">
+            <h6 class="text-muted small mb-1">Perubahan Harga</h6>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Top N</label>
+            <input type="number" class="form-control form-control-sm" name="pc_top_n" min="1" max="50">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Min Score</label>
+            <input type="number" class="form-control form-control-sm" name="pc_min_score" min="0" max="100">
           </div>
           <div class="col-12 mt-2">
             <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formFuzzy">
@@ -163,6 +138,87 @@
       </div>
     </div>
 
+    <!-- Database -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-database"></i> Database</h5>
+        <form id="formDb" class="row g-2">
+          <div class="col-md-8">
+            <label class="form-label">Host</label>
+            <input type="text" class="form-control form-control-sm" name="db.host">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Port</label>
+            <input type="number" class="form-control form-control-sm" name="db.port">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">User</label>
+            <input type="text" class="form-control form-control-sm" name="db.user">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control form-control-sm" name="db.password"
+                   placeholder="••••••••">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Database</label>
+            <input type="text" class="form-control form-control-sm" name="db.name">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Pool Size</label>
+            <input type="number" class="form-control form-control-sm" name="db.pool_size" min="1" max="50">
+          </div>
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formDb">
+              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Sesi Login -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-clock-history"></i> Sesi Login</h5>
+        <form id="formSession" class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Otomatis Keluar Setelah</label>
+            <div class="input-group input-group-sm">
+              <input type="number" class="form-control form-control-sm" name="session_max_age" id="sessionMaxAge" min="60" placeholder="86400">
+              <span class="input-group-text">detik</span>
+            </div>
+            <div class="d-flex gap-1 mt-1">
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="3600" style="font-size:0.7rem">1 Jam</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="28800" style="font-size:0.7rem">8 Jam</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="86400" style="font-size:0.7rem">1 Hari</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 session-preset" data-val="604800" style="font-size:0.7rem">7 Hari</button>
+            </div>
+          </div>
+          <div class="col-12 mt-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg"></i> Simpan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Hapus Data -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-trash3"></i> Hapus Data</h5>
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <p class="mb-0 text-muted small">Hapus semua Faktur Pembelian Snapshots untuk edit Riwayat Faktur Pembelian.</p>
+          </div>
+          <button class="btn btn-outline-danger btn-sm" id="btnCleanupSnapshots">
+            <i class="bi bi-trash"></i> Hapus Semua Snapshot
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}
@@ -188,16 +244,20 @@
       setVal('formOpenai', 'openai.api_version', cfg.openai.api_version);
       // api_key field left empty
 
-      // Fuzzy
+      // Fuzzy Matching
       setVal('formFuzzy', 'fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
       setVal('formFuzzy', 'fuzzy_top_n', cfg.fuzzy_top_n);
       setVal('formFuzzy', 'fuzzy_min_score', cfg.fuzzy_min_score);
+      setVal('formFuzzy', 'pc_top_n', cfg.pc_top_n);
+      setVal('formFuzzy', 'pc_min_score', cfg.pc_min_score);
 
       // Server
       setVal('formServer', 'store_name', cfg.store_name);
       setVal('formServer', 'server_host', cfg.server_host);
       setVal('formServer', 'server_port', cfg.server_port);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;
+      // Session
+      setVal('formSession', 'session_max_age', cfg.session_max_age || 86400);
       setVal('formServer', 'mdns_hostname', cfg.mdns_hostname);
       toggleMdnsHostname(cfg.lan_mode);
     });
@@ -208,6 +268,13 @@
   }
   document.getElementById('lanModeCheck').addEventListener('change', function() {
     toggleMdnsHostname(this.checked);
+  });
+
+  // Session preset buttons
+  document.querySelectorAll('.session-preset').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('sessionMaxAge').value = this.dataset.val;
+    });
   });
 
   // Populate LAN URLs from live status
@@ -249,12 +316,14 @@
   // Collect form fields into a nested object
   function collectForm(form) {
     const data = {};
-    form.querySelectorAll('input').forEach(input => {
+    form.querySelectorAll('input, select').forEach(input => {
       const name = input.name;
       if (!name) return;
 
       let val;
-      if (input.type === 'checkbox') {
+      if (input.tagName === 'SELECT') {
+        val = Number(input.value) || input.value;
+      } else if (input.type === 'checkbox') {
         val = input.checked;
       } else if (input.type === 'password') {
         // Only send password if user typed something
@@ -330,7 +399,7 @@
     });
   }
 
-  const restartForms = new Set(['formDb', 'formOpenai', 'formFuzzy', 'formServer']);
+  const restartForms = new Set(['formDb', 'formFuzzy', 'formServer']);
 
   // Attach save handler to each form
   document.querySelectorAll('form[id^="form"]').forEach(form => {
@@ -359,6 +428,27 @@
     });
   });
 })();
+
+// Snapshot cleanup
+document.getElementById('btnCleanupSnapshots').addEventListener('click', async function() {
+  const confirmed = await (window.showConfirm
+    ? showConfirm('Hapus semua data snapshot perubahan harga?')
+    : Promise.resolve(confirm('Hapus semua data snapshot perubahan harga?')));
+  if (!confirmed) return;
+  this.disabled = true;
+  try {
+    const res = await fetch('/api/snapshots/cleanup', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      window.showToast && showToast(`${data.deleted} snapshot dihapus`, 'success');
+    } else {
+      window.showToast && showToast('Gagal: ' + (data.error || 'Unknown'), 'danger');
+    }
+  } catch (e) {
+    window.showToast && showToast('Error: ' + e.message, 'danger');
+  }
+  this.disabled = false;
+});
 
 function copyUrl(id) {
   const input = document.getElementById(id);

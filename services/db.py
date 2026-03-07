@@ -24,7 +24,7 @@ async def create_pool():
         charset=cfg.charset,
         minsize=2,
         maxsize=cfg.pool_size,
-        autocommit=False,
+        autocommit=True,
         pool_recycle=300,
         connect_timeout=10,
     )
@@ -67,5 +67,4 @@ async def execute_modify(pool, sql, params=None):
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(sql, params or ())
-            await conn.commit()
             return cur.rowcount

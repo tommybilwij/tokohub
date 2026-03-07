@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Laporan Barang Bonus{% endblock %}
+
+{% block content %}
+<div class="sh-page">
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <a href="/laporan" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Kembali</a>
+    <h5 class="mb-0"><i class="bi bi-gift"></i> Laporan Barang Bonus</h5>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-presets">
+      <button class="sh-preset active" data-preset="today">Hari Ini</button>
+      <button class="sh-preset" data-preset="yesterday">Kemarin</button>
+      <button class="sh-preset" data-preset="7d">7 Hari</button>
+      <button class="sh-preset" data-preset="30d">30 Hari</button>
+      <button class="sh-preset" data-preset="month">Bulan Ini</button>
+      <button class="sh-preset" data-preset="year">Tahun Ini</button>
+    </div>
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="date" id="focDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="date" id="focDateTo" class="form-control form-control-sm">
+      </label>
+      <button class="btn btn-sm btn-primary" id="focBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary Banner -->
+  <div class="sh-summary d-none" id="focSummary">
+    <div class="sh-summary-item">
+      <span class="sh-summary-label">Jenis Barang</span>
+      <span class="sh-summary-value" id="focTotalItems">0</span>
+    </div>
+    <div class="sh-summary-item">
+      <span class="sh-summary-label">Total FOC (Pcs)</span>
+      <span class="sh-summary-value sh-summary-green" id="focTotalQty">0</span>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="focLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results Table -->
+  <div class="d-none" id="focResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="focResultCount"></small>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-success" id="focBtnExport">
+          <i class="bi bi-filetype-csv"></i> CSV
+        </button>
+        <button class="btn btn-sm btn-outline-danger" id="focBtnExportPdf">
+          <i class="bi bi-filetype-pdf"></i> PDF
+        </button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th class="text-center" style="width:40px">#</th>
+            <th class="sh-sortable" data-col="tanggal" style="white-space:nowrap;min-width:110px">Tanggal <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="stockid">Artno <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="artname">Nama Barang <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="qtybonus">FOC (Pcs) <i class="bi bi-chevron-expand"></i></th>
+            <th style="white-space:nowrap;min-width:100px">Satuan</th>
+            <th class="sh-sortable" data-col="suppid" style="min-width:160px">Supplier <i class="bi bi-chevron-expand"></i></th>
+            <th>No Faktur</th>
+          </tr>
+        </thead>
+        <tbody id="focTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="focEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada data barang diskon untuk periode ini.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/jspdf.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/jspdf.plugin.autotable.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/foc_history.js') }}?v={{ range(10000,99999) | random }}"></script>
+{% endblock %}

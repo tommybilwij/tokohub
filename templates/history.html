@@ -1,16 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Riwayat PO{% endblock %}
+{% block title %}Faktur Pembelian{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Riwayat Purchase Order</h5>
-    <span class="badge bg-secondary">{{ total }} total</span>
+<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-receipt-cutoff"></i> Faktur Pembelian</h5>
+    {% if can_entry | default(false) %}
+    <a href="/faktur-pembelian/input" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Input Faktur Pembelian
+    </a>
+    {% endif %}
   </div>
-  <div class="card-body p-0">
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="date" id="hDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="date" id="hDateTo" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Supplier
+        <div class="h-supp-dropdown" id="hSuppDropdown">
+          <input type="text" class="form-control form-control-sm" id="hSuppInput" placeholder="Semua" autocomplete="off" style="min-width:220px">
+          <input type="hidden" id="hSupplier" value="">
+          <div class="h-supp-menu d-none" id="hSuppMenu"></div>
+        </div>
+      </label>
+      <button class="btn btn-sm btn-primary" id="hBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="hLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results -->
+  <div class="d-none" id="hResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="hResultCount"></small>
+    </div>
     <div class="table-responsive">
-      <table class="table table-sm table-hover mb-0">
-        <thead class="table-light">
+      <table class="sh-table">
+        <thead>
           <tr>
             <th>No. Order</th>
             <th>Tanggal</th>
@@ -20,62 +57,28 @@
             <th></th>
           </tr>
         </thead>
-        <tbody>
-          {% for o in orders %}
-          <tr>
-            <td><code>{{ o.noorder }}</code></td>
-            <td>{{ o.tglorder.strftime('%Y-%m-%d') if o.tglorder else '-' }}</td>
-            <td>{{ o.supplier_name or o.suppid }}</td>
-            <td class="text-end">{{ '{:,.0f}'.format(o.jlhfaktur or 0) }}</td>
-            <td class="text-center">{{ o.line_count }}</td>
-            <td>
-              <button class="btn btn-sm btn-outline-primary btn-view-po"
-                      data-po="{{ o.noorder }}">
-                <i class="bi bi-eye"></i>
-              </button>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="6" class="text-center text-muted py-4">
-              Belum ada PO dari Receipt App.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
+        <tbody id="hTableBody"></tbody>
       </table>
     </div>
-  </div>
-
-  {% if total > 20 %}
-  <div class="card-footer">
-    <nav>
-      <ul class="pagination pagination-sm mb-0 justify-content-center">
-        {% if page > 1 %}
-        <li class="page-item">
-          <a class="page-link" href="?page={{ page - 1 }}">&laquo;</a>
-        </li>
-        {% endif %}
-        <li class="page-item active">
-          <span class="page-link">{{ page }}</span>
-        </li>
-        {% if total > page * 20 %}
-        <li class="page-item">
-          <a class="page-link" href="?page={{ page + 1 }}">&raquo;</a>
-        </li>
-        {% endif %}
-      </ul>
+    <!-- Pagination -->
+    <nav class="mt-2" id="hPagination">
+      <ul class="pagination pagination-sm mb-0 justify-content-center" id="hPageList"></ul>
     </nav>
   </div>
-  {% endif %}
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="hEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada faktur untuk filter ini.</p>
+  </div>
 </div>
 
-<!-- PO Detail Modal -->
-<div class="modal fade" id="poDetailModal" tabindex="-1">
+<!-- FP Detail Modal -->
+<div class="modal fade" id="fpDetailModal" tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detail PO: <span id="detailPONumber"></span></h5>
+        <h5 class="modal-title">Detail Faktur: <span id="detailFPNumber"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -104,44 +107,373 @@
     </div>
   </div>
 </div>
+
+<!-- FP Edit Overlay -->
+<div class="fp-edit-overlay d-none" id="fpEditOverlay">
+  <div class="fp-edit-header">
+    <div class="d-flex align-items-center gap-3">
+      <button class="btn btn-sm btn-outline-light" id="editBtnBack" title="Kembali">
+        <i class="bi bi-arrow-left"></i> Kembali
+      </button>
+      <h5 class="mb-0 text-white" id="editTitle">Edit Faktur</h5>
+    </div>
+    <button class="btn btn-sm btn-success" id="editBtnSave">
+      <i class="bi bi-check-lg"></i> Simpan
+    </button>
+  </div>
+  <div class="fp-edit-body">
+    <div class="row g-2 mb-3">
+      <div class="col-md-3">
+        <label class="form-label mb-1"><small>Supplier</small></label>
+        <div class="h-supp-dropdown">
+          <input type="text" class="form-control form-control-sm" id="editSuppInput" placeholder="-- Pilih Supplier --" autocomplete="off">
+          <input type="hidden" id="editSupplier" value="">
+          <div class="h-supp-menu d-none" id="editSuppMenu"></div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1"><small>Tanggal</small></label>
+        <input type="date" class="form-control form-control-sm" id="editDate">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1"><small>User</small></label>
+        <input type="text" class="form-control form-control-sm" id="editUserDisplay" value="{{ user.username if user else '' }}" readonly>
+        <input type="hidden" id="editUser" value="{{ user.username if user else '' }}">
+      </div>
+      <div class="col-md-5">
+        <label class="form-label mb-1"><small>Tambah Item</small></label>
+        <div class="position-relative">
+          <input type="text" class="form-control form-control-sm" id="editSearchInput" placeholder="Cari nama / barcode...">
+          <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:200px;overflow-y:auto" id="editSearchResults"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
+        <span class="badge badge-counter" id="editItemCount">0 item</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="editItemTable">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th class="col-name">Nama Barang</th>
+                <th class="col-barcode">Barcode</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="editTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.querySelectorAll('.btn-view-po').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const po = btn.dataset.po;
-    const res = await fetch(`/api/po/${po}`);
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+(function() {
+  'use strict';
 
-    document.getElementById('detailPONumber').textContent = data.noorder;
-    document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
-    document.getElementById('detailDate').textContent = data.tglorder || '';
-    document.getElementById('detailTotal').textContent = formatNumber(data.jlhfaktur || 0);
+  var pageEl = document.querySelector('.sh-page');
+  var canEdit = pageEl.dataset.canEdit === 'true';
+  var canDelete = pageEl.dataset.canDelete === 'true';
+  var canLock = pageEl.dataset.canLock === 'true';
 
-    const tbody = document.getElementById('detailLines');
-    tbody.innerHTML = '';
-    (data.lines || []).forEach((line, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i + 1}</td>
-        <td><code>${line.stockid || ''}</code></td>
-        <td>${line.artname || ''}</td>
-        <td class="text-end">${line.qty}</td>
-        <td>${line.satuanbsr || ''}</td>
-        <td class="text-end">${formatNumber(line.hbelibsr || 0)}</td>
-        <td class="text-end">${formatNumber(line.amount || 0)}</td>
-      `;
-      tbody.appendChild(tr);
+  var elDateFrom = document.getElementById('hDateFrom');
+  var elDateTo = document.getElementById('hDateTo');
+  var elSupplier = document.getElementById('hSupplier');
+  var elBtnSearch = document.getElementById('hBtnSearch');
+  var elLoading = document.getElementById('hLoading');
+  var elResults = document.getElementById('hResults');
+  var elEmpty = document.getElementById('hEmpty');
+  var elBody = document.getElementById('hTableBody');
+  var elCount = document.getElementById('hResultCount');
+  var elPageList = document.getElementById('hPageList');
+
+  var currentPage = 1;
+  var perPage = 20;
+
+  // Default date range: today
+  var today = new Date().toISOString().split('T')[0];
+  elDateFrom.value = today;
+  elDateTo.value = today;
+
+  // Searchable supplier dropdown
+  var elSuppInput = document.getElementById('hSuppInput');
+  var elSuppMenu = document.getElementById('hSuppMenu');
+  var allVendors = [];
+
+  fetch('/api/vendors')
+    .then(function(r) { return r.json(); })
+    .then(function(vendors) {
+      allVendors = vendors.map(function(v) {
+        return { id: v.id, label: v.id + ' - ' + (v.name || v.id) };
+      });
     });
 
-    new bootstrap.Modal(document.getElementById('poDetailModal')).show();
-  });
-});
+  function renderSuppMenu(filter) {
+    var q = (filter || '').toLowerCase();
+    var items = q ? allVendors.filter(function(v) { return v.label.toLowerCase().indexOf(q) >= 0; }) : allVendors;
+    elSuppMenu.innerHTML = '';
+    var semua = document.createElement('div');
+    semua.className = 'h-supp-item';
+    semua.textContent = 'Semua';
+    semua.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      elSupplier.value = '';
+      elSuppInput.value = '';
+      elSuppInput.placeholder = 'Semua';
+      elSuppMenu.classList.add('d-none');
+      loadData(1);
+    });
+    elSuppMenu.appendChild(semua);
+    items.slice(0, 50).forEach(function(v) {
+      var div = document.createElement('div');
+      div.className = 'h-supp-item';
+      div.textContent = v.label;
+      div.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        elSupplier.value = v.id;
+        elSuppInput.value = v.label;
+        elSuppMenu.classList.add('d-none');
+        loadData(1);
+      });
+      elSuppMenu.appendChild(div);
+    });
+    elSuppMenu.classList.remove('d-none');
+  }
 
-function formatNumber(n) {
-  return new Intl.NumberFormat('id-ID').format(Math.round(n));
-}
+  var suppSelected = ''; // store selected label to restore on blur without change
+  elSuppInput.addEventListener('focus', function() {
+    suppSelected = elSuppInput.value;
+    elSuppInput.value = '';
+    renderSuppMenu('');
+  });
+  elSuppInput.addEventListener('input', function() { renderSuppMenu(elSuppInput.value); });
+  elSuppInput.addEventListener('blur', function() {
+    elSuppMenu.classList.add('d-none');
+    // Restore previous selection if user didn't pick anything
+    if (!elSuppInput.value && suppSelected) elSuppInput.value = suppSelected;
+  });
+  elSuppInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { elSuppMenu.classList.add('d-none'); elSuppInput.blur(); }
+  });
+
+  function fmtNum(n) {
+    return new Intl.NumberFormat('id-ID').format(Math.round(n));
+  }
+
+  function loadData(page) {
+    currentPage = page || 1;
+    elLoading.classList.remove('d-none');
+    elResults.classList.add('d-none');
+    elEmpty.classList.add('d-none');
+
+    var params = new URLSearchParams();
+    params.set('page', currentPage);
+    if (elDateFrom.value) params.set('date_from', elDateFrom.value);
+    if (elDateTo.value) params.set('date_to', elDateTo.value);
+    if (elSupplier.value) params.set('supplier', elSupplier.value);
+
+    fetch('/api/fp/list?' + params.toString())
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        elLoading.classList.add('d-none');
+        var items = data.items || [];
+        var total = data.total || 0;
+
+        if (items.length === 0) {
+          elEmpty.classList.remove('d-none');
+          return;
+        }
+
+        elResults.classList.remove('d-none');
+        elCount.textContent = total + ' faktur ditemukan';
+
+        elBody.innerHTML = '';
+        items.forEach(function(o) {
+          var tr = document.createElement('tr');
+          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-fp" data-fp="' + o.nofaktur + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          if (canEdit) {
+            var editCls = o.isupdateprice ? 'btn-outline-secondary' : 'btn-outline-warning';
+            var editDis = o.isupdateprice ? ' disabled' : '';
+            actions += ' <button class="btn btn-sm btn-edit-fp ' + editCls + '" data-fp="' + o.nofaktur + '" title="Edit"' + editDis + '><i class="bi bi-pencil"></i></button>';
+          }
+          if (canDelete && !o.isupdateprice) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-fp" data-fp="' + o.nofaktur + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
+          if (canLock) {
+            var lockCls = o.isupdateprice ? 'btn-warning' : 'btn-outline-secondary';
+            var lockIcon = o.isupdateprice ? 'lock-fill' : 'unlock';
+            var lockTitle = o.isupdateprice ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+            actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.isupdateprice ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+          }
+          tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
+            + '<td>' + (o.tglfaktur || '-') + '</td>'
+            + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+            + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
+            + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td class="text-nowrap">' + actions + '</td>';
+          elBody.appendChild(tr);
+        });
+
+        // Pagination
+        renderPagination(total);
+
+        // Bind view/edit/lock buttons
+        bindButtons();
+      });
+  }
+
+  function renderPagination(total) {
+    var totalPages = Math.ceil(total / perPage);
+    elPageList.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    // Show up to 5 pages around current
+    var startPage = Math.max(1, currentPage - 2);
+    var endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    // << prev
+    if (currentPage > 1) {
+      addPageBtn('«', currentPage - 1);
+    }
+
+    for (var p = startPage; p <= endPage; p++) {
+      addPageBtn(p, p, p === currentPage);
+    }
+
+    // >> next
+    if (currentPage < totalPages) {
+      addPageBtn('»', currentPage + 1);
+    }
+  }
+
+  function addPageBtn(label, page, active) {
+    var li = document.createElement('li');
+    li.className = 'page-item' + (active ? ' active' : '');
+    var a = document.createElement('a');
+    a.className = 'page-link';
+    a.href = '#';
+    a.textContent = label;
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      loadData(page);
+    });
+    li.appendChild(a);
+    elPageList.appendChild(li);
+  }
+
+  function bindButtons() {
+    // View
+    document.querySelectorAll('#hTableBody .btn-view-fp').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var fp = btn.dataset.fp;
+        var res = await fetch('/api/fp/' + fp);
+        var data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('detailFPNumber').textContent = data.nofaktur;
+        document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
+        document.getElementById('detailDate').textContent = data.tglfaktur || '';
+        document.getElementById('detailTotal').textContent = fmtNum(data.jlhfaktur || 0);
+        var tbody = document.getElementById('detailLines');
+        tbody.innerHTML = '';
+        (data.lines || []).forEach(function(line, i) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + (i + 1) + '</td>'
+            + '<td><code>' + (line.stockid || '') + '</code></td>'
+            + '<td>' + (line.artname || '') + '</td>'
+            + '<td class="text-end">' + line.qty + '</td>'
+            + '<td>' + (line.satuanbsr || '') + '</td>'
+            + '<td class="text-end">' + fmtNum(line.hbelibsr || 0) + '</td>'
+            + '<td class="text-end">' + fmtNum(line.amount || 0) + '</td>';
+          tbody.appendChild(tr);
+        });
+        new bootstrap.Modal(document.getElementById('fpDetailModal')).show();
+      });
+    });
+
+    // Delete
+    document.querySelectorAll('#hTableBody .btn-delete-fp').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var fp = btn.dataset.fp;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus faktur ' + fp + '? Stok dan harga akan dikembalikan.') : Promise.resolve(confirm('Hapus faktur ' + fp + '?')));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/fp/' + encodeURIComponent(fp), {method: 'DELETE'});
+          var data = await res.json();
+          if (data.ok) {
+            window.showToast && showToast('Faktur ' + fp + ' berhasil dihapus');
+            loadData(currentPage);
+          } else {
+            window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
+      });
+    });
+
+    // Lock/unlock
+    document.querySelectorAll('#hTableBody .btn-lock-fp').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var fp = btn.dataset.fp;
+        var locked = btn.dataset.locked === '1';
+        var msg = locked ? 'Buka kunci faktur ' + fp + '?' : 'Kunci faktur ' + fp + ' agar tidak bisa diedit?';
+        var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/fp/' + fp + '/toggle-lock', {method: 'POST'});
+          var data = await res.json();
+          if (data.ok) {
+            var newLocked = data.isupdateprice;
+            btn.dataset.locked = newLocked;
+            btn.className = 'btn btn-sm btn-lock-fp ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
+            btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+            btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
+            var editBtn = btn.closest('td').querySelector('.btn-edit-fp');
+            if (editBtn) {
+              editBtn.disabled = !!newLocked;
+              editBtn.className = 'btn btn-sm btn-edit-fp ' + (newLocked ? 'btn-outline-secondary' : 'btn-outline-warning');
+            }
+            if (canDelete) {
+              var td = btn.closest('td');
+              var delBtn = td.querySelector('.btn-delete-fp');
+              if (newLocked && delBtn) {
+                delBtn.remove();
+              } else if (!newLocked && !delBtn) {
+                var newDel = document.createElement('button');
+                newDel.className = 'btn btn-sm btn-outline-danger btn-delete-fp';
+                newDel.dataset.fp = fp;
+                newDel.title = 'Hapus';
+                newDel.innerHTML = '<i class="bi bi-trash"></i>';
+                td.insertBefore(newDel, btn);
+                newDel.insertAdjacentText('afterend', ' ');
+                bindButtons();
+              }
+            }
+            window.showToast && showToast(newLocked ? 'Faktur dikunci' : 'Faktur dibuka kuncinya');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
+      });
+    });
+  }
+
+  elBtnSearch.addEventListener('click', function() { loadData(1); });
+  elDateFrom.addEventListener('change', function() { loadData(1); });
+  elDateTo.addEventListener('change', function() { loadData(1); });
+
+
+  // Initial load
+  loadData(1);
+})();
 </script>
+<script src="{{ url_for('static', filename='js/fp_edit.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

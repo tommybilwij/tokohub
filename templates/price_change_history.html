@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}Perubahan Harga{% endblock %}
+
+{% block content %}
+<div class="sh-page" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-tag"></i> Perubahan Harga</h5>
+    {% if can_entry | default(false) %}
+    <a href="/perubahan-harga/input" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Input Perubahan Harga
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="date" id="phDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="date" id="phDateTo" class="form-control form-control-sm">
+      </label>
+      <button class="btn btn-sm btn-primary" id="phBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="phLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results -->
+  <div class="d-none" id="phResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="phResultCount"></small>
+    </div>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th>No. PH</th>
+            <th>Tanggal</th>
+            <th>Keterangan</th>
+            <th>User</th>
+            <th class="text-center">Items</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="phTableBody"></tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <nav class="mt-2" id="phPagination">
+      <ul class="pagination pagination-sm mb-0 justify-content-center" id="phPageList"></ul>
+    </nav>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="phEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada perubahan harga untuk filter ini.</p>
+  </div>
+</div>
+
+<!-- PH Detail Modal -->
+<div class="modal fade" id="phDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detail Perubahan Harga: <span id="detailPHNumber"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4"><strong>Tanggal:</strong> <span id="detailPHDate"></span></div>
+          <div class="col-md-4"><strong>User:</strong> <span id="detailPHUser"></span></div>
+          <div class="col-md-4"><strong>Keterangan:</strong> <span id="detailPHUraian"></span></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Artno</th>
+                <th>Nama</th>
+                <th class="text-end">HJual Lama</th>
+                <th class="text-end">HJual Baru</th>
+                <th class="text-end">HJual2</th>
+                <th class="text-end">HJual3</th>
+              </tr>
+            </thead>
+            <tbody id="detailPHLines"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  'use strict';
+
+  var pageEl = document.querySelector('.sh-page');
+  var canDelete = pageEl.dataset.canDelete === 'true';
+  var canLock = pageEl.dataset.canLock === 'true';
+
+  var elDateFrom = document.getElementById('phDateFrom');
+  var elDateTo = document.getElementById('phDateTo');
+  var elBtnSearch = document.getElementById('phBtnSearch');
+  var elLoading = document.getElementById('phLoading');
+  var elResults = document.getElementById('phResults');
+  var elEmpty = document.getElementById('phEmpty');
+  var elBody = document.getElementById('phTableBody');
+  var elCount = document.getElementById('phResultCount');
+  var elPageList = document.getElementById('phPageList');
+
+  var currentPage = 1;
+  var perPage = 20;
+
+  // Default date range: today
+  var today = new Date().toISOString().split('T')[0];
+  elDateFrom.value = today;
+  elDateTo.value = today;
+
+  function fmtNum(n) {
+    return new Intl.NumberFormat('id-ID').format(Math.round(n));
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function loadData(page) {
+    currentPage = page || 1;
+    elLoading.classList.remove('d-none');
+    elResults.classList.add('d-none');
+    elEmpty.classList.add('d-none');
+
+    var params = new URLSearchParams();
+    params.set('page', currentPage);
+    if (elDateFrom.value) params.set('date_from', elDateFrom.value);
+    if (elDateTo.value) params.set('date_to', elDateTo.value);
+
+    fetch('/api/ph/list?' + params.toString())
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        elLoading.classList.add('d-none');
+        var items = data.items || [];
+        var total = data.total || 0;
+
+        if (items.length === 0) {
+          elEmpty.classList.remove('d-none');
+          return;
+        }
+
+        elResults.classList.remove('d-none');
+        elCount.textContent = total + ' perubahan harga ditemukan';
+
+        elBody.innerHTML = '';
+        items.forEach(function(o) {
+          var tr = document.createElement('tr');
+          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-ph" data-ph="' + esc(o.nobukti) + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          if (canDelete && !o.islocked) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-ph" data-ph="' + esc(o.nobukti) + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
+          if (canLock) {
+            var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
+            var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
+            var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+            actions += ' <button class="btn btn-sm btn-lock-ph ' + lockCls + '" data-ph="' + esc(o.nobukti) + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+          }
+          tr.innerHTML = '<td><code>' + esc(o.nobukti) + '</code></td>'
+            + '<td>' + (o.tglberlaku || '-') + '</td>'
+            + '<td>' + esc(o.uraian || '') + '</td>'
+            + '<td>' + esc(o.userid || '') + '</td>'
+            + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td class="text-nowrap">' + actions + '</td>';
+          elBody.appendChild(tr);
+        });
+
+        renderPagination(total);
+        bindButtons();
+      });
+  }
+
+  function renderPagination(total) {
+    var totalPages = Math.ceil(total / perPage);
+    elPageList.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    var startPage = Math.max(1, currentPage - 2);
+    var endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    if (currentPage > 1) addPageBtn('«', currentPage - 1);
+    for (var p = startPage; p <= endPage; p++) addPageBtn(p, p, p === currentPage);
+    if (currentPage < totalPages) addPageBtn('»', currentPage + 1);
+  }
+
+  function addPageBtn(label, page, active) {
+    var li = document.createElement('li');
+    li.className = 'page-item' + (active ? ' active' : '');
+    var a = document.createElement('a');
+    a.className = 'page-link';
+    a.href = '#';
+    a.textContent = label;
+    a.addEventListener('click', function(e) { e.preventDefault(); loadData(page); });
+    li.appendChild(a);
+    elPageList.appendChild(li);
+  }
+
+  function bindButtons() {
+    // View
+    document.querySelectorAll('#phTableBody .btn-view-ph').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var ph = btn.dataset.ph;
+        var res = await fetch('/api/ph/' + encodeURIComponent(ph));
+        var data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('detailPHNumber').textContent = data.nobukti;
+        document.getElementById('detailPHDate').textContent = data.tglberlaku || '';
+        document.getElementById('detailPHUser').textContent = data.userid || '';
+        document.getElementById('detailPHUraian').textContent = data.uraian || '';
+        var tbody = document.getElementById('detailPHLines');
+        tbody.innerHTML = '';
+        (data.lines || []).forEach(function(line, i) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + (i + 1) + '</td>'
+            + '<td><code>' + esc(line.stockid || '') + '</code></td>'
+            + '<td>' + esc(line.artname || '') + '</td>'
+            + '<td class="text-end">' + fmtNum(line.oprice || 0) + '</td>'
+            + '<td class="text-end fw-bold">' + fmtNum(line.hjual || 0) + '</td>'
+            + '<td class="text-end">' + fmtNum(line.hjual2 || 0) + '</td>'
+            + '<td class="text-end">' + fmtNum(line.hjual3 || 0) + '</td>';
+          tbody.appendChild(tr);
+        });
+        new bootstrap.Modal(document.getElementById('phDetailModal')).show();
+      });
+    });
+
+    // Delete
+    document.querySelectorAll('#phTableBody .btn-delete-ph').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var ph = btn.dataset.ph;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus perubahan harga ' + ph + '? Harga jual akan dikembalikan.') : Promise.resolve(confirm('Hapus perubahan harga ' + ph + '?')));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/ph/' + encodeURIComponent(ph), {method: 'DELETE'});
+          var data = await res.json();
+          if (data.ok) {
+            window.showToast && showToast('Perubahan harga ' + ph + ' berhasil dihapus');
+            loadData(currentPage);
+          } else {
+            window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
+      });
+    });
+
+    // Lock/unlock
+    document.querySelectorAll('#phTableBody .btn-lock-ph').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var ph = btn.dataset.ph;
+        var locked = btn.dataset.locked === '1';
+        var msg = locked ? 'Buka kunci ' + ph + '?' : 'Kunci ' + ph + ' agar tidak bisa diubah?';
+        var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
+        if (!confirmed) return;
+        try {
+          var res = await fetch('/api/ph/' + encodeURIComponent(ph) + '/toggle-lock', {method: 'POST'});
+          var data = await res.json();
+          if (data.ok) {
+            var newLocked = data.islocked;
+            btn.dataset.locked = newLocked;
+            btn.className = 'btn btn-sm btn-lock-ph ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
+            btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+            btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
+            if (canDelete) {
+              var td = btn.closest('td');
+              var delBtn = td.querySelector('.btn-delete-ph');
+              if (newLocked && delBtn) {
+                delBtn.remove();
+              } else if (!newLocked && !delBtn) {
+                var newDel = document.createElement('button');
+                newDel.className = 'btn btn-sm btn-outline-danger btn-delete-ph';
+                newDel.dataset.ph = ph;
+                newDel.title = 'Hapus';
+                newDel.innerHTML = '<i class="bi bi-trash"></i>';
+                td.insertBefore(newDel, btn);
+                newDel.insertAdjacentText('afterend', ' ');
+                bindButtons();
+              }
+            }
+            window.showToast && showToast(newLocked ? 'Perubahan harga dikunci' : 'Perubahan harga dibuka kuncinya');
+          }
+        } catch(e) {
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
+      });
+    });
+  }
+
+  elBtnSearch.addEventListener('click', function() { loadData(1); });
+  elDateFrom.addEventListener('change', function() { loadData(1); });
+  elDateTo.addEventListener('change', function() { loadData(1); });
+
+  // Initial load
+  loadData(1);
+})();
+</script>
+{% endblock %}

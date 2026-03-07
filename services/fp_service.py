@@ -81,7 +81,7 @@ async def get_stock_details(pool, artno_list):
     return {row['artno']: row for row in rows}
 
 
-async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0):
+async def preview_fp(pool, supplier_id, items, order_date=None, shipping_cost=0):
     """Build a FP preview without committing.
 
     Args:
@@ -226,7 +226,7 @@ async def preview_po(pool, supplier_id, items, order_date=None, shipping_cost=0)
     }
 
 
-async def commit_po(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
+async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
     """Create Faktur Pembelian in two phases to minimise lock contention with MyPosse POS.
 
     Phase 1 (single transaction):
@@ -242,7 +242,7 @@ async def commit_po(pool, supplier_id, items, order_date=None, userid=None, ship
     if not userid:
         raise POCreationError("userid is required")
     order_date = order_date or date.today()
-    preview = await preview_po(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
+    preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
     # Capture before-state for snapshot
     from services.snapshot_service import capture_before, build_after, save_snapshot
@@ -557,7 +557,7 @@ async def get_fp_detail(pool, fp_number):
 async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
     """Update an existing Faktur Pembelian: reverse old stock, replace sthist lines, apply new stock.
 
-    Same two-phase approach as commit_po.
+    Same two-phase approach as commit_fp.
     """
     if not userid:
         raise POCreationError("userid is required")
@@ -581,7 +581,7 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     )
 
     # Build new preview
-    preview = await preview_po(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
+    preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
     # Capture before-state for snapshot
     from services.snapshot_service import capture_before, build_after, save_snapshot

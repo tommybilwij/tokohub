@@ -34,7 +34,7 @@
     itemTableBody:   $('#itemTableBody'),
     itemCount:       $('#itemCount'),
     emptyRow:        $('#emptyRow'),
-    btnPreviewPO:    $('#btnPreviewPO'),
+    btnPreviewFP:    $('#btnPreviewFP'),
     btnClearAll:     $('#btnClearAll'),
     btnUploadPhoto:  $('#btnUploadPhoto'),
     photoInput:      $('#photoInput'),
@@ -45,14 +45,14 @@
     matchCandidates: $('#matchCandidates'),
     matchFilter:     $('#matchFilter'),
     chkSaveAlias:    $('#chkSaveAlias'),
-    poPreviewModal:  $('#poPreviewModal'),
-    poSupplierName:  $('#poSupplierName'),
-    poDate:          $('#poDate'),
-    poGrandTotal:    $('#poGrandTotal'),
-    poPreviewBody:   $('#poPreviewBody'),
-    btnCommitPO:     $('#btnCommitPO'),
-    poSuccessModal:  $('#poSuccessModal'),
-    successPONumber: $('#successPONumber'),
+    fpPreviewModal:  $('#fpPreviewModal'),
+    fpSupplierName:  $('#fpSupplierName'),
+    fpDate:          $('#fpDate'),
+    fpGrandTotal:    $('#fpGrandTotal'),
+    fpPreviewBody:   $('#fpPreviewBody'),
+    btnCommitFP:     $('#btnCommitFP'),
+    fpSuccessModal:  $('#fpSuccessModal'),
+    successFPNumber: $('#successFPNumber'),
     successTotal:    $('#successTotal'),
     successLineCount:$('#successLineCount'),
     btnNewReceipt:   $('#btnNewReceipt'),
@@ -82,7 +82,7 @@
 
   /**
    * Calculate net purchase price after cascading discounts and tax.
-   * Mirrors the backend calculation in fp_service.preview_po().
+   * Mirrors the backend calculation in fp_service.preview_fp().
    */
   function calcNetPrice(hbelibsr, pctdisc1, pctdisc2, pctdisc3, pctppn) {
     const d1 = hbelibsr * (pctdisc1 || 0) / 100;
@@ -418,7 +418,7 @@
     });
 
     // Action buttons
-    dom.btnPreviewPO.addEventListener('click', previewPO);
+    dom.btnPreviewFP.addEventListener('click', previewFP);
     dom.btnClearAll.addEventListener('click', clearAllItems);
 
     // Header fields — persist on change
@@ -441,11 +441,11 @@
     dom.btnUploadPhoto.addEventListener('click', uploadPhoto);
 
     // FP commit
-    dom.btnCommitPO.addEventListener('click', commitPO);
+    dom.btnCommitFP.addEventListener('click', commitFP);
 
     // New receipt after success
     dom.btnNewReceipt.addEventListener('click', () => {
-      bootstrap.Modal.getInstance(dom.poSuccessModal).hide();
+      bootstrap.Modal.getInstance(dom.fpSuccessModal).hide();
       clearAllItems();
     });
 
@@ -1051,7 +1051,7 @@
           <span class="mt-2 d-inline-block">Belum ada barang. Tambahkan dari panel kiri.</span>
         </td></tr>`;
       dom.itemCount.textContent = '0 item';
-      dom.btnPreviewPO.disabled = true;
+      dom.btnPreviewFP.disabled = true;
       dom.btnClearAll.disabled = true;
       _saveState();
       return;
@@ -1279,7 +1279,7 @@
     dom.btnClearAll.disabled = false;
 
     const allMatched = state.items.every((i) => i.status === 'auto' && i.selectedArtno);
-    dom.btnPreviewPO.disabled = !allMatched;
+    dom.btnPreviewFP.disabled = !allMatched;
 
     _saveState();
     _autoZoomTable();
@@ -1976,7 +1976,7 @@
     return payload;
   }
 
-  async function previewPO() {
+  async function previewFP() {
     if (!requireHeaderFields()) return;
     const userId = dom.userSelect.value;
     const supplierId = dom.vendorSelect.value;
@@ -2010,8 +2010,8 @@
         },
       });
 
-      renderPOPreview(data);
-      new bootstrap.Modal(dom.poPreviewModal).show();
+      renderFPPreview(data);
+      new bootstrap.Modal(dom.fpPreviewModal).show();
     } catch (e) {
       showToast('Preview gagal: ' + e.message, 'danger');
     } finally {
@@ -2019,57 +2019,57 @@
     }
   }
 
-  function renderPOPreview(data) {
+  function renderFPPreview(data) {
     const vendor = state.vendors.find((v) => v.id === data.supplier_id);
-    dom.poSupplierName.textContent = vendor ? `${vendor.id} - ${vendor.name}` : data.supplier_id;
-    dom.poDate.textContent = data.order_date;
-    dom.poGrandTotal.textContent = formatNumber(data.grand_total);
+    dom.fpSupplierName.textContent = vendor ? `${vendor.id} - ${vendor.name}` : data.supplier_id;
+    dom.fpDate.textContent = data.order_date;
+    dom.fpGrandTotal.textContent = formatNumber(data.grand_total);
 
     const fmtDisc = (v) => {
-      if (!v) return '<span class="po-disc-zero">-</span>';
+      if (!v) return '<span class="fp-disc-zero">-</span>';
       const n = parseFloat(v);
-      if (n === 0) return '<span class="po-disc-zero">-</span>';
+      if (n === 0) return '<span class="fp-disc-zero">-</span>';
       return Number.isInteger(n) ? n.toString() : n.toFixed(2);
     };
 
-    dom.poPreviewBody.innerHTML = '';
+    dom.fpPreviewBody.innerHTML = '';
     let totalAmount = 0;
     data.lines.forEach((line, i) => {
       totalAmount += line.amount || 0;
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="po-rownum">${i + 1}</td>
-        <td class="po-artno">${line.artno}</td>
+        <td class="fp-rownum">${i + 1}</td>
+        <td class="fp-artno">${line.artno}</td>
         <td>${line.artname}</td>
-        <td class="po-num">${line.qty_besar || line.qty}</td>
+        <td class="fp-num">${line.qty_besar || line.qty}</td>
         <td>${line.satuanbsr}</td>
-        <td class="po-num">${formatNumber(line.hbelibsr)}</td>
-        <td class="po-num">${formatNumber(line.hbelikcl)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc1)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc2)}</td>
-        <td class="po-num">${fmtDisc(line.pctdisc3)}</td>
-        <td class="po-num">${fmtDisc(line.pctppn)}</td>
-        <td class="po-num">${formatNumber(line.netto_full)}</td>
-        <td class="po-num">${formatNumber(line.netto_full * (line.qty_besar || line.qty))}</td>
-        <td class="po-num po-amount">${formatNumber(line.amount)}</td>
+        <td class="fp-num">${formatNumber(line.hbelibsr)}</td>
+        <td class="fp-num">${formatNumber(line.hbelikcl)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc1)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc2)}</td>
+        <td class="fp-num">${fmtDisc(line.pctdisc3)}</td>
+        <td class="fp-num">${fmtDisc(line.pctppn)}</td>
+        <td class="fp-num">${formatNumber(line.netto_full)}</td>
+        <td class="fp-num">${formatNumber(line.netto_full * (line.qty_besar || line.qty))}</td>
+        <td class="fp-num fp-amount">${formatNumber(line.amount)}</td>
       `;
-      dom.poPreviewBody.appendChild(tr);
+      dom.fpPreviewBody.appendChild(tr);
     });
 
     // Grand total row
     const trTotal = document.createElement('tr');
-    trTotal.className = 'po-row-grand-total';
+    trTotal.className = 'fp-row-grand-total';
     trTotal.innerHTML = `
       <td colspan="13" class="text-end">Grand Total</td>
-      <td class="po-num po-grand-total-value">${formatNumber(data.grand_total)}</td>
+      <td class="fp-num fp-grand-total-value">${formatNumber(data.grand_total)}</td>
     `;
-    dom.poPreviewBody.appendChild(trTotal);
+    dom.fpPreviewBody.appendChild(trTotal);
   }
 
   // -----------------------------------------------------------------------
   // FP Commit
   // -----------------------------------------------------------------------
-  async function commitPO() {
+  async function commitFP() {
     if (!await showConfirm('Buat Purchase Order dan update stok? Aksi ini tidak bisa dibatalkan.')) return;
 
     const userId = dom.userSelect.value;
@@ -2099,7 +2099,7 @@
       });
 
       // Close preview, show success — clear draft
-      bootstrap.Modal.getInstance(dom.poPreviewModal).hide();
+      bootstrap.Modal.getInstance(dom.fpPreviewModal).hide();
       _clearSavedState();
 
       // Save aliases for items that were flagged during match selection
@@ -2116,12 +2116,12 @@
         }
       }
 
-      dom.successPONumber.textContent = data.fp_number;
+      dom.successFPNumber.textContent = data.fp_number;
       dom.successTotal.textContent = formatNumber(data.grand_total);
       dom.successLineCount.textContent = data.line_count;
 
       setTimeout(() => {
-        new bootstrap.Modal(dom.poSuccessModal).show();
+        new bootstrap.Modal(dom.fpSuccessModal).show();
       }, 300);
     } catch (e) {
       showToast('Commit Faktur gagal: ' + e.message, 'danger');

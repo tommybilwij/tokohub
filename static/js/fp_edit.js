@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var overlay = document.getElementById('poEditOverlay');
+  var overlay = document.getElementById('fpEditOverlay');
   if (!overlay) return;
 
   var UNITS = ['CTN','BOX','BAL','DUS','PAK','LSN','KTK','RTG','ZAK','GONI','SAK','KLG','KRAT','PPN','TOP','PAIL','GROS','GROSS','KRT','Pcs'];

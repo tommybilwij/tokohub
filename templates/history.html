@@ -109,8 +109,8 @@
 </div>
 
 <!-- FP Edit Overlay -->
-<div class="po-edit-overlay d-none" id="poEditOverlay">
-  <div class="po-edit-header">
+<div class="fp-edit-overlay d-none" id="fpEditOverlay">
+  <div class="fp-edit-header">
     <div class="d-flex align-items-center gap-3">
       <button class="btn btn-sm btn-outline-light" id="editBtnBack" title="Kembali">
         <i class="bi bi-arrow-left"></i> Kembali
@@ -121,7 +121,7 @@
       <i class="bi bi-check-lg"></i> Simpan
     </button>
   </div>
-  <div class="po-edit-body">
+  <div class="fp-edit-body">
     <div class="row g-2 mb-3">
       <div class="col-md-3">
         <label class="form-label mb-1"><small>Supplier</small></label>
@@ -369,8 +369,8 @@
     // View
     document.querySelectorAll('#hTableBody .btn-view-fp').forEach(function(btn) {
       btn.addEventListener('click', async function() {
-        var po = btn.dataset.fp;
-        var res = await fetch('/api/fp/' + po);
+        var fp = btn.dataset.fp;
+        var res = await fetch('/api/fp/' + fp);
         var data = await res.json();
         if (data.error) { alert(data.error); return; }
         document.getElementById('detailFPNumber').textContent = data.nofaktur;
@@ -397,13 +397,13 @@
     // Lock/unlock
     document.querySelectorAll('#hTableBody .btn-lock-fp').forEach(function(btn) {
       btn.addEventListener('click', async function() {
-        var po = btn.dataset.fp;
+        var fp = btn.dataset.fp;
         var locked = btn.dataset.locked === '1';
-        var msg = locked ? 'Buka kunci faktur ' + po + '?' : 'Kunci faktur ' + po + ' agar tidak bisa diedit?';
+        var msg = locked ? 'Buka kunci faktur ' + fp + '?' : 'Kunci faktur ' + fp + ' agar tidak bisa diedit?';
         var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
         if (!confirmed) return;
         try {
-          var res = await fetch('/api/fp/' + po + '/toggle-lock', {method: 'POST'});
+          var res = await fetch('/api/fp/' + fp + '/toggle-lock', {method: 'POST'});
           var data = await res.json();
           if (data.ok) {
             var newLocked = data.isupdateprice;

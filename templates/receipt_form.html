@@ -135,7 +135,7 @@
       <div class="card-footer">
         <div class="d-flex gap-3 align-items-center flex-wrap">
           <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-cta" id="btnPreviewPO" disabled>
+            <button class="btn btn-sm btn-cta" id="btnPreviewFP" disabled>
               <i class="bi bi-send"></i> Kirim Faktur
             </button>
           </div>
@@ -175,7 +175,7 @@
 </div>
 
 <!-- FP Preview Modal -->
-<div class="modal fade" id="poPreviewModal" tabindex="-1">
+<div class="modal fade" id="fpPreviewModal" tabindex="-1">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header modal-header-primary">
@@ -183,22 +183,22 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="po-summary">
-          <div class="po-summary-item">
-            <span class="po-summary-label">Supplier</span>
-            <span class="po-summary-value" id="poSupplierName"></span>
+        <div class="fp-summary">
+          <div class="fp-summary-item">
+            <span class="fp-summary-label">Supplier</span>
+            <span class="fp-summary-value" id="fpSupplierName"></span>
           </div>
-          <div class="po-summary-item">
-            <span class="po-summary-label">Tanggal</span>
-            <span class="po-summary-value" id="poDate"></span>
+          <div class="fp-summary-item">
+            <span class="fp-summary-label">Tanggal</span>
+            <span class="fp-summary-value" id="fpDate"></span>
           </div>
-          <div class="po-summary-item po-summary-total">
-            <span class="po-summary-label">Total</span>
-            <span class="po-summary-value" id="poGrandTotal"></span>
+          <div class="fp-summary-item fp-summary-total">
+            <span class="fp-summary-label">Total</span>
+            <span class="fp-summary-value" id="fpGrandTotal"></span>
           </div>
         </div>
         <div class="table-responsive">
-          <table class="po-preview-table">
+          <table class="fp-preview-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -217,13 +217,13 @@
                 <th class="text-end">Amount</th>
               </tr>
             </thead>
-            <tbody id="poPreviewBody"></tbody>
+            <tbody id="fpPreviewBody"></tbody>
           </table>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn btn-primary-app" id="btnCommitPO">
+        <button type="button" class="btn btn-primary-app" id="btnCommitFP">
           <i class="bi bi-check-circle"></i> Buat Faktur & Update Stok
         </button>
       </div>
@@ -232,7 +232,7 @@
 </div>
 
 <!-- FP Success Modal -->
-<div class="modal fade" id="poSuccessModal" tabindex="-1">
+<div class="modal fade" id="fpSuccessModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header modal-header-primary">
@@ -240,7 +240,7 @@
       </div>
       <div class="modal-body text-center">
         <div class="display-1 text-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
-        <h4>No. Faktur: <span id="successPONumber" class="text-primary"></span></h4>
+        <h4>No. Faktur: <span id="successFPNumber" class="text-primary"></span></h4>
         <p>Total: <span id="successTotal" class="fw-bold"></span></p>
         <p class="text-muted"><span id="successLineCount"></span> item, stok telah diperbarui.</p>
       </div>

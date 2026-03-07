@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from config import settings
 from dependencies import get_db
-from models.receipt import MatchRequest, AliasCreate, AliasDelete, POPreviewRequest, POCommitRequest, POUpdateRequest
+from models.receipt import MatchRequest, AliasCreate, AliasDelete, FPPreviewRequest, FPCommitRequest, FPUpdateRequest
 from services.stock_search import search_stock
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ async def delete_alias(data: AliasDelete, db: aiomysql.Pool = Depends(get_db)):
 
 
 @router.post('/receipt/preview')
-async def preview_po(data: POPreviewRequest, db: aiomysql.Pool = Depends(get_db)):
+async def preview_fp(data: FPPreviewRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()
     items = [item.model_dump() for item in data.items]
     order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
@@ -122,7 +122,7 @@ async def preview_po(data: POPreviewRequest, db: aiomysql.Pool = Depends(get_db)
         return JSONResponse({'error': 'supplier_id and items are required'}, status_code=400)
 
     try:
-        from services.fp_service import preview_po as _preview
+        from services.fp_service import preview_fp as _preview
         result = await _preview(db, supplier_id, items, order_date, shipping_cost=data.shipping_cost)
         return result
     except Exception as e:
@@ -131,7 +131,7 @@ async def preview_po(data: POPreviewRequest, db: aiomysql.Pool = Depends(get_db)
 
 
 @router.post('/receipt/commit')
-async def commit_po(data: POCommitRequest, db: aiomysql.Pool = Depends(get_db)):
+async def commit_fp(data: FPCommitRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()
     userid = data.userid.strip()
     items = [item.model_dump() for item in data.items]
@@ -141,7 +141,7 @@ async def commit_po(data: POCommitRequest, db: aiomysql.Pool = Depends(get_db)):
         return JSONResponse({'error': 'supplier_id, userid, and items are required'}, status_code=400)
 
     try:
-        from services.fp_service import commit_po as _commit
+        from services.fp_service import commit_fp as _commit
         result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
         return result
     except Exception as e:
@@ -199,7 +199,7 @@ async def toggle_fp_lock(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
 
 
 @router.post('/receipt/update')
-async def update_fp(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
+async def update_fp(data: FPUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     supplier_id = data.supplier_id.strip()
     userid = data.userid.strip()
     fp_number = data.fp_number.strip()

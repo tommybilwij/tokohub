@@ -24,7 +24,7 @@ class AliasDelete(BaseModel):
     id: int
 
 
-class POItem(BaseModel):
+class FPItem(BaseModel):
     artno: str
     qty: float
     price_override: float | None = None
@@ -46,25 +46,25 @@ class POItem(BaseModel):
     bundling2: dict | None = None
 
 
-class POPreviewRequest(BaseModel):
+class FPPreviewRequest(BaseModel):
     supplier_id: str
-    items: list[POItem]
+    items: list[FPItem]
     order_date: str | None = None
     shipping_cost: float = 0  # legacy total fallback
 
 
-class POCommitRequest(BaseModel):
+class FPCommitRequest(BaseModel):
     supplier_id: str
     userid: str
-    items: list[POItem]
+    items: list[FPItem]
     order_date: str | None = None
     shipping_cost: float = 0  # legacy total fallback
 
 
-class POUpdateRequest(BaseModel):
+class FPUpdateRequest(BaseModel):
     fp_number: str
     supplier_id: str
     userid: str
-    items: list[POItem]
+    items: list[FPItem]
     order_date: str | None = None
     shipping_cost: float = 0

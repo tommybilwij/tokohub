@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import settings, _ENVRC_PATH
+from services.encryption import ensure_enc_file
 
 # Resolve base directory (supports PyInstaller frozen builds)
 if getattr(sys, 'frozen', False):
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('zeroconf').setLevel(logging.ERROR)
 
 os.makedirs(settings.upload_folder, exist_ok=True)
+ensure_enc_file()
 
 _lifespan_lock = asyncio.Lock()
 _lifespan_count = 0

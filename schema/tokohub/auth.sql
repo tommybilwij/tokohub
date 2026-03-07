@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS tokohub.auth (
   username VARCHAR(30) NOT NULL,
-  password_hash VARCHAR(128) NOT NULL DEFAULT '',
+  password_hash VARCHAR(256) NOT NULL DEFAULT '',
   role VARCHAR(20) NOT NULL DEFAULT 'karyawan',
   permissions VARCHAR(500) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

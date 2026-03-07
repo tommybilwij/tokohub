@@ -2,16 +2,16 @@
 
 import hashlib
 import logging
-import secrets
+import os
 
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from services.db import execute_query, execute_single, execute_modify
+from services.encryption import get_secret_key, get_pepper
 
 logger = logging.getLogger(__name__)
 
 # Session cookie config
-_SECRET_KEY = None
 _SERIALIZER = None
 SESSION_COOKIE = 'tokohub_session'
 
@@ -49,21 +49,47 @@ ADMIN_PAGES = {'settings', 'users'}
 
 
 def _get_serializer() -> URLSafeTimedSerializer:
-    global _SECRET_KEY, _SERIALIZER
+    global _SERIALIZER
     if _SERIALIZER is None:
-        _SECRET_KEY = secrets.token_hex(32)
-        _SERIALIZER = URLSafeTimedSerializer(_SECRET_KEY)
+        _SERIALIZER = URLSafeTimedSerializer(get_secret_key())
     return _SERIALIZER
 
 
+# --- Password hashing: PBKDF2-HMAC-SHA256 with pepper + per-user salt ---
+
+_PBKDF2_ITERATIONS = 600_000
+_PBKDF2_PREFIX = 'pbkdf2$'
+
+
 def hash_password(password: str) -> str:
-    """SHA-256 hash of password with app-level salt."""
-    salted = f'tokohub:{password}'
-    return hashlib.sha256(salted.encode()).hexdigest()
+    """PBKDF2-HMAC-SHA256 with pepper and random salt.
+
+    Returns: 'pbkdf2$iterations$salt_hex$hash_hex'
+    """
+    pepper = get_pepper()
+    salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac(
+        'sha256',
+        (pepper + password).encode(),
+        salt,
+        _PBKDF2_ITERATIONS,
+    )
+    return f'{_PBKDF2_PREFIX}{_PBKDF2_ITERATIONS}${salt.hex()}${dk.hex()}'
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return hash_password(password) == password_hash
+    """Verify password against stored PBKDF2 hash."""
+    if not password_hash.startswith(_PBKDF2_PREFIX):
+        return False
+    _, iterations, salt_hex, hash_hex = password_hash.split('$')
+    pepper = get_pepper()
+    dk = hashlib.pbkdf2_hmac(
+        'sha256',
+        (pepper + password).encode(),
+        bytes.fromhex(salt_hex),
+        int(iterations),
+    )
+    return dk.hex() == hash_hex
 
 
 def create_session_token(username: str, role: str) -> str:

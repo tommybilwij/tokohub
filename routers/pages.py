@@ -116,9 +116,9 @@ async def history_page(
     if not has_entry and not has_history:
         denied = await _check_page(request, user, 'faktur')
         if denied: return denied
-    can_edit = await has_page_access(pool, user['role'], 'faktur:edit')
-    can_delete = await has_page_access(pool, user['role'], 'faktur:delete')
-    can_lock = await has_page_access(pool, user['role'], 'faktur:lock')
+    can_edit = await has_page_access(pool, user['role'], 'faktur:daftar:edit')
+    can_delete = await has_page_access(pool, user['role'], 'faktur:daftar:delete')
+    can_lock = await has_page_access(pool, user['role'], 'faktur:daftar:lock')
     return templates.TemplateResponse(request, 'history.html', {
         'can_entry': has_entry, 'can_edit': can_edit, 'can_delete': can_delete, 'can_lock': can_lock,
         **await _user_ctx(request, user),

@@ -37,7 +37,7 @@ async def upload_photo(photo: UploadFile = File(...), db: aiomysql.Pool = Depend
 
     try:
         from services.ocr import extract_lines
-        items = await extract_lines(filepath)
+        items = await extract_lines(db, filepath)
         return {'items': items}
     except Exception as e:
         logger.exception("OCR failed")

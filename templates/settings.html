@@ -29,8 +29,8 @@
             <input type="text" class="form-control form-control-sm" name="openai.api_version">
           </div>
           <div class="col-12 mt-2">
-            <button type="submit" class="btn btn-warning btn-sm btn-save-restart" data-form="formOpenai">
-              <i class="bi bi-arrow-clockwise"></i> Simpan & Restart
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg"></i> Simpan
             </button>
           </div>
         </form>
@@ -399,7 +399,7 @@
     });
   }
 
-  const restartForms = new Set(['formDb', 'formOpenai', 'formFuzzy', 'formServer']);
+  const restartForms = new Set(['formDb', 'formFuzzy', 'formServer']);
 
   // Attach save handler to each form
   document.querySelectorAll('form[id^="form"]').forEach(form => {

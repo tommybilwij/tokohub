@@ -8,11 +8,14 @@ import threading
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 
+import aiomysql
+
 from dependencies import get_db
 
 import config
 from config import save_to_envrc, _ENVRC_PATH
 from models.settings import SettingsUpdate
+from services.llm import get_openai_config, save_openai_config
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,8 @@ def _mask(value: str, visible: int = 4) -> str:
 
 
 @router.get('/api/settings')
-async def api_settings_get():
+async def api_settings_get(db: aiomysql.Pool = Depends(get_db)):
+    openai_cfg = await get_openai_config(db)
     return {
         'db': {
             'host': config.settings.db.host,
@@ -38,10 +42,10 @@ async def api_settings_get():
             'pool_size': config.settings.db.pool_size,
         },
         'openai': {
-            'api_base': config.settings.openai.api_base,
-            'api_key': _mask(config.settings.openai.api_key),
-            'deployment_id': config.settings.openai.deployment_id,
-            'api_version': config.settings.openai.api_version,
+            'api_base': openai_cfg['api_base'],
+            'api_key': _mask(openai_cfg['api_key']),
+            'deployment_id': openai_cfg['deployment_id'],
+            'api_version': openai_cfg['api_version'],
         },
         'fuzzy_cache_ttl': config.settings.fuzzy_cache_ttl,
         'fuzzy_top_n': config.settings.fuzzy_top_n,
@@ -68,10 +72,20 @@ def _strip_masked(data: dict) -> dict:
 
 
 @router.post('/api/settings')
-async def api_settings_post(data: SettingsUpdate):
+async def api_settings_post(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
     raw = _strip_masked(data.model_dump(exclude_none=True))
     try:
-        save_to_envrc(raw)
+        # Save OpenAI config to DB
+        if 'openai' in raw:
+            openai_data = raw.pop('openai')
+            # Merge with existing config (so partial updates work)
+            existing = await get_openai_config(db)
+            existing.update(openai_data)
+            await save_openai_config(db, existing)
+
+        # Save everything else to envrc
+        if raw:
+            save_to_envrc(raw)
         return {'ok': True}
     except Exception as e:
         logger.exception("Failed to save settings")
@@ -79,10 +93,16 @@ async def api_settings_post(data: SettingsUpdate):
 
 
 @router.post('/api/setup')
-async def api_setup(data: SettingsUpdate):
+async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
     raw = _strip_masked(data.model_dump(exclude_none=True))
     try:
-        save_to_envrc(raw)
+        if 'openai' in raw:
+            openai_data = raw.pop('openai')
+            existing = await get_openai_config(db)
+            existing.update(openai_data)
+            await save_openai_config(db, existing)
+        if raw:
+            save_to_envrc(raw)
         return {'ok': True}
     except Exception as e:
         logger.exception("Failed to save setup")

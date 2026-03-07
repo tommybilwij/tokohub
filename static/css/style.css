@@ -2262,14 +2262,20 @@ body {
 .value-changed { background: #fff3cd; border-radius: 3px; }
 .value-changed input { background: #fff3cd !important; }
 .sblm-hint {
-  font-size: 0.7rem;
-  color: #996600;
-  font-style: italic;
+  font-size: 0.8rem;
+  color: #c62828;
+  font-weight: 600;
   line-height: 1;
-  margin-top: 2px;
+  margin-bottom: 1px;
 }
 .sblm-inline { display: inline-block; margin-left: 8px; }
 .sblm-inline .sblm-hint { display: inline; }
+.dp-sblm-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--dp-pad-x, 10px);
+}
 
 /* Home page cards */
 .card-home {

@@ -69,17 +69,17 @@
     return h;
   }
 
-  // Show "sebelum" hint — always show when snapshot data exists
+  // Show "sebelum" hint — always show when snapshot data exists (value on top, no prefix)
   function sblmHint(stockVal) {
     if (stockVal == null || stockVal === undefined) return '';
     var sv = Number(stockVal) || 0;
-    return '<div class="sblm-hint">Stok sblm: ' + fmtNum(sv) + '</div>';
+    return '<div class="sblm-hint">' + fmtNum(sv) + '</div>';
   }
 
   function sblmPctHint(stockVal) {
     if (stockVal == null || stockVal === undefined) return '';
     var sv = Number(stockVal) || 0;
-    return '<div class="sblm-hint">Stok sblm: ' + sv + '%</div>';
+    return '<div class="sblm-hint">' + sv + '%</div>';
   }
 
   // CSS class for changed values
@@ -195,6 +195,12 @@
   }
 
   // ------- Render jual table -------
+  // Bundling stock field mapping: tier 1 -> hjualo1/hjual2o1/..., tier 2 -> hjualo2/hjual2o2/...
+  var _bundlingStockMap = {
+    1: { hjual1: 'hjualo1', hjual2: 'hjual2o1', hjual3: 'hjual3o1', hjual4: 'hjual4o1', hjual5: 'hjual5o1' },
+    2: { hjual1: 'hjualo2', hjual2: 'hjual2o2', hjual3: 'hjual3o2', hjual4: 'hjual4o2', hjual5: 'hjual5o2' },
+  };
+
   function renderJualTable(idx, tier, values) {
     var t = tier == null ? 'main' : tier;
     var dis = tier != null && !values._enabled ? 'disabled' : '';
@@ -207,18 +213,47 @@
       { label: 'Jual 4', field: 'hjual4', stockField: 'hjual4' },
       { label: 'Jual 5', field: 'hjual5', stockField: 'hjual5' },
     ];
+
+    // Calculate stok sblm netto/pcs for margin hints
+    var stkNettoPcs = null;
+    if (stk.hbelibsr != null) {
+      var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+      var stkPk = stk.packing || 1;
+      stkNettoPcs = stkPk > 0 ? stkNet.final / stkPk : 0;
+    }
+
     var rowsHTML = rows.map(function (r) {
       var val = values[r.field];
-      var stkVal = (tier == null) ? stk[r.stockField] : null;
-      var cls = (tier == null) ? changedCls(stkVal, val) : '';
-      var hint = (tier == null) ? sblmHint(stkVal) : '';
+      var stkVal;
+      if (tier == null) {
+        stkVal = stk[r.stockField];
+      } else {
+        var bmap = _bundlingStockMap[tier];
+        stkVal = bmap ? stk[bmap[r.field]] : null;
+      }
+      var cls = changedCls(stkVal, val);
+      var hint = sblmHint(stkVal);
+      // Margin/MRG% hints from stok sblm
+      var mrgHint = '', pctHint = '';
+      if (stkVal != null && stkNettoPcs) {
+        var sv = Number(stkVal) || 0;
+        if (sv) {
+          var stkMargin = sv - stkNettoPcs;
+          var stkPct = (stkMargin / stkNettoPcs) * 100;
+          pctHint = '<div class="sblm-hint">' + stkPct.toFixed(2) + '%</div>';
+          mrgHint = '<div class="sblm-hint">' + fmtNum(stkMargin) + '</div>';
+        } else {
+          pctHint = '<div class="sblm-hint">—</div>';
+          mrgHint = '<div class="sblm-hint">—</div>';
+        }
+      }
       return '<tr>' +
         '<td class="jt-label">' + r.label + '</td>' +
-        '<td class="' + cls + '"><input type="text" class="jual-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
-        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '>' + hint + '</td>' +
-        '<td class="jt-pct"><input type="text" class="jual-pct-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        '<td class="' + cls + '">' + hint + '<input type="text" class="jual-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
+        '<td class="jt-pct">' + pctHint + '<input type="text" class="jual-pct-input" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
         ' value="" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-margin"><span class="jual-margin" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
+        '<td class="jt-margin">' + mrgHint + '<span class="jual-margin" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
         '</tr>';
     }).join('');
     return '<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>' + rowsHTML + '</tbody></table>';
@@ -253,6 +288,7 @@
     editLines.forEach(function (line, idx) {
       var sat = line.satuanbsr || 'Bsr';
       var stk = beforePrices[line.stockid] || {};
+      var aft = afterPrices[line.stockid] || {};
       var unitOpts = UNITS.map(function (u) {
         return '<option' + (u === line.satuanbsr ? ' selected' : '') + '>' + u + '</option>';
       }).join('');
@@ -294,7 +330,7 @@
             '<div class="dp-section-header">Qty & Total Harga Beli</div>' +
             '<div class="dp-input-row">' +
               '<div class="dp-input-group">' +
-                '<label class="dp-input-label">Sat. Besar</label>' +
+                '<label class="dp-input-label">Sat. Besar' + (aft.qty != null ? ' <span class="sblm-hint" style="display:inline">' + (aft.qty_besar || aft.qty || 0) + ' ' + esc(stk.satbesar || sat) + '</span>' : '') + '</label>' +
                 '<div class="d-flex gap-1 align-items-center">' +
                   '<div class="qty-stepper">' +
                     '<button type="button" class="qty-stepper-btn ed-qtybsr-down" data-idx="' + idx + '"><i class="bi bi-dash"></i></button>' +
@@ -305,7 +341,7 @@
                 '</div>' +
               '</div>' +
               '<div class="dp-input-group">' +
-                '<label class="dp-input-label">Qty Kcl</label>' +
+                '<label class="dp-input-label">Qty Kcl' + (stk.packing != null ? ' <span class="sblm-hint" style="display:inline">' + (stk.packing || 0) + ' Pcs</span>' : '') + '</label>' +
                 '<div class="d-flex gap-1 align-items-center">' +
                   '<div class="qty-stepper">' +
                     '<button type="button" class="qty-stepper-btn ed-packing-down" data-idx="' + idx + '"><i class="bi bi-dash"></i></button>' +
@@ -316,7 +352,7 @@
                 '</div>' +
               '</div>' +
               '<div class="dp-input-group">' +
-                '<label class="dp-input-label">Total Harga Beli</label>' +
+                '<label class="dp-input-label">Total Harga Beli' + (aft.amount != null ? ' <span class="sblm-hint" style="display:inline">' + fmtNum(aft.amount || 0) + '</span>' : '') + '</label>' +
                 '<div class="d-flex align-items-center" style="height:100%">' +
                   '<input type="text" class="form-control edit-price-total text-end" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
                 '</div>' +
@@ -326,12 +362,11 @@
           // Harga Beli section
           '<div class="dp-section dp-beli">' +
             '<div class="dp-section-header">Harga Beli</div>' +
+            (stk.hbelibsr != null ? '<div class="dp-sblm-row"><span class="dp-label"></span><span class="sblm-hint">' + fmtNum(stk.hbelibsr) + '</span><span class="sblm-hint dp-unit">/' + esc(stk.satbesar || sat) + '</span><span class="sblm-hint">' + (stk.packing ? fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) : '') + '</span><span class="sblm-hint dp-unit">/Pcs</span></div>' : '') +
             '<div class="dp-beli-row">' +
               '<span class="dp-label">Beli</span>' +
               '<span class="dp-val hbeli-bsr' + changedCls(stk.hbelibsr, line.hbelibsr) + '" data-idx="' + idx + '">' + (line.hbelibsr ? fmtNum(line.hbelibsr) : '—') + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
               '<span class="dp-val hbeli-pcs" data-idx="' + idx + '">' + (line.packing > 0 ? fmtNum(trunc2(line.hbelibsr / line.packing)) : '—') + '</span><span class="dp-unit">/Pcs</span>' +
-              '<span class="sblm-inline">' + sblmHint(stk.hbelibsr) + '</span>' +
-              (stk.hbelibsr != null && stk.packing ? '<span class="sblm-inline">' + '<div class="sblm-hint">Stok sblm: ' + fmtNum(trunc2((stk.hbelibsr || 0) / (stk.packing || 1))) + '/Pcs</div></span>' : '') +
             '</div>' +
             '<table class="beli-table"><thead><tr>' +
               '<th></th>' +
@@ -345,22 +380,26 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
+              (aft.foc != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + (aft.foc || 0) + '</div>' : '') +
               '<input type="number" class="amt-input edit-foc" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
-              '<span class="bt-unit">Pcs</span></div>' +
+              '<span class="bt-unit">Pcs</span>' +
+            '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              '<input type="text" class="amt-input edit-bkirim" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal"></div>' +
+              (aft.shipping_cost != null ? '<div class="sblm-hint" style="display:inline-block;margin-right:4px">' + fmtNum(aft.shipping_cost || 0) + '</div>' : '') +
+              '<input type="text" class="amt-input edit-bkirim" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
+            '</div>' +
+            (function () {
+              if (stk.hbelibsr == null) return '';
+              var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
+              var stkNettoBsr = stkNet.final;
+              var stkPk = stk.packing || 1;
+              var stkNettoPcs = stkPk > 0 ? stkNettoBsr / stkPk : 0;
+              return '<div class="dp-sblm-row"><span class="dp-label"></span><span class="sblm-hint">' + fmtNum(stkNettoBsr) + '</span><span class="sblm-hint dp-unit">/' + esc(stk.satbesar || sat) + '</span><span class="sblm-hint">' + fmtNum(stkNettoPcs) + '</span><span class="sblm-hint dp-unit">/Pcs</span></div>';
+            })() +
             '<div class="dp-netto-row">' +
               '<span class="dp-label">Netto</span>' +
               '<span class="dp-netto-val netto-bsr" data-idx="' + idx + '">' + fmtNum(nettoBsr) + '</span><span class="dp-unit dp-unit-bsr">/' + esc(sat) + '</span>' +
               '<span class="dp-netto-val netto-pcs" data-idx="' + idx + '">' + fmtNum(nettoPcs) + '</span><span class="dp-unit">/Pcs</span>' +
-              (function () {
-                if (stk.hbelibsr == null) return '';
-                var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
-                var stkNettoBsr = stkNet.final;
-                var stkPk = stk.packing || 1;
-                var stkNettoPcs = stkPk > 0 ? stkNettoBsr / stkPk : 0;
-                return '<span class="sblm-inline"><div class="sblm-hint">Stok sblm: ' + fmtNum(stkNettoBsr) + '/' + esc(stk.satbesar || sat) + ', ' + fmtNum(stkNettoPcs) + '/Pcs</div></span>';
-              })() +
             '</div>' +
           '</div>' +
           // Harga Jual section
@@ -396,14 +435,14 @@
       var stkNet = calcNetPrice(stk.hbelibsr || 0, stk.pctdisc1 || 0, stk.pctdisc2 || 0, stk.pctdisc3 || 0, stk.pctppn || 0);
       var stkAmtMap = { pctdisc1: stkNet.d1, pctdisc2: stkNet.d2, pctdisc3: stkNet.d3, pctppn: stkNet.ppnAmt };
       var stkAmt = stkAmtMap[field] || 0;
-      stkAmtHint = '<div class="sblm-hint">Stok sblm: ' + fmtNum(stkAmt) + '</div>';
-      stkTotalHint = '<div class="sblm-hint">Stok sblm: ' + fmtNum(stkAmt * qtyBsr) + '</div>';
+      stkAmtHint = '<div class="sblm-hint">' + fmtNum(stkAmt) + '</div>';
+      stkTotalHint = '<div class="sblm-hint">' + fmtNum(stkAmt * qtyBsr) + '</div>';
     }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
-      '<td><input type="text" class="amt-total edit-disc-total" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal">' + stkTotalHint + '</td>' +
-      '<td><input type="text" class="amt-input edit-disc-amt" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal">' + stkAmtHint + '</td>' +
-      '<td class="' + cls + '"><input type="number" class="pct-input edit-disc-pct" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100">' + hint + '</td>' +
+      '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td class="' + cls + '">' + hint + '<input type="number" class="pct-input edit-disc-pct" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
       '</tr>';
   }
 

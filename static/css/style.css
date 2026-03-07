@@ -507,13 +507,24 @@ body {
    Harga Beli — values & inputs
    ----------------------------------------------------------------------- */
 /* Qty / Sat Besar / Total Harga inputs row (moved from main row) */
+/* Qty & Harga panel — same style as dp-beli */
+.dp-qty {
+  border-color: var(--clr-accent-100);
+  border-left: 4px solid var(--clr-accent-600);
+  background: var(--clr-card-bg);
+}
+.dp-qty .dp-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--clr-accent-800);
+  border-bottom-color: var(--clr-accent-100);
+}
+
 .dp-input-row {
   display: flex;
   gap: 1.25rem;
   align-items: stretch;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e9ecef;
 }
 .dp-input-group {
   display: flex;
@@ -532,6 +543,14 @@ body {
 }
 .dp-input-group .w-fixed-72 { width: 90px; }
 .dp-input-group .edit-qty-besar { width: 60px; }
+.dp-unit-label {
+  display: inline-flex;
+  align-items: center;
+  height: calc(1.5em + 0.5rem + calc(var(--bs-border-width) * 2));
+  padding: 0.25rem 0.5rem;
+  font-size: var(--fs-base);
+  color: #6c757d;
+}
 
 /* Beli/Netto standalone rows */
 .dp-beli-row,

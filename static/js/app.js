@@ -1072,9 +1072,9 @@
         <td colspan="5">
           <div class="dp-grid">
             ${_renderStockInfo(idx, item)}
-            <!-- Row 1: Harga Beli (full width) -->
-            <div class="dp-section dp-beli">
-              <div class="dp-section-header">Harga Beli</div>
+            <!-- Qty & Harga inputs -->
+            <div class="dp-section dp-qty">
+              <div class="dp-section-header">Qty & Harga</div>
               <div class="dp-input-row">
                 <div class="dp-input-group">
                   <label class="dp-input-label">Sat. Besar</label>
@@ -1091,20 +1091,29 @@
                   </div>
                 </div>
                 <div class="dp-input-group">
-                  <label class="dp-input-label">Qty Kcl (Pcs)</label>
-                  <div class="qty-stepper">
-                    <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
-                    <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
-                           value="${item.qtyKecil}" min="0" step="0.01">
-                    <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                  <label class="dp-input-label">Qty Kcl</label>
+                  <div class="d-flex gap-1 align-items-center">
+                    <div class="qty-stepper">
+                      <button type="button" class="qty-stepper-btn qty-down" data-idx="${idx}"><i class="bi bi-dash"></i></button>
+                      <input type="number" class="form-control edit-qty-kecil" data-idx="${idx}"
+                             value="${item.qtyKecil}" min="0" step="0.01">
+                      <button type="button" class="qty-stepper-btn qty-up" data-idx="${idx}"><i class="bi bi-plus"></i></button>
+                    </div>
+                    <span class="dp-unit-label">Pcs</span>
                   </div>
                 </div>
                 <div class="dp-input-group">
                   <label class="dp-input-label">Total Harga</label>
-                  <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
-                         value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
+                  <div class="d-flex align-items-center" style="height:100%">
+                    <input type="text" class="form-control edit-price-total text-end" data-idx="${idx}"
+                           value="${item.priceTotal ? formatNumber(item.priceTotal) : ''}" placeholder="0" inputmode="decimal">
+                  </div>
                 </div>
               </div>
+            </div>
+            <!-- Harga Beli -->
+            <div class="dp-section dp-beli">
+              <div class="dp-section-header">Harga Beli</div>
               <div class="dp-beli-row">
                 <span class="dp-label">Beli</span>
                 <span class="dp-val hbeli-bsr" data-idx="${idx}">—</span><span class="dp-unit dp-unit-bsr">/${satuanBsr}</span>

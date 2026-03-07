@@ -44,7 +44,8 @@ async def lifespan(app: FastAPI):
         if get_pool() is None:
             await create_pool()
     app.state.db_pool = get_pool()
-    await _ensure_schema(app.state.db_pool)
+    from services.schema import ensure_tokohub_schema
+    await ensure_tokohub_schema(app.state.db_pool)
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1
@@ -84,19 +85,6 @@ for r in [pages, settings_router, stock, receipt, sales, foc, health]:
 async def inject_branding(request, call_next):
     templates.env.globals['store_name'] = settings.store_name
     return await call_next(request)
-
-
-async def _ensure_schema(pool):
-    """Create stock_alias table if it doesn't exist."""
-    try:
-        from services.db import execute_modify
-        schema_path = _BASE_DIR / 'schema' / 'stock_alias.sql'
-        with open(schema_path) as f:
-            sql = f.read()
-        await execute_modify(pool, sql)
-        logger.info("stock_alias table ensured")
-    except Exception as e:
-        logger.warning("Could not ensure stock_alias table: %s", e, exc_info=True)
 
 
 def _parse_args():

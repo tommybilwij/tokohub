@@ -41,7 +41,7 @@
           {% endif %}
           {% if nav_pages is defined and 'price_change' in nav_pages %}
           <li class="nav-item">
-            <a class="nav-link {% if request.url.path == '/price-change' %}active{% endif %}"
+            <a class="nav-link {% if request.url.path in ['/price-change', '/price-change-entry'] %}active{% endif %}"
                href="/price-change">
               <i class="bi bi-tag"></i> Perubahan Harga
             </a>

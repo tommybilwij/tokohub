@@ -13,6 +13,9 @@ from services.price_change_service import (
     commit_price_change,
     get_price_change_report,
     get_price_change_from_snapshots,
+    get_ph_history,
+    get_ph_detail,
+    toggle_ph_lock,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,40 @@ async def api_commit_price_change(
     except Exception as e:
         logger.exception("Price change commit failed")
         return JSONResponse({'error': str(e)}, status_code=500)
+
+
+@router.get('/api/ph/list')
+async def api_ph_list(
+    page: int = 1,
+    date_from: str = None,
+    date_to: str = None,
+    db: aiomysql.Pool = Depends(get_db),
+):
+    rows, total = await get_ph_history(
+        db, page=page, date_from=date_from or None, date_to=date_to or None,
+    )
+    items = []
+    for r in rows:
+        d = dict(r)
+        d['tglberlaku'] = d['tglberlaku'].strftime('%Y-%m-%d') if d['tglberlaku'] else ''
+        items.append(d)
+    return {'items': items, 'total': total, 'page': page}
+
+
+@router.get('/api/ph/{ph_number}')
+async def api_ph_detail(ph_number: str, db: aiomysql.Pool = Depends(get_db)):
+    result = await get_ph_detail(db, ph_number)
+    if not result:
+        return JSONResponse({'error': 'Not found'}, status_code=404)
+    return result
+
+
+@router.post('/api/ph/{ph_number}/toggle-lock')
+async def api_ph_toggle_lock(ph_number: str, db: aiomysql.Pool = Depends(get_db)):
+    result = await toggle_ph_lock(db, ph_number)
+    if 'error' in result:
+        return JSONResponse(result, status_code=404)
+    return result
 
 
 @router.get('/api/price-change/report')

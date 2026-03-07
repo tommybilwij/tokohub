@@ -226,6 +226,86 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
     return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
 
 
+async def get_ph_history(pool, page=1, per_page=20, date_from=None, date_to=None) -> tuple:
+    """Get paginated list of price change headers from icphg."""
+    where = []
+    params = []
+    if date_from:
+        where.append("h.tglberlaku >= %s")
+        params.append(date_from)
+    if date_to:
+        where.append("h.tglberlaku <= %s")
+        params.append(date_to)
+    where_sql = (' AND ' + ' AND '.join(where)) if where else ''
+
+    count_row = await execute_single(
+        pool,
+        f"SELECT COUNT(*) as cnt FROM icphg h WHERE 1=1{where_sql}",
+        tuple(params),
+    )
+    total = count_row['cnt'] if count_row else 0
+
+    offset = (page - 1) * per_page
+    rows = await execute_query(
+        pool,
+        f"""SELECT h.nobukti, h.tglberlaku, h.uraian, h.userid, h.islocked, h.becreff,
+                   (SELECT COUNT(*) FROM sthist s WHERE s.becreff = h.becreff AND s.tipetrans = 0) as line_count
+            FROM icphg h
+            WHERE 1=1{where_sql}
+            ORDER BY h.becreff DESC
+            LIMIT %s OFFSET %s""",
+        tuple(params) + (per_page, offset),
+    )
+    return rows, total
+
+
+async def get_ph_detail(pool, ph_number: str) -> dict | None:
+    """Get price change header + line items from sthist."""
+    header = await execute_single(
+        pool,
+        "SELECT nobukti, becreff, tglberlaku, uraian, userid, islocked FROM icphg WHERE nobukti = %s",
+        (ph_number,),
+    )
+    if not header:
+        return None
+
+    lines = await execute_query(
+        pool,
+        """SELECT stockid, artpabrik, artname, oprice, hjual, hjual2, hjual3, hjual4, hjual5,
+                  hbelibsr, hbelikcl, hbelinetto, packing, satuanbsr, satuankcl,
+                  pctdisc1, pctdisc2, pctdisc3, pctppn
+           FROM sthist WHERE becreff = %s AND tipetrans = 0 ORDER BY noindex""",
+        (header['becreff'],),
+    )
+    result = dict(header)
+    result['tglberlaku'] = result['tglberlaku'].isoformat() if result['tglberlaku'] else ''
+    result['lines'] = []
+    for l in lines:
+        d = dict(l)
+        for k in ('oprice', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
+                  'hbelibsr', 'hbelikcl', 'hbelinetto', 'packing',
+                  'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn'):
+            d[k] = float(d.get(k) or 0)
+        result['lines'].append(d)
+    return result
+
+
+async def toggle_ph_lock(pool, ph_number: str) -> dict:
+    """Toggle islocked on icphg + isupdateprice on sthist lines."""
+    header = await execute_single(
+        pool, "SELECT nobukti, becreff, islocked FROM icphg WHERE nobukti = %s", (ph_number,),
+    )
+    if not header:
+        return {'error': 'Not found'}
+    new_val = 0 if header['islocked'] else 1
+    await execute_modify(pool, "UPDATE icphg SET islocked = %s WHERE nobukti = %s", (new_val, ph_number))
+    await execute_modify(
+        pool, "UPDATE sthist SET isupdateprice = %s WHERE becreff = %s AND tipetrans = 0",
+        (new_val, header['becreff']),
+    )
+    return {'ok': True, 'islocked': new_val}
+
+
 async def get_price_change_report(pool, report_date: date | None = None) -> list[dict]:
     """Get manual price changes (tipetrans=0) for a specific date from sthist."""
     report_date = report_date or date.today()

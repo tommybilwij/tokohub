@@ -59,3 +59,12 @@ class POCommitRequest(BaseModel):
     items: list[POItem]
     order_date: str | None = None
     shipping_cost: float = 0  # legacy total fallback
+
+
+class POUpdateRequest(BaseModel):
+    po_number: str
+    supplier_id: str
+    userid: str
+    items: list[POItem]
+    order_date: str | None = None
+    shipping_cost: float = 0

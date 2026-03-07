@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from config import settings
 from dependencies import get_db
-from models.receipt import MatchRequest, AliasCreate, AliasDelete, POPreviewRequest, POCommitRequest
+from models.receipt import MatchRequest, AliasCreate, AliasDelete, POPreviewRequest, POCommitRequest, POUpdateRequest
 from services.stock_search import search_stock
 
 logger = logging.getLogger(__name__)
@@ -156,3 +156,23 @@ async def get_po(po_number: str, db: aiomysql.Pool = Depends(get_db)):
     if not result:
         return JSONResponse({'error': 'PO not found'}, status_code=404)
     return result
+
+
+@router.post('/receipt/update')
+async def update_po(data: POUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
+    supplier_id = data.supplier_id.strip()
+    userid = data.userid.strip()
+    po_number = data.po_number.strip()
+    items = [item.model_dump() for item in data.items]
+    order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
+
+    if not supplier_id or not items or not userid or not po_number:
+        return JSONResponse({'error': 'po_number, supplier_id, userid, and items are required'}, status_code=400)
+
+    try:
+        from services.po_service import update_po as _update
+        result = await _update(db, po_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
+        return result
+    except Exception as e:
+        logger.exception("PO update failed")
+        return JSONResponse({'error': str(e)}, status_code=500)

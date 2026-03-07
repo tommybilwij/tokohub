@@ -281,6 +281,7 @@
 
   // Show a Bootstrap toast notification (expose globally for other pages)
   window.showToast = showToast;
+  window.showConfirm = showConfirm;
   function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
     if (!container) return;

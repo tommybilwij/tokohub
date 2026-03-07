@@ -525,11 +525,295 @@ async def get_po_detail(pool, po_number):
         """SELECT stockid, artpabrik, artname, qty, packing,
                   hbelibsr, hbelikcl, hbelinetto,
                   pctdisc1, pctdisc2, pctdisc3, pctppn, jlhppn,
-                  satuanbsr, satuankcl, hjual, amount
+                  satuanbsr, satuankcl,
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  amount, qtybonus
            FROM icpos
            WHERE becreff = %s
            ORDER BY nourut""",
         (header['becreff'],)
     )
+    # Fetch bundling data from stock table for each item
+    artno_list = [l['stockid'] for l in lines if l.get('stockid')]
+    bundling_map = {}
+    if artno_list:
+        placeholders = ','.join(['%s'] * len(artno_list))
+        stock_rows = await execute_query(
+            pool,
+            f"""SELECT artno, ispaketprc, over1, over2,
+                       hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                       hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
+                FROM stock WHERE artno IN ({placeholders})""",
+            tuple(artno_list)
+        )
+        for sr in stock_rows:
+            b1 = b2 = None
+            qty1 = float(sr.get('over1') or 0)
+            if qty1:
+                b1 = {'min_qty': qty1,
+                       'hjual1': float(sr.get('hjualo1') or 0), 'hjual2': float(sr.get('hjual2o1') or 0),
+                       'hjual3': float(sr.get('hjual3o1') or 0), 'hjual4': float(sr.get('hjual4o1') or 0),
+                       'hjual5': float(sr.get('hjual5o1') or 0)}
+            qty2 = float(sr.get('over2') or 0)
+            if qty2:
+                b2 = {'min_qty': qty2,
+                       'hjual1': float(sr.get('hjualo2') or 0), 'hjual2': float(sr.get('hjual2o2') or 0),
+                       'hjual3': float(sr.get('hjual3o2') or 0), 'hjual4': float(sr.get('hjual4o2') or 0),
+                       'hjual5': float(sr.get('hjual5o2') or 0)}
+            bundling_map[sr['artno']] = {'bundling1': b1, 'bundling2': b2}
+
+    for line in lines:
+        for k in ('qty', 'packing', 'hbelibsr', 'hbelikcl', 'hbelinetto',
+                   'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn', 'jlhppn',
+                   'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5', 'amount'):
+            if line.get(k) is not None:
+                line[k] = float(line[k])
+        if line.get('qtybonus') is not None:
+            line['qtybonus'] = int(line['qtybonus'])
+        bnd = bundling_map.get(line.get('stockid'), {})
+        line['bundling1'] = bnd.get('bundling1')
+        line['bundling2'] = bnd.get('bundling2')
+    if header.get('tglorder') is not None:
+        header['tglorder'] = str(header['tglorder'])
+    if header.get('jlhfaktur') is not None:
+        header['jlhfaktur'] = float(header['jlhfaktur'])
     header['lines'] = lines
     return header
+
+
+async def update_po(pool, po_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
+    """Update an existing PO: reverse old stock, replace lines, apply new stock.
+
+    Same two-phase approach as commit_po.
+    """
+    if not userid:
+        raise POCreationError("userid is required")
+    order_date = order_date or date.today()
+
+    # Look up existing PO and FP records
+    header = await execute_single(
+        pool,
+        "SELECT noorder, becreff, suppid FROM icpom WHERE noorder = %s",
+        (po_number,)
+    )
+    if not header:
+        raise POCreationError(f"PO not found: {po_number}")
+    po_becreff = header['becreff']
+
+    fp_row = await execute_single(
+        pool,
+        "SELECT nofaktur, becreff FROM icbym WHERE noorder = %s",
+        (po_number,)
+    )
+    if not fp_row:
+        raise POCreationError(f"FP not found for PO: {po_number}")
+    fp_number = fp_row['nofaktur']
+    fp_becreff = fp_row['becreff']
+
+    # Get old lines for stlastbal reversal
+    old_lines = await execute_query(
+        pool,
+        "SELECT stockid, qty, packing, qtybonus FROM icpos WHERE becreff = %s",
+        (po_becreff,)
+    )
+
+    # Build new preview
+    preview = await preview_po(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            try:
+                # Reverse old stlastbal
+                for old in old_lines:
+                    old_qty_small = float(Decimal(str(old['qty'])) * Decimal(str(old['packing'] or 1))) + float(old.get('qtybonus') or 0)
+                    await cursor.execute(
+                        """UPDATE stlastbal
+                           SET curqty = curqty - %s
+                           WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
+                        (old_qty_small, old['stockid'])
+                    )
+
+                # Delete old lines
+                await cursor.execute("DELETE FROM icpos WHERE becreff = %s", (po_becreff,))
+                await cursor.execute("DELETE FROM sthist WHERE becreff = %s", (fp_becreff,))
+
+                # Update headers
+                await cursor.execute(
+                    """UPDATE icpom
+                       SET suppid = %s, tglorder = %s, duedate = %s,
+                           jlhfaktur = %s, userid = %s
+                       WHERE noorder = %s""",
+                    (supplier_id, order_date, order_date,
+                     preview['grand_total'], userid, po_number)
+                )
+                await cursor.execute(
+                    """UPDATE icbym
+                       SET suppid = %s, tglfaktur = %s, duedate = %s,
+                           jlhfaktur = %s, userid = %s
+                       WHERE noorder = %s""",
+                    (supplier_id, order_date, order_date,
+                     preview['grand_total'], userid, po_number)
+                )
+
+                # Insert new lines (same as commit_po Phase 1)
+                for line in preview['lines']:
+                    await cursor.execute(
+                        """INSERT INTO icpos
+                           (becreff, stockid, artpabrik, artname, qty,
+                            hbelibsr, hbelikcl, hbelinetto,
+                            pctdisc1, pctdisc2, pctdisc3,
+                            jlhdisc1, jlhdisc2, jlhdisc3,
+                            pctppn, jlhppn,
+                            packing, satuanbsr, satuankcl,
+                            hjual, hjual2, hjual3, hjual4, hjual5,
+                            amount, qtybonus)
+                           VALUES (%s, %s, %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s, %s, %s,
+                                   %s, %s)""",
+                        (po_becreff, line['artno'], line['artpabrik'], line['artname'],
+                         line['qty'],
+                         line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
+                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                         line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
+                         line['pctppn'], line['jlhppn'],
+                         line['packing'], line['satuanbsr'], line['satuankcl'],
+                         line['hjual'], line['hjual2'], line['hjual3'],
+                         line['hjual4'], line['hjual5'],
+                         line['amount'], line.get('foc', 0))
+                    )
+
+                    foc = Decimal(str(line.get('foc', 0)))
+                    qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
+
+                    await cursor.execute(
+                        """INSERT INTO sthist
+                           (stockid, artpabrik, artname, tanggal,
+                            qty, beli, packing, satuanbsr, satuankcl,
+                            hbelibsr, hbelikcl, hbelinetto,
+                            pctdisc1, pctdisc2, pctdisc3,
+                            jlhdisc1, jlhdisc2, jlhdisc3,
+                            pctppn, jlhppn,
+                            hjual, hjual2, hjual3, hjual4, hjual5,
+                            amount, qtybonus,
+                            suppid, whid, nofaktur, becreff, tipetrans,
+                            isupdateprice, isupdatepurchprice)
+                           VALUES (%s, %s, %s, %s,
+                                   %s, %s, %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s,
+                                   %s, %s, %s, %s, %s,
+                                   %s, %s,
+                                   %s, 'LAPANGAN', %s, %s, 1,
+                                   1, 1)""",
+                        (line['artno'], line['artpabrik'], line['artname'], order_date,
+                         line['qty'], float(qty_small), line['packing'],
+                         line['satuanbsr'], line['satuankcl'],
+                         line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
+                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                         line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
+                         line['pctppn'], line['jlhppn'],
+                         line['hjual'], line['hjual2'], line['hjual3'],
+                         line['hjual4'], line['hjual5'],
+                         line['amount'], line.get('foc', 0),
+                         supplier_id, fp_number, fp_becreff)
+                    )
+
+                # Apply new stlastbal
+                for line in preview['lines']:
+                    foc = Decimal(str(line.get('foc', 0)))
+                    qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
+                    await cursor.execute(
+                        """UPDATE stlastbal
+                           SET curqty = curqty + %s
+                           WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
+                        (float(qty_small), line['artno'])
+                    )
+                    if cursor.rowcount == 0:
+                        await cursor.execute(
+                            """INSERT INTO stlastbal (artno, curqty, warehouseid)
+                               VALUES (%s, %s, 'LAPANGAN')""",
+                            (line['artno'], float(qty_small))
+                        )
+
+                await conn.commit()
+
+            except Exception:
+                await conn.rollback()
+                logger.exception("PO update failed (Phase 1)")
+                raise
+
+    # Phase 2 — Deferred stock price + bundling updates (same as commit_po)
+    from services.db import execute_modify
+    for line in preview['lines']:
+        try:
+            await execute_modify(
+                pool,
+                """UPDATE stock
+                   SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                       pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                       jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                       pctppn = %s, jlhppn = %s,
+                       hjual = %s, hjual2 = %s, hjual3 = %s,
+                       hjual4 = %s, hjual5 = %s,
+                       satbesar = %s, packing = %s
+                   WHERE artno = %s""",
+                (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                 line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                 line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                 line['pctppn'], line['jlhppn_kcl'],
+                 line['hjual'], line['hjual2'], line['hjual3'],
+                 line['hjual4'], line['hjual5'],
+                 line['satuanbsr'], line['packing'],
+                 line['artno']),
+            )
+        except Exception:
+            logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
+
+        b1 = line.get('bundling1') or {}
+        b2 = line.get('bundling2') or {}
+        has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
+        try:
+            await execute_modify(
+                pool,
+                """UPDATE stock
+                   SET ispaketprc = %s,
+                       over1 = %s,
+                       hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                       over2 = %s,
+                       hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                   WHERE artno = %s""",
+                (has_bundling,
+                 b1.get('min_qty') or 0,
+                 b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
+                 b1.get('hjual4') or 0, b1.get('hjual5') or 0,
+                 b2.get('min_qty') or 0,
+                 b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
+                 b2.get('hjual4') or 0, b2.get('hjual5') or 0,
+                 line['artno']),
+            )
+        except Exception:
+            logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
+
+    from services.stock_search import invalidate_cache
+    invalidate_cache()
+
+    result = {
+        'po_number': po_number,
+        'fp_number': fp_number,
+        'supplier_id': supplier_id,
+        'order_date': order_date.isoformat(),
+        'grand_total': preview['grand_total'],
+        'line_count': preview['line_count'],
+        'lines': preview['lines'],
+    }
+
+    _write_audit_log(f"{po_number}_edit", result)
+    logger.info("PO updated: %s / FP %s (total=%.2f)", po_number, fp_number, preview['grand_total'])
+    return result

@@ -2074,3 +2074,73 @@ body {
     align-self: flex-start;
   }
 }
+
+/* -----------------------------------------------------------------------
+   PO Edit Overlay (Daftar Faktur)
+   ----------------------------------------------------------------------- */
+.po-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: var(--clr-neutral-50, #f8f9fa);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.po-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--clr-primary-700, #1565c0);
+  color: #fff;
+  flex-shrink: 0;
+}
+.po-edit-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+/* Edit table — mirror #itemTable styles */
+#editItemTable .item-main td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: none;
+  border-top: 1px solid #e9ecef;
+}
+#editItemTable .item-main {
+  cursor: pointer;
+  transition: background-color var(--ease-default);
+  border-left: 3px solid var(--clr-primary-500);
+}
+#editItemTable .item-main:hover { background-color: #eaf0fb; }
+#editItemTable .item-main .row-num {
+  font-weight: var(--fw-semibold);
+  color: #adb5bd;
+  font-size: var(--fs-base);
+  text-align: center;
+}
+#editItemTable .item-main .form-control,
+#editItemTable .item-main .form-select {
+  font-size: var(--fs-base);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--clr-input-border);
+}
+#editItemTable .item-main .form-control:focus,
+#editItemTable .item-main .form-select:focus {
+  border-color: var(--clr-primary-500);
+  box-shadow: var(--shadow-focus-primary);
+}
+#editItemTable .item-main.has-detail-open td { border-bottom: none; }
+#editItemTable .item-detail { display: none; }
+#editItemTable .item-detail.open {
+  display: table-row;
+  animation: fadeSlideIn var(--ease-expand) ease both;
+}
+#editItemTable .item-detail td {
+  padding: 0;
+  border-bottom: 2px solid var(--clr-card-border);
+  background: var(--clr-neutral-50);
+}

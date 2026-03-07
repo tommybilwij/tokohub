@@ -2,7 +2,7 @@
 {% block title %}Daftar Faktur{% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="card" id="historyList">
   <div class="card-header d-flex justify-content-between align-items-center">
     <h5 class="mb-0"><i class="bi bi-clock-history"></i> Daftar Faktur</h5>
     <span class="badge bg-secondary">{{ total }} total</span>
@@ -28,17 +28,21 @@
             <td>{{ o.supplier_name or o.suppid }}</td>
             <td class="text-end">{{ '{:,.0f}'.format(o.jlhfaktur or 0) }}</td>
             <td class="text-center">{{ o.line_count }}</td>
-            <td>
+            <td class="text-nowrap">
               <button class="btn btn-sm btn-outline-primary btn-view-po"
-                      data-po="{{ o.noorder }}">
+                      data-po="{{ o.noorder }}" title="Lihat">
                 <i class="bi bi-eye"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-warning btn-edit-po"
+                      data-po="{{ o.noorder }}" title="Edit">
+                <i class="bi bi-pencil"></i>
               </button>
             </td>
           </tr>
           {% else %}
           <tr>
             <td colspan="6" class="text-center text-muted py-4">
-              Belum ada PO dari Receipt App.
+              Belum ada faktur.
             </td>
           </tr>
           {% endfor %}
@@ -104,6 +108,69 @@
     </div>
   </div>
 </div>
+
+<!-- PO Edit Overlay -->
+<div class="po-edit-overlay d-none" id="poEditOverlay">
+  <div class="po-edit-header">
+    <div class="d-flex align-items-center gap-3">
+      <button class="btn btn-sm btn-outline-light" id="editBtnBack" title="Kembali">
+        <i class="bi bi-arrow-left"></i> Kembali
+      </button>
+      <h5 class="mb-0 text-white" id="editTitle">Edit Faktur</h5>
+    </div>
+    <button class="btn btn-sm btn-success" id="editBtnSave">
+      <i class="bi bi-check-lg"></i> Simpan
+    </button>
+  </div>
+  <div class="po-edit-body">
+    <div class="row g-2 mb-3">
+      <div class="col-md-3">
+        <label class="form-label mb-1"><small>Supplier</small></label>
+        <select class="form-select form-select-sm" id="editSupplier"></select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1"><small>Tanggal</small></label>
+        <input type="date" class="form-control form-control-sm" id="editDate">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label mb-1"><small>User</small></label>
+        <select class="form-select form-select-sm" id="editUser"></select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label mb-1"><small>Tambah Item</small></label>
+        <div class="position-relative">
+          <input type="text" class="form-control form-control-sm" id="editSearchInput" placeholder="Cari nama / barcode...">
+          <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:200px;overflow-y:auto" id="editSearchResults"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
+        <span class="badge badge-counter" id="editItemCount">0 item</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0" id="editItemTable">
+            <thead>
+              <tr>
+                <th class="col-num">#</th>
+                <th class="col-name">Nama Barang</th>
+                <th class="col-barcode">Barcode</th>
+                <th class="col-satbsr">Sat. Besar</th>
+                <th class="col-qtykcl">Qty Kcl <span style="text-transform:none">(Pcs)</span></th>
+                <th class="col-price">Total Harga</th>
+                <th class="col-match">Artno</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="editTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -144,4 +211,5 @@ function formatNumber(n) {
   return new Intl.NumberFormat('id-ID').format(Math.round(n));
 }
 </script>
+<script src="{{ url_for('static', filename='js/po_edit.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

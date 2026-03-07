@@ -2,14 +2,14 @@
 
 import os
 import sys
-import signal
 import logging
 import threading
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from config import settings as _s, save_to_envrc, _ENVRC_PATH
+import config
+from config import save_to_envrc, _ENVRC_PATH
 from models.settings import SettingsUpdate
 
 logger = logging.getLogger(__name__)
@@ -28,27 +28,27 @@ def _mask(value: str, visible: int = 4) -> str:
 async def api_settings_get():
     return {
         'db': {
-            'host': _s.db.host,
-            'port': _s.db.port,
-            'user': _s.db.user,
-            'password': _mask(_s.db.password),
-            'name': _s.db.name,
-            'pool_size': _s.db.pool_size,
+            'host': config.settings.db.host,
+            'port': config.settings.db.port,
+            'user': config.settings.db.user,
+            'password': _mask(config.settings.db.password),
+            'name': config.settings.db.name,
+            'pool_size': config.settings.db.pool_size,
         },
         'openai': {
-            'api_base': _s.openai.api_base,
-            'api_key': _mask(_s.openai.api_key),
-            'deployment_id': _s.openai.deployment_id,
-            'api_version': _s.openai.api_version,
+            'api_base': config.settings.openai.api_base,
+            'api_key': _mask(config.settings.openai.api_key),
+            'deployment_id': config.settings.openai.deployment_id,
+            'api_version': config.settings.openai.api_version,
         },
-        'fuzzy_cache_ttl': _s.fuzzy_cache_ttl,
-        'fuzzy_top_n': _s.fuzzy_top_n,
-        'fuzzy_min_score': _s.fuzzy_min_score,
-        'server_port': _s.server_port,
-        'server_host': _s.server_host,
-        'lan_mode': _s.lan_mode,
-        'mdns_hostname': _s.mdns_hostname,
-        'store_name': _s.store_name,
+        'fuzzy_cache_ttl': config.settings.fuzzy_cache_ttl,
+        'fuzzy_top_n': config.settings.fuzzy_top_n,
+        'fuzzy_min_score': config.settings.fuzzy_min_score,
+        'server_port': config.settings.server_port,
+        'server_host': config.settings.server_host,
+        'lan_mode': config.settings.lan_mode,
+        'mdns_hostname': config.settings.mdns_hostname,
+        'store_name': config.settings.store_name,
     }
 
 
@@ -87,19 +87,32 @@ async def api_setup(data: SettingsUpdate):
 
 @router.post('/api/restart')
 async def api_restart():
-    """Restart the server process. Works in both dev and Tauri sidecar mode."""
-    import resource
+    """Restart the server process. Works on macOS, Linux, and Windows."""
 
     def _restart():
-        import time
+        import time, subprocess
         time.sleep(0.5)  # let the response flush
-        soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-        os.closerange(3, soft)
         is_frozen = getattr(sys, 'frozen', False)
-        if is_frozen:
-            os.execv(sys.executable, sys.argv)
+
+        if sys.platform == 'win32':
+            # Windows: spawn a new process then exit the current one
+            if is_frozen:
+                subprocess.Popen([sys.executable] + sys.argv[1:])
+            else:
+                subprocess.Popen([sys.executable] + sys.argv)
+            os._exit(0)
         else:
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # Unix: close inherited file descriptors, then exec
+            try:
+                import resource
+                soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
+            except ImportError:
+                soft = 1024
+            os.closerange(3, soft)
+            if is_frozen:
+                os.execv(sys.executable, sys.argv)
+            else:
+                os.execv(sys.executable, [sys.executable] + sys.argv)
 
     threading.Thread(target=_restart, daemon=True).start()
     return {'ok': True}

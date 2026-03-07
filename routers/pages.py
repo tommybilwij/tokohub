@@ -193,9 +193,9 @@ async def price_change_page(
     if denied: return denied
     pool = request.app.state.db_pool
     ctx = await _user_ctx(request, user)
-    ctx['can_entry'] = await has_page_access(pool, user['role'], 'price_change')
-    ctx['can_delete'] = await has_page_access(pool, user['role'], 'price_change:delete')
-    ctx['can_lock'] = await has_page_access(pool, user['role'], 'price_change:lock')
+    ctx['can_entry'] = await has_page_access(pool, user['role'], 'price_change:input')
+    ctx['can_delete'] = await has_page_access(pool, user['role'], 'price_change:daftar:delete')
+    ctx['can_lock'] = await has_page_access(pool, user['role'], 'price_change:daftar:lock')
     return templates.TemplateResponse(request, 'price_change_history.html', ctx)
 
 
@@ -205,12 +205,12 @@ async def price_change_entry_page(
     templates: Jinja2Templates = Depends(get_templates),
     user: dict = Depends(get_current_user),
 ):
-    denied = await _check_page(request, user, 'price_change')
+    denied = await _check_page(request, user, 'price_change:input')
     if denied: return denied
     pool = request.app.state.db_pool
     ctx = await _user_ctx(request, user)
-    ctx['can_update_purch_price'] = await has_page_access(pool, user['role'], 'price_change:update_beli')
-    ctx['can_lock_history'] = await has_page_access(pool, user['role'], 'price_change:lock')
+    ctx['can_update_purch_price'] = await has_page_access(pool, user['role'], 'price_change:input:update_beli')
+    ctx['can_lock_history'] = await has_page_access(pool, user['role'], 'price_change:daftar:lock')
     return templates.TemplateResponse(request, 'price_change.html', ctx)
 
 

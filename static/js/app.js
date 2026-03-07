@@ -279,6 +279,12 @@
     });
   }
 
+  // Logout handler (global)
+  window._logout = async function() {
+    await fetch('/api/auth/logout', {method: 'POST'});
+    window.location.href = '/login';
+  };
+
   // Show a Bootstrap toast notification (expose globally for other pages)
   window.showToast = showToast;
   window.showConfirm = showConfirm;
@@ -328,17 +334,7 @@
   }
 
   async function loadUsers() {
-    try {
-      const users = await api('/api/users');
-      users.forEach((u) => {
-        const opt = document.createElement('option');
-        opt.value = u.nouser;
-        opt.textContent = u.usrname || u.nouser;
-        dom.userSelect.appendChild(opt);
-      });
-    } catch (e) {
-      console.error('Failed to load users:', e);
-    }
+    // User is pre-filled from login session — no need to load
   }
 
   async function loadVendors() {

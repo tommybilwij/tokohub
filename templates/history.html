@@ -134,7 +134,8 @@
       </div>
       <div class="col-md-2">
         <label class="form-label mb-1"><small>User</small></label>
-        <select class="form-select form-select-sm" id="editUser"></select>
+        <input type="text" class="form-control form-control-sm" id="editUserDisplay" value="{{ user.username if user else '' }}" readonly>
+        <input type="hidden" id="editUser" value="{{ user.username if user else '' }}">
       </div>
       <div class="col-md-5">
         <label class="form-label mb-1"><small>Tambah Item</small></label>

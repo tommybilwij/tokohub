@@ -2,7 +2,7 @@
 {% block title %}Histori Penjualan{% endblock %}
 
 {% block content %}
-<div class="sh-page">
+<div class="sh-page" data-show-harga="{{ show_harga | default(true) | tojson }}" data-show-total="{{ show_total | default(true) | tojson }}">
   <h5 class="mb-3"><i class="bi bi-graph-up"></i> Histori Penjualan</h5>
 
   <!-- Filter Bar -->
@@ -49,10 +49,12 @@
       <span class="sh-summary-label">Total Qty</span>
       <span class="sh-summary-value" id="shTotalQty">0</span>
     </div>
+    {% if show_total %}
     <div class="sh-summary-item">
       <span class="sh-summary-label">Total Penjualan</span>
       <span class="sh-summary-value sh-summary-green" id="shTotalSales">0</span>
     </div>
+    {% endif %}
   </div>
 
   <!-- Loading -->
@@ -83,9 +85,13 @@
             <th class="sh-sortable" data-col="barcode">Barcode <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="deptid">Dept <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="artname">Nama Barang <i class="bi bi-chevron-expand"></i></th>
+            {% if show_harga %}
             <th class="sh-sortable text-end" data-col="hjual">Harga Jual <i class="bi bi-chevron-expand"></i></th>
+            {% endif %}
             <th class="sh-sortable text-end" data-col="total_qty">Qty <i class="bi bi-chevron-expand"></i></th>
+            {% if show_total %}
             <th class="sh-sortable text-end" data-col="total_amount">Total <i class="bi bi-chevron-expand"></i></th>
+            {% endif %}
           </tr>
         </thead>
         <tbody id="shTableBody"></tbody>

@@ -27,8 +27,11 @@
   // Guard: only run on sales history page
   if (!elFrom) return;
 
+  var pageEl = document.querySelector('.sh-page');
+  var showHarga = pageEl.dataset.showHarga === 'true';
+  var showTotal = pageEl.dataset.showTotal === 'true';
   var rows = [];
-  var sortCol = 'total_amount';
+  var sortCol = showTotal ? 'total_amount' : 'total_qty';
   var sortAsc = false;
   var lastDept = '';
 
@@ -210,11 +213,11 @@
         });
         elTotalItems.textContent = fmtInt(rows.length);
         elTotalQty.textContent = fmtInt(totalQty);
-        elTotalSales.textContent = fmt(totalAmount);
+        if (elTotalSales) elTotalSales.textContent = fmt(totalAmount);
         elSummary.classList.remove('d-none');
 
         elCount.textContent = rows.length + ' barang';
-        sortCol = 'total_amount';
+        sortCol = showTotal ? 'total_amount' : 'total_qty';
         sortAsc = false;
         renderTable();
         elResults.classList.remove('d-none');
@@ -246,9 +249,9 @@
         '<td><code>' + esc(r.barcode || '') + '</code></td>' +
         '<td class="text-center">' + esc(r.deptid || '') + '</td>' +
         '<td>' + esc(r.artname) + '</td>' +
-        '<td class="text-end">' + fmt(r.hjual) + '</td>' +
+        (showHarga ? '<td class="text-end">' + fmt(r.hjual) + '</td>' : '') +
         '<td class="text-end">' + fmtInt(r.total_qty) + '</td>' +
-        '<td class="text-end fw-semibold">' + fmt(r.total_amount) + '</td>' +
+        (showTotal ? '<td class="text-end fw-semibold">' + fmt(r.total_amount) + '</td>' : '') +
         '</tr>';
     }).join('');
 
@@ -294,18 +297,23 @@
       return 0;
     });
 
-    var csvRows = [['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total']];
+    var header = ['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang'];
+    if (showHarga) header.push('Harga Jual');
+    header.push('Qty');
+    if (showTotal) header.push('Total');
+    var csvRows = [header];
     sorted.forEach(function (r, i) {
-      csvRows.push([
+      var row = [
         i + 1,
         r.artno || '',
         '="' + (r.barcode || '') + '"',
         r.deptid || '',
         r.artname || '',
-        r.hjual || 0,
-        r.total_qty || 0,
-        r.total_amount || 0
-      ]);
+      ];
+      if (showHarga) row.push(r.hjual || 0);
+      row.push(r.total_qty || 0);
+      if (showTotal) row.push(r.total_amount || 0);
+      csvRows.push(row);
     });
 
     var csv = csvRows.map(function (row) {
@@ -358,23 +366,35 @@
     var tableRows = sorted.map(function (r, i) {
       totalQty += Number(r.total_qty) || 0;
       totalAmount += Number(r.total_amount) || 0;
-      return [i + 1, r.artno || '', r.barcode || '', r.deptid || '', r.artname || '', fmt(r.hjual), fmtInt(r.total_qty), fmt(r.total_amount)];
+      var row = [i + 1, r.artno || '', r.barcode || '', r.deptid || '', r.artname || ''];
+      if (showHarga) row.push(fmt(r.hjual));
+      row.push(fmtInt(r.total_qty));
+      if (showTotal) row.push(fmt(r.total_amount));
+      return row;
     });
-    tableRows.push(['', '', '', '', '', 'TOTAL', fmtInt(totalQty), fmt(totalAmount)]);
+    var footerRow = ['', '', '', '', ''];
+    if (showHarga) footerRow.push('TOTAL');
+    else footerRow[footerRow.length - 1] = 'TOTAL';
+    footerRow.push(fmtInt(totalQty));
+    if (showTotal) footerRow.push(fmt(totalAmount));
+    tableRows.push(footerRow);
+
+    var pdfHeadRow = ['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang'];
+    if (showHarga) pdfHeadRow.push('Harga Jual');
+    pdfHeadRow.push('Qty');
+    if (showTotal) pdfHeadRow.push('Total');
+    var pdfHead = [pdfHeadRow];
+    var pdfColStyles = { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 14 } };
+    // Right-align numeric columns (after the base 5 text columns)
+    for (var ci = 5; ci < pdfHeadRow.length; ci++) pdfColStyles[ci] = { halign: 'right' };
 
     doc.autoTable({
       startY: 25,
-      head: [['#', 'Artno', 'Barcode', 'Dept', 'Nama Barang', 'Harga Jual', 'Qty', 'Total']],
+      head: pdfHead,
       body: tableRows,
       styles: { fontSize: 8, cellPadding: 1.5 },
       headStyles: { fillColor: [40, 167, 69] },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        3: { halign: 'center', cellWidth: 14 },
-        5: { halign: 'right' },
-        6: { halign: 'right' },
-        7: { halign: 'right' },
-      },
+      columnStyles: pdfColStyles,
       didParseCell: function (data) {
         if (data.row.index === tableRows.length - 1) {
           data.cell.styles.fontStyle = 'bold';

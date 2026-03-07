@@ -236,7 +236,7 @@
     var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     doc.setFontSize(14);
-    doc.text('Barang Diskon (FOC)', 14, 15);
+    doc.text('Barang Bonus (FOC)', 14, 15);
     doc.setFontSize(9);
     doc.text('Periode: ' + elFrom.value + '  s/d  ' + elTo.value, 14, 21);
 

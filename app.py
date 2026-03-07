@@ -66,17 +66,18 @@ app.state.templates = templates
 app.state.lan_active = settings.lan_mode
 app.state.https_port = None
 
-# Middleware (order matters: last added = outermost)
-from middleware import SetupGateMiddleware
+# Middleware (order matters: last added = outermost = runs first)
+from middleware import SetupGateMiddleware, AuthMiddleware
 app.add_middleware(SetupGateMiddleware)
+app.add_middleware(AuthMiddleware)
 
 if settings.lan_mode:
     from middleware import LANAuthMiddleware
     app.add_middleware(LANAuthMiddleware)
 
 # Routers
-from routers import pages, settings as settings_router, stock, receipt, sales, foc, health
-for r in [pages, settings_router, stock, receipt, sales, foc, health]:
+from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth
+for r in [pages, settings_router, stock, receipt, sales, foc, health, auth]:
     app.include_router(r.router)
 
 

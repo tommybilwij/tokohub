@@ -24,7 +24,6 @@
   var currentPO = null;
   var editLines = [];
   var vendors = [];
-  var users = [];
 
   // ------- Helpers -------
   function fmtNum(n) {
@@ -73,10 +72,6 @@
     if (!vendors.length) {
       try { vendors = await (await fetch('/api/vendors')).json(); } catch (e) { console.error(e); }
     }
-    if (!users.length) {
-      try { users = await (await fetch('/api/users')).json(); } catch (e) { console.error(e); }
-    }
-
     elSupplier.innerHTML = '<option value="">-- Pilih Supplier --</option>';
     vendors.forEach(function (v) {
       var opt = document.createElement('option');
@@ -85,13 +80,7 @@
       elSupplier.appendChild(opt);
     });
 
-    elUser.innerHTML = '<option value="">-- Pilih User --</option>';
-    users.forEach(function (u) {
-      var opt = document.createElement('option');
-      opt.value = u.nouser;
-      opt.textContent = u.usrname || u.nouser;
-      elUser.appendChild(opt);
-    });
+    // User is pre-filled from login session (hidden input)
   }
 
   // ------- Open overlay -------
@@ -109,7 +98,7 @@
     elTitle.textContent = 'Edit Faktur: ' + data.noorder;
     elSupplier.value = data.suppid || '';
     elDate.value = data.tglorder || '';
-    elUser.value = data.userid || '';
+    // elUser is pre-filled from login session
 
     editLines = (data.lines || []).map(function (l) {
       var b1 = l.bundling1 || {};

@@ -22,43 +22,75 @@
       </button>
       <div class="collapse navbar-collapse" id="navMain">
         <ul class="navbar-nav me-auto">
+          {% if nav_pages is defined and 'scanner' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/scanner' %}active{% endif %}"
                href="/scanner">
               <i class="bi bi-upc-scan"></i> Scanner
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and 'entry' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/entry' %}active{% endif %}"
                href="/entry">
               <i class="bi bi-receipt"></i> Input Faktur
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and 'history' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/history' %}active{% endif %}"
                href="/history">
               <i class="bi bi-clock-history"></i> Daftar Faktur
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and 'sales' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/sales-history' %}active{% endif %}"
                href="/sales-history">
               <i class="bi bi-graph-up"></i> Penjualan
             </a>
           </li>
+          {% endif %}
+          {% if nav_pages is defined and 'foc' in nav_pages %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/foc-history' %}active{% endif %}"
                href="/foc-history">
-              <i class="bi bi-gift"></i> Barang Diskon
+              <i class="bi bi-gift"></i> Barang Bonus
             </a>
           </li>
+          {% endif %}
+          {% if user and user.role == 'admin' %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path == '/settings' %}active{% endif %}"
                href="/settings">
               <i class="bi bi-gear"></i> Settings
             </a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path == '/users' %}active{% endif %}"
+               href="/users">
+              <i class="bi bi-people"></i> Users
+            </a>
+          </li>
+          {% endif %}
         </ul>
+        {% if user %}
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+              <i class="bi bi-person-circle"></i> {{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><span class="dropdown-item-text small text-muted">Role: {{ user.role }}</span></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="#" onclick="window._logout()"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+            </ul>
+          </li>
+        </ul>
+        {% endif %}
       </div>
     </div>
   </nav>

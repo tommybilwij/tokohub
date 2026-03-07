@@ -27,9 +27,8 @@
         <!-- User Selection -->
         <div class="mb-3">
           <label class="form-label fw-semibold">User</label>
-          <select id="userSelect" class="form-select">
-            <option value="">-- Pilih User --</option>
-          </select>
+          <input type="text" id="userDisplay" class="form-control" value="{{ user.username if user else '' }}" readonly>
+          <input type="hidden" id="userSelect" value="{{ user.username if user else '' }}">
         </div>
 
         <!-- Supplier Selection -->

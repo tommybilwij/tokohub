@@ -165,7 +165,7 @@
 
     var csvRows = [['#', 'Sumber', 'No. Referensi', 'Dept', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']];
     all.forEach(function(r, i) {
-      csvRows.push([i + 1, r.source, r.ref, r.dept, r.barcode, r.artname, r.old_hjual, r.new_hjual]);
+      csvRows.push([i + 1, r.source, r.ref, r.dept, '\t' + r.barcode, r.artname, Number(r.old_hjual).toFixed(2), Number(r.new_hjual).toFixed(2)]);
     });
 
     var csv = csvRows.map(function(row) {

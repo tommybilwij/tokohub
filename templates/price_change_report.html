@@ -18,7 +18,10 @@
         <i class="bi bi-search"></i> Cari
       </button>
     </div>
-    <div class="d-flex gap-2 ms-auto" id="pcExportBtns" style="display:none!important">
+  </div>
+
+  <div class="d-flex justify-content-end align-items-center mb-2 d-none" id="pcExportBtns">
+    <div class="d-flex gap-2">
       <button class="btn btn-sm btn-outline-success" id="pcBtnCsv">
         <i class="bi bi-filetype-csv"></i> CSV
       </button>
@@ -99,11 +102,9 @@
 
         // Show export buttons if there's data
         if (hasFaktur || hasManual) {
-          elExportBtns.style.cssText = '';
-          elExportBtns.classList.add('d-flex');
+          elExportBtns.classList.remove('d-none');
         } else {
-          elExportBtns.style.display = 'none';
-          elExportBtns.classList.remove('d-flex');
+          elExportBtns.classList.add('d-none');
         }
 
         // Faktur changes

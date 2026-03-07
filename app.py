@@ -36,16 +36,25 @@ _lifespan_count = 0
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup/shutdown: create and close DB pool (safe for dual servers)."""
+    """Startup/shutdown: create and close DB pool (safe for dual servers).
+
+    If .envrc doesn't exist yet (fresh install) or DB is unreachable,
+    the app still starts so the /setup page can be served.
+    """
     global _lifespan_count
     from services.db import create_pool, close_pool, get_pool
     async with _lifespan_lock:
         _lifespan_count += 1
         if get_pool() is None:
-            await create_pool()
-    app.state.db_pool = get_pool()
-    from services.schema import ensure_tokohub_schema
-    await ensure_tokohub_schema(app.state.db_pool)
+            try:
+                await create_pool()
+            except Exception:
+                logger.warning("Could not connect to database — running in setup mode")
+    pool = get_pool()
+    app.state.db_pool = pool
+    if pool is not None:
+        from services.schema import ensure_tokohub_schema
+        await ensure_tokohub_schema(pool)
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1

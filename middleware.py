@@ -7,17 +7,18 @@ from config import _ENVRC_PATH
 from services.lan_auth import is_private_ip
 from services.auth import decode_session_token, get_auth_record, SESSION_COOKIE
 
-_SETUP_PASSTHROUGH = ('/setup', '/api/setup', '/api/settings', '/health', '/static')
+_SETUP_PASSTHROUGH = ('/setup', '/api/setup', '/api/settings', '/api/restart', '/health', '/static')
 _AUTH_PASSTHROUGH = ('/login', '/api/auth/login', '/api/auth/user-list', '/api/auth/register',
-                     '/health', '/static', '/setup', '/api/setup', '/api/settings')
+                     '/health', '/static', '/setup', '/api/setup', '/api/settings', '/api/restart')
 _LOCALHOST = {'127.0.0.1', '::1'}
 
 
 class SetupGateMiddleware(BaseHTTPMiddleware):
-    """Redirect to /setup if .envrc doesn't exist yet."""
+    """Redirect to /setup if .envrc doesn't exist or DB is not connected."""
 
     async def dispatch(self, request, call_next):
-        if not _ENVRC_PATH.exists():
+        needs_setup = not _ENVRC_PATH.exists() or getattr(request.app.state, 'db_pool', None) is None
+        if needs_setup:
             path = request.url.path
             if not any(path.startswith(p) for p in _SETUP_PASSTHROUGH):
                 return RedirectResponse('/setup')

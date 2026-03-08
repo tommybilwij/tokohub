@@ -32,11 +32,14 @@ async def api_stock_search(
     query = q.strip()
     if not query:
         return []
-    # Use Perubahan Harga search settings when mode=pc
+    from config import settings
+    # Use mode-specific search settings
     if mode == 'pc':
-        from config import settings
         limit = limit or settings.pc_top_n
         min_score = min_score if min_score is not None else settings.pc_min_score
+    elif mode == 'po':
+        limit = limit or settings.po_top_n
+        min_score = min_score if min_score is not None else settings.po_min_score
     results = await search_stock(
         db, query,
         top_n=limit,

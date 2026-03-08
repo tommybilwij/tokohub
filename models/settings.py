@@ -27,6 +27,8 @@ class SettingsUpdate(BaseModel):
     fuzzy_min_score: int | None = None
     pc_top_n: int | None = None
     pc_min_score: int | None = None
+    po_top_n: int | None = None
+    po_min_score: int | None = None
     server_port: int | None = None
     server_host: str | None = None
     lan_mode: bool | None = None

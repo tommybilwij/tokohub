@@ -52,6 +52,8 @@ async def api_settings_get(db: aiomysql.Pool = Depends(get_db)):
         'fuzzy_min_score': config.settings.fuzzy_min_score,
         'pc_top_n': config.settings.pc_top_n,
         'pc_min_score': config.settings.pc_min_score,
+        'po_top_n': config.settings.po_top_n,
+        'po_min_score': config.settings.po_min_score,
         'server_port': config.settings.server_port,
         'server_host': config.settings.server_host,
         'lan_mode': config.settings.lan_mode,

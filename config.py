@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     pc_top_n: int = 10
     pc_min_score: int = 30
 
+    # Fuzzy matching (Pesanan Pembelian)
+    po_top_n: int = 50
+    po_min_score: int = 40
+
     # Server
     server_port: int = 5000
     server_host: str = '127.0.0.1'
@@ -185,6 +189,8 @@ _KEY_TO_ENV = {
     'fuzzy_min_score': 'FUZZY_MIN_SCORE',
     'pc_top_n': 'PC_TOP_N',
     'pc_min_score': 'PC_MIN_SCORE',
+    'po_top_n': 'PO_TOP_N',
+    'po_min_score': 'PO_MIN_SCORE',
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',

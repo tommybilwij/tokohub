@@ -179,6 +179,51 @@ async def get_stock_balances(pool, suppid: str) -> dict:
     return {r['artno']: float(r['curqty'] or 0) for r in rows}
 
 
+async def get_item_po_data(pool, artno: str, date_from: str, date_to: str) -> dict:
+    """Get sales monthly + stock for a single artno (any supplier)."""
+    d_from = datetime.strptime(date_from[:10], '%Y-%m-%d').date()
+    d_to = datetime.strptime(date_to[:10], '%Y-%m-%d').date()
+
+    months = []
+    d = d_from.replace(day=1)
+    while d <= d_to:
+        months.append(d.strftime('%Y-%m'))
+        if d.month == 12:
+            d = d.replace(year=d.year + 1, month=1)
+        else:
+            d = d.replace(month=d.month + 1)
+
+    monthly = {}
+    for month_str in months:
+        y, m = month_str.split('-')
+        m_start = date(int(y), int(m), 1)
+        if int(m) == 12:
+            m_end = date(int(y) + 1, 1, 1) - timedelta(days=1)
+        else:
+            m_end = date(int(y), int(m) + 1, 1) - timedelta(days=1)
+        eff_start = max(m_start, d_from)
+        eff_end = min(m_end, d_to)
+
+        tables = await _sl_table_names(pool, eff_start.isoformat(), eff_end.isoformat())
+        if not tables:
+            continue
+        unions = ' UNION ALL '.join(f"SELECT artno, qty FROM `{t}`" for t in tables)
+        sql = f"SELECT SUM(s.qty) AS total_qty FROM ({unions}) s WHERE s.artno = %s"
+        rows = await execute_query(pool, sql, (artno,))
+        if rows and rows[0]['total_qty']:
+            monthly[month_str] = float(rows[0]['total_qty'])
+
+    # Stock balance (no supplier filter)
+    rows = await execute_query(
+        pool,
+        "SELECT SUM(curqty) AS curqty FROM stlastbal WHERE artno = %s",
+        (artno,),
+    )
+    stock_qty = float(rows[0]['curqty'] or 0) if rows and rows[0]['curqty'] else 0
+
+    return {'monthly': monthly, 'stock': stock_qty}
+
+
 async def _generate_po_number(cursor, order_date: date) -> str:
     """Generate PO number: PP{YYMMDD}{5-digit-seq}."""
     prefix = 'PP' + order_date.strftime('%y%m%d')

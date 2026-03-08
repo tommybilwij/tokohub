@@ -7,6 +7,7 @@ from fastapi.responses import Response, JSONResponse
 from dependencies import get_db
 from services.po_service import (
     get_vendor_items, get_sales_data, get_sales_monthly, get_stock_balances,
+    get_item_po_data,
     save_pesanan, update_pesanan, get_po_list, get_po_detail, delete_po, export_po_csv,
 )
 
@@ -34,6 +35,12 @@ async def api_sales_monthly(suppid: str, date_from: str, date_to: str,
 @router.get('/api/po/stock-balance')
 async def api_stock_balance(suppid: str, db: aiomysql.Pool = Depends(get_db)):
     return await get_stock_balances(db, suppid)
+
+
+@router.get('/api/po/item-data')
+async def api_item_po_data(artno: str, date_from: str, date_to: str,
+                           db: aiomysql.Pool = Depends(get_db)):
+    return await get_item_po_data(db, artno, date_from, date_to)
 
 
 @router.post('/api/po/save')

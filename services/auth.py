@@ -165,8 +165,8 @@ async def set_password(pool, username: str, password: str, role: str = None) -> 
 
         await execute_modify(
             pool,
-            "INSERT INTO tokohub.auth (username, password_hash, role) "
-            "VALUES (%s, %s, %s)",
+            "INSERT INTO tokohub.auth (username, password_hash, role, created_at) "
+            "VALUES (%s, %s, %s, NOW())",
             (username, ph, role),
         )
     logger.info("Password set for %s (role=%s)", username, role)

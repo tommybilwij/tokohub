@@ -160,7 +160,7 @@
   'use strict';
 
   var currentUser = '{{ user.username if user else "" }}';
-  var today = new Date().toISOString().split('T')[0];
+  var _d = new Date(); var today = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
   var STORAGE_KEY = 'po_input_draft';
 
   // Edit mode detection

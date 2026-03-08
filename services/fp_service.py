@@ -42,30 +42,6 @@ def _bundling_val(line: dict, key: str, field: str) -> float:
     return float(b.get(field) or 0)
 
 
-def _extract_shipping(d: dict) -> float:
-    """Back-calculate shipping_cost from sthist jlhppn.
-
-    In sthist, jlhppn = (ppn_per_bsr * qty) + shipping_cost.
-    So shipping = jlhppn - recalculated ppn total.
-    """
-    hbelibsr = float(d.get('hbelibsr') or 0)
-    pctdisc1 = float(d.get('pctdisc1') or 0)
-    pctdisc2 = float(d.get('pctdisc2') or 0)
-    pctppn = float(d.get('pctppn') or 0)
-    qty = float(d.get('qty') or 0)
-    jlhppn = float(d.get('jlhppn') or 0)
-
-    disc1 = hbelibsr * pctdisc1 / 100
-    after_disc1 = hbelibsr - disc1
-    disc2 = after_disc1 * pctdisc2 / 100
-    after_disc2 = after_disc1 - disc2
-    ppn_per_bsr = after_disc2 * pctppn / 100
-    ppn_total = ppn_per_bsr * qty
-
-    shipping = jlhppn - ppn_total
-    return round(shipping, 2) if shipping > 0.005 else 0
-
-
 async def _generate_fp_number(cursor, order_date):
     """Generate Faktur Pembelian number: FP{YYMMDD}{5-digit-seq}."""
     prefix = f"FP{order_date.strftime('%y%m%d')}"
@@ -202,6 +178,13 @@ async def preview_fp(pool, supplier_id, items, order_date=None, shipping_cost=0)
         netto_full_with_ship = netto_full + (item_shipping / qty if qty else Decimal('0'))
         jlhppn_with_ship = float(ppn * qty) + float(item_shipping)
 
+        # Effective PPN% including shipping (for sthist + stock consistency)
+        if item_shipping and qty and after_disc2:
+            shipping_per_bsr = item_shipping / qty
+            effective_pctppn = (ppn + shipping_per_bsr) / after_disc2 * 100
+        else:
+            effective_pctppn = pctppn
+
         lines.append({
             'artno': artno,
             'artpabrik': stock['artpabrik'] or '',
@@ -221,13 +204,13 @@ async def preview_fp(pool, supplier_id, items, order_date=None, shipping_cost=0)
             'pctdisc1': float(pctdisc1),
             'pctdisc2': float(pctdisc2),
             'pctdisc3': float(pctdisc3),
-            'pctppn': float(pctppn),
+            'pctppn': float(effective_pctppn),
             'jlhppn': jlhppn_with_ship,
             'jlhdisc1_kcl': float(disc1_kcl),
             'jlhdisc2_kcl': float(disc2_kcl),
             'jlhdisc3_kcl': float(disc3_kcl),
             'hbelinetto_kcl': float(hbelinetto_kcl),
-            'jlhppn_kcl': float(ppn_kcl),
+            'jlhppn_kcl': float(ppn_kcl + (item_shipping / (qty * packing) if qty and packing else Decimal('0'))),
             'hjual': float(item['hjual1_override']) if item.get('hjual1_override') is not None else float(stock['hjual'] or 0),
             'hjual2': float(item['hjual2_override']) if item.get('hjual2_override') is not None else float(stock['hjual2'] or 0),
             'hjual3': float(item['hjual3_override']) if item.get('hjual3_override') is not None else float(stock['hjual3'] or 0),
@@ -605,7 +588,7 @@ async def get_fp_history(pool, page=1, per_page=20,
         f"""SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
                   b.userid, b.uraian, v.name AS supplier_name,
                   (SELECT COUNT(*) FROM sthist s WHERE s.becreff = b.becreff AND s.tipetrans = 1) AS line_count,
-                  b.isupdateprice, b.islocked
+                  b.isupdateprice, b.islocked, b.isupdate
            FROM icbym b
            LEFT JOIN vendor v ON v.id = b.suppid
            {where_sql}
@@ -778,8 +761,6 @@ async def get_fp_comparison(pool, fp_number: str) -> dict | None:
         after = _to_dict(line)
         after['qty_besar'] = after.get('qty', 0)
         after['foc'] = after.pop('qtybonus', 0)
-        # Back-calculate shipping from jlhppn (jlhppn = ppn_total + shipping)
-        after['shipping_cost'] = _extract_shipping(after)
 
         # "before" hbeli: most recent FP or PH (any tipetrans 0 or 1)
         prev_hbeli = await execute_single(
@@ -815,6 +796,9 @@ async def get_fp_comparison(pool, fp_number: str) -> dict | None:
             before = _to_dict(prev_hjual)
         else:
             before = None
+
+        if before:
+            before['foc'] = before.pop('qtybonus', 0) or 0
 
         items.append({'artno': artno, 'before': before, 'after': after})
 
@@ -945,7 +929,8 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                 await cursor.execute(
                     """UPDATE icbym
                        SET suppid = %s, tglfaktur = %s, duedate = %s,
-                           jlhfaktur = %s, userid = %s, uraian = %s, isupdateprice = %s
+                           jlhfaktur = %s, userid = %s, uraian = %s, isupdateprice = %s,
+                           isupdate = 1
                        WHERE nofaktur = %s AND tipe = '1'""",
                     (supplier_id, order_date, _due,
                      preview['grand_total'], userid, uraian, 1 if update_price else 0, fp_number)

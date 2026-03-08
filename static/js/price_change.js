@@ -46,8 +46,10 @@
     searchResults = editSearchResultsEl;
 
     if (btnCommit) btnCommit.innerHTML = '<i class="bi bi-check-lg"></i> Simpan Perubahan';
-    var newLabel = document.getElementById('pcBtnNewLabel');
-    if (newLabel) newLabel.textContent = 'Kembali ke Riwayat';
+    // In edit mode, hide "Entry Baru" and make "Lihat Riwayat" the primary button
+    document.getElementById('pcBtnNew').classList.add('d-none');
+    var histBtn = document.getElementById('pcBtnHistory');
+    if (histBtn) { histBtn.className = 'btn btn-primary-app'; }
   } else {
     // Normal mode: hide edit header and edit search row
     document.getElementById('pcEditHeader').classList.add('d-none');

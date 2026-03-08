@@ -60,7 +60,7 @@
   var elExportBtns = document.getElementById('pcExportBtns');
   var elBtnCsv = document.getElementById('pcBtnCsv');
   var elBtnPdf = document.getElementById('pcBtnPdf');
-  dateInput.value = new Date().toISOString().split('T')[0];
+  var _d = new Date(); dateInput.value = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
 
   var lastData = null;
 

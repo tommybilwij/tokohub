@@ -326,7 +326,7 @@
 
     // Set today's date as default
     if (dom.orderDate) {
-      dom.orderDate.value = new Date().toISOString().slice(0, 10);
+      var d = new Date(); dom.orderDate.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
 
     // Load dropdowns first, then restore saved state

@@ -55,6 +55,7 @@
             <th class="sh-sortable text-end" data-col="total">Total <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="inputter">User <i class="bi bi-chevron-expand"></i></th>
+            <th class="text-center">Status</th>
             <th>Ket.</th>
             <th class="text-center">Update Harga Jual</th>
             <th></th>
@@ -234,7 +235,7 @@
   var perPage = 20;
 
   // Default date range: today
-  var today = new Date().toISOString().split('T')[0];
+  var _d = new Date(); var today = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
   elDateFrom.value = today;
   elDateTo.value = today;
 
@@ -355,12 +356,14 @@
           var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
             + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
             + '</div>';
+          var statusBadge = o.isupdate ? '<span class="badge bg-warning text-dark">Berubah</span>' : '';
           tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
             + '<td>' + (o.tglfaktur || '-') + '</td>'
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
             + '<td>' + (o.userid || '-') + '</td>'
+            + '<td class="text-center">' + statusBadge + '</td>'
             + '<td class="text-center">' + (o.uraian ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.uraian) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
             + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
@@ -662,12 +665,15 @@
       var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
         + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
         + '</div>';
+      var statusBadge = o.isupdate ? '<span class="badge bg-warning text-dark">Berubah</span>' : '';
       tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
         + '<td>' + (o.tglfaktur || '-') + '</td>'
         + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
         + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
         + '<td class="text-center">' + (o.line_count || 0) + '</td>'
         + '<td>' + (o.userid || '-') + '</td>'
+        + '<td class="text-center">' + statusBadge + '</td>'
+        + '<td class="text-center">' + (o.uraian ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.uraian) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
         + '<td class="text-center">' + priceSwitch + '</td>'
         + '<td class="text-nowrap">' + actions + '</td>';
       elBody.appendChild(tr);

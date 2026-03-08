@@ -214,12 +214,6 @@
     beforePrices = snap.before;
     afterPrices = snap.after;
 
-    // Backfill bkirim from snapshot after data (not stored in sthist)
-    editLines.forEach(function (line) {
-      var af = afterPrices[line.stockid];
-      if (af && af.shipping_cost) line.bkirim = af.shipping_cost;
-    });
-
     renderTable();
     overlay.classList.remove('d-none');
     var mainContent = document.querySelector('.sh-page');
@@ -509,13 +503,12 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
-              '<input type="number" class="amt-input edit-foc' + (aft.foc != null ? changedCls(aft.foc, line.qtybonus) : '') + '" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
+              '<input type="number" class="amt-input edit-foc' + (stk.foc != null ? changedCls(stk.foc, line.qtybonus) : '') + '" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
               '<span class="bt-unit">Pcs</span>' +
-              (aft.foc != null ? '<span class="sblm-right">' + (aft.foc ? aft.foc + ' Pcs' : '—') + '</span>' : '') +
+              (stk.foc != null ? '<span class="sblm-right">' + (stk.foc ? stk.foc + ' Pcs' : '—') + '</span>' : '') +
             '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              '<input type="text" class="amt-input edit-bkirim' + (aft.shipping_cost != null ? changedCls(aft.shipping_cost, line.bkirim) : '') + '" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
-              (aft.shipping_cost != null ? '<span class="sblm-right">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</span>' : '') +
+              '<span class="text-muted small">Sudah masuk ke PPN</span>' +
             '</div>' +
             (function () {
               var nettoCls = '';
@@ -934,24 +927,10 @@
       el.addEventListener('change', function () {
         var idx = parseInt(el.dataset.idx);
         editLines[idx].qtybonus = parseInt(el.value) || 0;
-        var aft = afterPrices[editLines[idx].stockid] || {};
-        if (aft.foc != null) {
-          el.classList.toggle('value-changed', fmtNum(aft.foc) !== fmtNum(editLines[idx].qtybonus));
+        var stk = beforePrices[editLines[idx].stockid] || {};
+        if (stk.foc != null) {
+          el.classList.toggle('value-changed', fmtNum(stk.foc) !== fmtNum(editLines[idx].qtybonus));
         }
-      });
-    });
-
-    // B.Kirim
-    table.querySelectorAll('.edit-bkirim').forEach(function (el) {
-      el.addEventListener('change', function () {
-        var idx = parseInt(el.dataset.idx);
-        editLines[idx].bkirim = parseNum(el.value);
-        el.value = editLines[idx].bkirim ? fmtNum(editLines[idx].bkirim) : '';
-        var aft = afterPrices[editLines[idx].stockid] || {};
-        if (aft.shipping_cost != null) {
-          el.classList.toggle('value-changed', fmtNum(aft.shipping_cost) !== fmtNum(editLines[idx].bkirim));
-        }
-        updateComputedPrices(idx);
       });
     });
 

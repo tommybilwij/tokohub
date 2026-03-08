@@ -42,6 +42,30 @@ def _bundling_val(line: dict, key: str, field: str) -> float:
     return float(b.get(field) or 0)
 
 
+def _extract_shipping(d: dict) -> float:
+    """Back-calculate shipping_cost from sthist jlhppn.
+
+    In sthist, jlhppn = (ppn_per_bsr * qty) + shipping_cost.
+    So shipping = jlhppn - recalculated ppn total.
+    """
+    hbelibsr = float(d.get('hbelibsr') or 0)
+    pctdisc1 = float(d.get('pctdisc1') or 0)
+    pctdisc2 = float(d.get('pctdisc2') or 0)
+    pctppn = float(d.get('pctppn') or 0)
+    qty = float(d.get('qty') or 0)
+    jlhppn = float(d.get('jlhppn') or 0)
+
+    disc1 = hbelibsr * pctdisc1 / 100
+    after_disc1 = hbelibsr - disc1
+    disc2 = after_disc1 * pctdisc2 / 100
+    after_disc2 = after_disc1 - disc2
+    ppn_per_bsr = after_disc2 * pctppn / 100
+    ppn_total = ppn_per_bsr * qty
+
+    shipping = jlhppn - ppn_total
+    return round(shipping, 2) if shipping > 0.005 else 0
+
+
 async def _generate_fp_number(cursor, order_date):
     """Generate Faktur Pembelian number: FP{YYMMDD}{5-digit-seq}."""
     prefix = f"FP{order_date.strftime('%y%m%d')}"
@@ -355,12 +379,6 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                            WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
                         (float(qty_small), line['artno'])
                     )
-                    if cursor.rowcount == 0:
-                        await cursor.execute(
-                            """INSERT INTO stlastbal (artno, curqty, warehouseid)
-                               VALUES (%s, %s, 'LAPANGAN')""",
-                            (line['artno'], float(qty_small))
-                        )
 
                 # Increment nextrec counter
                 await cursor.execute(
@@ -701,7 +719,9 @@ async def toggle_fp_update_price(pool, fp_number: str) -> dict:
 async def get_fp_comparison(pool, fp_number: str) -> dict | None:
     """Get before/after comparison data for FP edit from sthist history.
 
-    'before' = previous sthist entry (PH or FP with isupdateprice=1)
+    'before' = what stock looked like before this FP was committed.
+      - hbeli fields: from most recent FP or PH (tipetrans IN (0,1))
+      - hjual fields: from most recent price-updating entry (PH or FP with isupdateprice=1)
     'after'  = this FP's own sthist entry
     """
     header = await execute_single(
@@ -720,7 +740,14 @@ async def get_fp_comparison(pool, fp_number: str) -> dict | None:
                ispaketprc, over1, over2,
                hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
                hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
-               qty, amount, qtybonus"""
+               jlhppn, qty, amount, qtybonus"""
+
+    _HJUAL_FIELDS = (
+        'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
+        'ispaketprc', 'over1', 'over2',
+        'hjualo1', 'hjual2o1', 'hjual3o1', 'hjual4o1', 'hjual5o1',
+        'hjualo2', 'hjual2o2', 'hjual3o2', 'hjual4o2', 'hjual5o2',
+    )
 
     lines = await execute_query(
         pool,
@@ -751,10 +778,20 @@ async def get_fp_comparison(pool, fp_number: str) -> dict | None:
         after = _to_dict(line)
         after['qty_besar'] = after.get('qty', 0)
         after['foc'] = after.pop('qtybonus', 0)
-        after['shipping_cost'] = 0
+        # Back-calculate shipping from jlhppn (jlhppn = ppn_total + shipping)
+        after['shipping_cost'] = _extract_shipping(after)
 
-        # "before" = previous sthist (PH or FP with update_price=true)
-        prev = await execute_single(
+        # "before" hbeli: most recent FP or PH (any tipetrans 0 or 1)
+        prev_hbeli = await execute_single(
+            pool,
+            f"""SELECT {_COLS} FROM sthist
+                WHERE stockid = %s AND noindex < %s AND tipetrans IN (0, 1)
+                ORDER BY noindex DESC LIMIT 1""",
+            (artno, ni),
+        )
+
+        # "before" hjual: most recent price-updating entry
+        prev_hjual = await execute_single(
             pool,
             f"""SELECT {_COLS} FROM sthist
                 WHERE stockid = %s AND noindex < %s
@@ -762,7 +799,22 @@ async def get_fp_comparison(pool, fp_number: str) -> dict | None:
                 ORDER BY noindex DESC LIMIT 1""",
             (artno, ni),
         )
-        before = _to_dict(prev) if prev else None
+
+        if prev_hbeli:
+            before = _to_dict(prev_hbeli)
+            # Overlay hjual fields from the hjual-specific lookup
+            if prev_hjual:
+                hjual_d = _to_dict(prev_hjual)
+                for f in _HJUAL_FIELDS:
+                    before[f] = hjual_d[f]
+            else:
+                # No previous hjual-updating entry — clear hjual fields so no hint shows
+                for f in _HJUAL_FIELDS:
+                    before.pop(f, None)
+        elif prev_hjual:
+            before = _to_dict(prev_hjual)
+        else:
+            before = None
 
         items.append({'artno': artno, 'before': before, 'after': after})
 
@@ -970,12 +1022,6 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                            WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
                         (float(qty_small), line['artno'])
                     )
-                    if cursor.rowcount == 0:
-                        await cursor.execute(
-                            """INSERT INTO stlastbal (artno, curqty, warehouseid)
-                               VALUES (%s, %s, 'LAPANGAN')""",
-                            (line['artno'], float(qty_small))
-                        )
 
                 await conn.commit()
 

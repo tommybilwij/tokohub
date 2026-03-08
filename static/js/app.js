@@ -2125,10 +2125,14 @@
     const supplierId = dom.vendorSelect.value;
     const matched = state.items.filter((i) => i.selectedArtno);
 
-    // Block if any item has QTY KCL = 0
+    // Block if any item has QTY KCL = 0 or Total Harga Beli = 0
     for (const it of matched) {
       if (!it.qtyKecil || it.qtyKecil <= 0) {
         showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim Faktur.`, 'danger');
+        return;
+      }
+      if (!it.priceBsr || it.priceBsr <= 0) {
+        showToast(`Total Harga Beli untuk "${it.name || it.selectedArtno}" adalah 0. Isi harga beli sebelum kirim Faktur.`, 'warning');
         return;
       }
     }

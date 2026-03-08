@@ -49,11 +49,11 @@
       <table class="sh-table">
         <thead>
           <tr>
-            <th>No. Order</th>
-            <th>Tanggal</th>
-            <th>Supplier</th>
-            <th class="text-end">Total</th>
-            <th class="text-center">Items</th>
+            <th class="sh-sortable" data-col="po_number">No. Order <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="tanggal">Tanggal <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="supplier_name">Supplier <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="total">Total <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
             <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
@@ -311,6 +311,7 @@
         elResults.classList.remove('d-none');
         elCount.textContent = total + ' faktur ditemukan';
 
+        lastItems = items;
         elBody.innerHTML = '';
         items.forEach(function(o) {
           var tr = document.createElement('tr');
@@ -583,6 +584,88 @@
     } finally {
       chk.disabled = false;
     }
+  });
+
+  // --- Client-side sorting ---
+  var lastItems = [];
+  var sortState = { key: null, asc: true };
+
+  function getSortVal(o, key) {
+    switch(key) {
+      case 'po_number': return o.nofaktur || '';
+      case 'tanggal': return o.tglfaktur || '';
+      case 'supplier_name': return (o.supplier_name || o.suppid || '').toLowerCase();
+      case 'total': return Number(o.jlhfaktur) || 0;
+      case 'total_items': return Number(o.line_count) || 0;
+      default: return '';
+    }
+  }
+
+  function sortAndRender() {
+    if (!lastItems.length) return;
+    var sorted = lastItems.slice();
+    if (sortState.key) {
+      sorted.sort(function(a, b) {
+        var va = getSortVal(a, sortState.key);
+        var vb = getSortVal(b, sortState.key);
+        if (typeof va === 'number') return sortState.asc ? va - vb : vb - va;
+        if (va < vb) return sortState.asc ? -1 : 1;
+        if (va > vb) return sortState.asc ? 1 : -1;
+        return 0;
+      });
+    }
+    elBody.innerHTML = '';
+    sorted.forEach(function(o) {
+      var tr = document.createElement('tr');
+      var actions = '<button class="btn btn-sm btn-outline-primary btn-view-fp" data-fp="' + o.nofaktur + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+      if (canEdit && !o.islocked && !o.isupdateprice) {
+        actions += ' <button class="btn btn-sm btn-outline-success btn-edit-fp" data-fp="' + o.nofaktur + '" title="Edit"><i class="bi bi-pencil"></i></button>';
+      }
+      if (canDelete && !o.islocked) {
+        actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-fp" data-fp="' + o.nofaktur + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+      }
+      if (canLock) {
+        var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
+        var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
+        var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+        actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+      }
+      var priceChecked = o.isupdateprice ? ' checked' : '';
+      var priceDisabled = o.islocked ? ' disabled' : '';
+      var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
+        + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
+        + '</div>';
+      tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
+        + '<td>' + (o.tglfaktur || '-') + '</td>'
+        + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+        + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
+        + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+        + '<td class="text-center">' + priceSwitch + '</td>'
+        + '<td class="text-nowrap">' + actions + '</td>';
+      elBody.appendChild(tr);
+    });
+    bindButtons();
+    updateSortIcons();
+  }
+
+  function updateSortIcons() {
+    document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+      var icon = th.querySelector('i');
+      if (th.dataset.col === sortState.key) {
+        icon.className = sortState.asc ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      } else {
+        icon.className = 'bi bi-chevron-expand';
+      }
+    });
+  }
+
+  document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = th.dataset.col;
+      if (sortState.key === key) { sortState.asc = !sortState.asc; }
+      else { sortState.key = key; sortState.asc = true; }
+      sortAndRender();
+    });
   });
 
   elBtnSearch.addEventListener('click', function() { loadData(1); });

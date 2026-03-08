@@ -900,7 +900,7 @@ body {
 }
 
 .qty-stepper input {
-  width: 42px;
+  width: 56px;
   text-align: center;
   border: none;
   border-left: 1px solid var(--clr-input-border);

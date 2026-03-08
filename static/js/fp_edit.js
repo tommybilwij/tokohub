@@ -362,7 +362,7 @@
         fields.forEach(function (f) { if (Math.abs((Number(stk[f]) || 0) - (Number(line[f]) || 0)) >= 0.001) hasChanges = true; });
         if (Math.abs((Number(stk.hjual) || 0) - (Number(line.hjual) || 0)) >= 0.001) hasChanges = true;
       }
-      var changeIcon = hasChanges ? ' <i class="bi bi-exclamation-triangle-fill text-warning" title="Harga berbeda dari stok saat ini"></i>' : '';
+      var changeIcon = hasChanges ? ' <span class="badge bg-warning text-dark" style="font-size:0.7em;vertical-align:middle"><i class="bi bi-exclamation-triangle-fill"></i> Harga berubah</span>' : '';
 
       // Main row
       var tr = document.createElement('tr');

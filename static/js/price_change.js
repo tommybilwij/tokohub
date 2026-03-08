@@ -111,7 +111,7 @@
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty pc-bundling-minqty" data-idx="${itemIdx}" data-tier="${tier}"
-                   value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${b.enabled ? '' : 'disabled'}>
+                   value="${b.minQty || ''}" placeholder="0" min="0" step="1" ${b.enabled ? '' : 'disabled'}>
             <span style="text-transform:none">Pcs</span>
           </span>
         </div>
@@ -329,7 +329,6 @@
                 <thead>
                   <tr>
                     <th></th>
-                    <th class="dp-th-total">/${sat} &times; 1 =</th>
                     <th>/${sat}</th>
                     <th>%</th>
                   </tr>
@@ -338,24 +337,20 @@
                   <tr>
                     <td class="bt-label">Diskon 1</td>
                     <td class="text-end text-muted">${net.disc1Amt ? fmt(net.disc1Amt) : '0'}</td>
-                    <td class="text-end text-muted">${net.disc1Amt ? fmt(net.disc1Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc1 || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 2</td>
-                    <td class="text-end text-muted">${net.disc2Amt ? fmt(net.disc2Amt) : '0'}</td>
                     <td class="text-end text-muted">${net.disc2Amt ? fmt(net.disc2Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc2 || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">PPN</td>
                     <td class="text-end text-muted">${net.ppnAmt ? fmt(net.ppnAmt) : '0'}</td>
-                    <td class="text-end text-muted">${net.ppnAmt ? fmt(net.ppnAmt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctppn || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 3</td>
-                    <td class="text-end text-muted">${net.disc3Amt ? fmt(net.disc3Amt) : '0'}</td>
                     <td class="text-end text-muted">${net.disc3Amt ? fmt(net.disc3Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc3 || '—'}</td>
                   </tr>
@@ -363,8 +358,7 @@
               </table>
               <div class="beli-row-foc">
                 <span class="bt-label">F.O.C</span>
-                <span class="text-muted">0</span>
-                <span class="bt-unit">Pcs</span>
+                <span class="text-muted">0 Pcs</span>
               </div>
               <div class="beli-row-shipping">
                 <span class="bt-label">B.Kirim</span>

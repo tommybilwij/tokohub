@@ -2434,7 +2434,7 @@ body {
 #pcTable .pc-detail .dp-section-header {
   font-weight: var(--fw-semibold);
   font-size: 0.85rem;
-  color: var(--clr-primary-700);
+  color: var(--clr-accent-800);
   margin-bottom: 0.35rem;
 }
 #pcTable .pc-detail .pc-hjual {

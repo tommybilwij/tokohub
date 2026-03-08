@@ -234,8 +234,10 @@ async def delete_auth(pool, username: str) -> None:
 async def has_page_access(pool, role: str, page: str) -> bool:
     """Check if a role can access a given page.
 
-    A parent permission (e.g. 'faktur') also grants access to all
-    children (e.g. 'faktur:input', 'faktur:daftar').
+    Ancestor matching only applies to permissions NOT explicitly listed
+    in PAGES (i.e. unlisted sub-paths).  If a permission is listed in
+    PAGES it must be granted directly — a parent does not auto-grant
+    its explicitly-defined children.
     """
     if role == 'admin':
         return True
@@ -245,10 +247,12 @@ async def has_page_access(pool, role: str, page: str) -> bool:
     perm_list = perms.split(',')
     if page in perm_list:
         return True
-    # Check if any ancestor is granted (e.g. 'laporan' grants 'laporan:penjualan:harga')
-    parts = page.split(':')
-    for i in range(1, len(parts)):
-        ancestor = ':'.join(parts[:i])
-        if ancestor in perm_list:
-            return True
+    # Only fall back to ancestor matching for permissions that are NOT
+    # explicitly defined in PAGES (e.g. an ad-hoc sub-path).
+    if page not in PAGES:
+        parts = page.split(':')
+        for i in range(1, len(parts)):
+            ancestor = ':'.join(parts[:i])
+            if ancestor in perm_list:
+                return True
     return False

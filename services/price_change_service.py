@@ -62,9 +62,7 @@ async def _generate_ph_number(cursor, order_date):
     return f"{prefix}{seq:05d}"
 
 
-async def commit_price_change(pool, items: list[dict], userid: str = '',
-                              update_purch_price: bool = True,
-                              lock_history: bool = True) -> dict:
+async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict:
     """Commit price changes.
 
     Each item: {artno, hjual, hjual2, hjual3, hjual4, hjual5}
@@ -160,7 +158,6 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                         over1, over2, ispaketprc,
                         packing, satuanbsr, satuankcl,
                         nofaktur, tipetrans, becreff,
-                        isupdateprice, isupdatepurchprice,
                         oprice, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
                         pricelevel
                     ) VALUES (
@@ -174,7 +171,6 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                         %s, %s, %s,
                         %s, %s, %s,
                         %s, 0, %s,
-                        %s, %s,
                         %s, %s, %s, %s, %s, %s,
                         '1'
                     )""",
@@ -189,8 +185,6 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
                         stock['over1'], stock['over2'], stock['ispaketprc'],
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
-                        1 if lock_history else 0,
-                        1 if update_purch_price else 0,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
                     )
                 )
@@ -223,6 +217,207 @@ async def commit_price_change(pool, items: list[dict], userid: str = '',
         pass
 
     logger.info("Price change committed: %s (%d items)", ph_number, len(items))
+    return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
+
+
+async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -> dict:
+    """Update an existing Perubahan Harga.
+
+    Strategy: delete old sthist lines, restore old stock prices,
+    then re-apply with new prices (reusing same PH number and becreff).
+    """
+    if not items:
+        return {'error': 'No items'}
+
+    header = await execute_single(
+        pool,
+        "SELECT nobukti, becreff FROM icphg WHERE nobukti = %s",
+        (ph_number,),
+    )
+    if not header:
+        return {'error': 'Not found'}
+
+    becreff = header['becreff']
+
+    # Get old sthist lines to restore prices
+    old_lines = await execute_query(
+        pool,
+        """SELECT stockid, oprice, noindex,
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
+           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        (becreff,),
+    )
+    noindex_max = max((l['noindex'] for l in old_lines), default=0)
+
+    # Phase 1: Atomic — delete old sthist lines
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cursor:
+            try:
+                await cursor.execute(
+                    "DELETE FROM sthist WHERE becreff = %s AND tipetrans = 0", (becreff,),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
+
+    # Phase 2: Restore old stock prices where no newer change exists
+    for line in old_lines:
+        artno = line['stockid']
+        newer = await execute_single(
+            pool,
+            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
+            (artno, noindex_max),
+        )
+        if newer:
+            continue
+        old_hjual = float(line.get('oprice') or 0)
+        if not old_hjual:
+            continue
+        prev = await execute_single(
+            pool,
+            """SELECT hjual2, hjual3, hjual4, hjual5
+               FROM sthist WHERE stockid = %s AND noindex < %s
+               ORDER BY noindex DESC LIMIT 1""",
+            (artno, min(l['noindex'] for l in old_lines if l['stockid'] == artno)),
+        )
+        try:
+            if prev:
+                await execute_modify(
+                    pool,
+                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
+                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
+                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
+                )
+            else:
+                await execute_modify(
+                    pool, "UPDATE stock SET hjual=%s WHERE artno=%s", (old_hjual, artno),
+                )
+        except Exception:
+            logger.warning("Failed to restore price for %s during update", artno, exc_info=True)
+
+    # Phase 3: Re-read current stock prices and apply new changes
+    artnos = [i['artno'] for i in items]
+    before_map = await get_stock_prices(pool, artnos)
+    today = date.today()
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            for item in items:
+                artno = item['artno']
+                stock = before_map.get(artno)
+                if not stock:
+                    continue
+
+                new_hjual = float(item.get('hjual', stock['hjual']))
+                new_hjual2 = float(item.get('hjual2', stock['hjual2']))
+                new_hjual3 = float(item.get('hjual3', stock['hjual3']))
+                new_hjual4 = float(item.get('hjual4', stock['hjual4']))
+                new_hjual5 = float(item.get('hjual5', stock['hjual5']))
+                old_hjual = float(stock['hjual'] or 0)
+
+                netto = float(stock['hbelinetto'] or 0)
+                def _pct(jual):
+                    return round((jual - netto) / netto * 100, 2) if netto > 0 else -100
+                pctprofit = _pct(new_hjual)
+                pctprofit2 = _pct(new_hjual2) if new_hjual2 else -100
+                pctprofit3 = _pct(new_hjual3) if new_hjual3 else -100
+                pctprofit4 = _pct(new_hjual4) if new_hjual4 else -100
+                pctprofit5 = _pct(new_hjual5) if new_hjual5 else -100
+
+                # Update stock table
+                update_cols = ['hjual=%s', 'hjual2=%s', 'hjual3=%s', 'hjual4=%s', 'hjual5=%s']
+                update_vals = [new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5]
+
+                b1 = item.get('bundling1')
+                if b1:
+                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                                        float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
+                b2 = item.get('bundling2')
+                if b2:
+                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                                        float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                update_vals.append(artno)
+                await cursor.execute(
+                    f"UPDATE stock SET {', '.join(update_cols)} WHERE artno=%s",
+                    tuple(update_vals)
+                )
+
+                sthist_o1 = [float(b1.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b1 else [
+                    stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
+                sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
+                    stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
+
+                await cursor.execute(
+                    """INSERT INTO sthist (
+                        stockid, artpabrik, artname, tanggal, whid,
+                        hbelibsr, hbelikcl, hbelinetto,
+                        pctdisc1, pctdisc2, pctdisc3, pctppn,
+                        jlhdisc1, jlhdisc2, jlhdisc3, jlhppn,
+                        hjual, hjual2, hjual3, hjual4, hjual5,
+                        hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                        hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
+                        over1, over2, ispaketprc,
+                        packing, satuanbsr, satuankcl,
+                        nofaktur, tipetrans, becreff,
+                        oprice, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
+                        pricelevel
+                    ) VALUES (
+                        %s, %s, %s, %s, 'LAPANGAN',
+                        %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, 0, %s,
+                        %s, %s, %s, %s, %s, %s,
+                        '1'
+                    )""",
+                    (
+                        artno, stock['artpabrik'] or '', stock['artname'] or '', today,
+                        stock['hbelibsr'], stock['hbelikcl'], stock['hbelinetto'],
+                        stock['pctdisc1'], stock['pctdisc2'], stock['pctdisc3'], stock['pctppn'],
+                        stock['jlhdisc1'], stock['jlhdisc2'], stock['jlhdisc3'], stock['jlhppn'],
+                        new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
+                        *sthist_o1,
+                        *sthist_o2,
+                        stock['over1'], stock['over2'], stock['ispaketprc'],
+                        stock['packing'], stock['satbesar'], stock['satkecil'],
+                        ph_number, becreff,
+                        old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
+                    )
+                )
+
+            # Update icphg header
+            uraian = ', '.join(i.get('artno', '') for i in items[:3])
+            if len(items) > 3:
+                uraian += f' +{len(items) - 3}'
+            first_stock = before_map.get(items[0]['artno'])
+            if first_stock:
+                uraian = first_stock['artname'] or uraian
+                if len(items) > 1:
+                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            await cursor.execute(
+                "UPDATE icphg SET uraian = %s, userid = %s WHERE nobukti = %s",
+                (uraian[:200], userid, ph_number)
+            )
+            await conn.commit()
+
+    try:
+        from services.stock_search import invalidate_cache
+        invalidate_cache()
+    except Exception:
+        pass
+
+    logger.info("Price change updated: %s (%d items)", ph_number, len(items))
     return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
 
 
@@ -381,7 +576,7 @@ async def get_ph_detail(pool, ph_number: str) -> dict | None:
 
 
 async def toggle_ph_lock(pool, ph_number: str) -> dict:
-    """Toggle islocked on icphg + isupdateprice on sthist lines."""
+    """Toggle islocked on icphg."""
     header = await execute_single(
         pool, "SELECT nobukti, becreff, islocked FROM icphg WHERE nobukti = %s", (ph_number,),
     )
@@ -389,10 +584,6 @@ async def toggle_ph_lock(pool, ph_number: str) -> dict:
         return {'error': 'Not found'}
     new_val = 0 if header['islocked'] else 1
     await execute_modify(pool, "UPDATE icphg SET islocked = %s WHERE nobukti = %s", (new_val, ph_number))
-    await execute_modify(
-        pool, "UPDATE sthist SET isupdateprice = %s WHERE becreff = %s AND tipetrans = 0",
-        (new_val, header['becreff']),
-    )
     return {'ok': True, 'islocked': new_val}
 
 

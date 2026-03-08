@@ -2,18 +2,51 @@
 {% block title %}Perubahan Harga{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex align-items-center justify-content-between mb-2">
-  <div>
-    <h4 class="page-title mb-0">Perubahan Harga</h4>
-    <small class="text-muted">Cari barang, ubah harga jual, lalu simpan</small>
+<!-- Normal mode: standard page header -->
+<div id="pcNormalHeader" class="page-header d-flex align-items-center justify-content-between mb-2">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/perubahan-harga" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <div>
+      <h4 class="page-title mb-0">Input Perubahan Harga</h4>
+      <small class="text-muted">Cari barang, ubah harga jual, lalu simpan</small>
+    </div>
   </div>
   <div class="d-none d-md-block">
     <kbd class="me-1">Esc</kbd> <small class="text-muted">Tutup detail</small>
   </div>
 </div>
-<div class="row g-3">
-  <!-- Left: Search Panel -->
-  <div class="col-xl-3">
+
+<!-- Edit mode: FP-edit-style header (hidden by default, shown by JS) -->
+<div id="pcEditHeader" class="fp-edit-header d-none mb-2" style="border-radius:0.375rem">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/perubahan-harga" class="btn btn-sm btn-outline-light" id="pcBtnBack">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <h5 class="mb-0 text-white" id="pcEditTitle">Edit Perubahan Harga</h5>
+  </div>
+  <button class="btn btn-sm btn-success" id="pcEditBtnSave">
+    <i class="bi bi-check-lg"></i> Simpan
+  </button>
+</div>
+
+<!-- Edit mode: inline search row (hidden by default) -->
+<div id="pcEditSearchRow" class="d-none mb-3">
+  <div class="row g-2">
+    <div class="col-md-12">
+      <label class="form-label mb-1"><small>Tambah Item</small></label>
+      <div class="position-relative">
+        <input type="text" class="form-control form-control-sm" id="pcEditSearchInput" placeholder="Cari nama / barcode..." autocomplete="off">
+        <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:200px;overflow-y:auto" id="pcEditSearchResults"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3" id="pcMainLayout">
+  <!-- Left: Search Panel (normal mode only) -->
+  <div class="col-xl-3" id="pcLeftPanel">
     <div class="card">
       <div class="card-header card-header-primary">
         <h5 class="mb-0"><i class="bi bi-search"></i> Cari Barang</h5>
@@ -33,7 +66,7 @@
   </div>
 
   <!-- Right: Item List -->
-  <div class="col-xl-9">
+  <div class="col-xl-9" id="pcRightPanel">
     <div class="card">
       <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Perubahan Harga</h5>
@@ -61,23 +94,11 @@
           </table>
         </div>
       </div>
-      <div class="card-footer">
+      <div class="card-footer" id="pcFooter">
         <div class="d-flex gap-3 align-items-center flex-wrap">
           <button class="btn btn-sm btn-cta" id="pcBtnCommit" disabled>
             <i class="bi bi-check-lg"></i> Simpan Perubahan Harga
           </button>
-          {% if can_update_purch_price %}
-          <div class="form-check ms-3">
-            <input type="checkbox" class="form-check-input" id="pcUpdatePurchPrice" checked>
-            <label class="form-check-label small" for="pcUpdatePurchPrice">Update Harga Beli</label>
-          </div>
-          {% endif %}
-          {% if can_lock_history %}
-          <div class="form-check ms-3">
-            <input type="checkbox" class="form-check-input" id="pcLockHistory" checked>
-            <label class="form-check-label small" for="pcLockHistory">Kunci Riwayat</label>
-          </div>
-          {% endif %}
           <div class="ms-auto"></div>
           <button class="btn btn-outline-danger btn-sm" id="pcBtnClear" disabled>
             <i class="bi bi-trash"></i> Hapus
@@ -102,7 +123,7 @@
       </div>
       <div class="modal-footer justify-content-center">
         <button type="button" class="btn btn-primary-app" id="pcBtnNew">
-          <i class="bi bi-plus-circle"></i> Entry Baru
+          <i class="bi bi-plus-circle"></i> <span id="pcBtnNewLabel">Entry Baru</span>
         </button>
         <a href="/perubahan-harga" class="btn btn-outline-secondary">
           <i class="bi bi-list-ul"></i> Lihat Riwayat
@@ -116,6 +137,7 @@
 {% block scripts %}
 <script>
 const _pcUser = '{{ user.username if user else "" }}';
+const _pcEditPH = new URLSearchParams(window.location.search).get('edit') || '';
 </script>
 <script src="{{ url_for('static', filename='js/price_change.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

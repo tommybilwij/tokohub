@@ -11,6 +11,7 @@ from dependencies import get_db, get_current_user
 from services.price_change_service import (
     get_stock_prices,
     commit_price_change,
+    update_ph,
     get_price_change_report,
     get_price_change_from_snapshots,
     get_ph_history,
@@ -47,14 +48,33 @@ async def api_commit_price_change(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
-        update_purch_price = data.get('update_purch_price', True)
-        lock_history = data.get('lock_history', True)
-        result = await commit_price_change(db, items, userid=user['username'] if user else '',
-                                           update_purch_price=update_purch_price,
-                                           lock_history=lock_history)
+        result = await commit_price_change(db, items, userid=user['username'] if user else '')
         return result
     except Exception as e:
         logger.exception("Price change commit failed")
+        return JSONResponse({'error': str(e)}, status_code=500)
+
+
+@router.post('/api/ph/{ph_number}/update')
+async def api_ph_update(
+    ph_number: str,
+    request: Request,
+    db: aiomysql.Pool = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Update an existing price change."""
+    data = await request.json()
+    items = data.get('items', [])
+    if not items:
+        return JSONResponse({'error': 'No items'}, status_code=400)
+    try:
+        result = await update_ph(db, ph_number, items,
+                                 userid=user['username'] if user else '')
+        if 'error' in result:
+            return JSONResponse(result, status_code=400)
+        return result
+    except Exception as e:
+        logger.exception("Price change update failed")
         return JSONResponse({'error': str(e)}, status_code=500)
 
 

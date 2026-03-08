@@ -525,8 +525,20 @@
       var bundlings = item._bundlings || [];
       if (bundlings.length > 0) {
         dom.sdBundlingSection.classList.remove('d-none');
+        var tierLabels = [
+          { key: 'hjual1', label: 'H.Jual 1' },
+          { key: 'hjual2', label: 'Member' },
+          { key: 'hjual3', label: 'H.Jual 3' },
+          { key: 'hjual4', label: 'H.Jual 4' },
+          { key: 'hjual5', label: 'H.Jual 5' },
+        ];
         dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
-          return '<tr><td>' + b.qty + '</td><td class="text-end">' + fmt(b.hjual1) + '</td><td class="text-end">' + fmt(b.hjual2) + '</td><td class="text-end">' + fmt(b.hjual3) + '</td><td class="text-end">' + fmt(b.hjual4) + '</td><td class="text-end">' + fmt(b.hjual5) + '</td></tr>';
+          var rows = tierLabels.map(function(t) {
+            return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(b[t.key]) + '</td></tr>';
+          }).join('');
+          return '<div class="sd-section-header"><i class="bi bi-box2"></i> Bundling (Qty: ' + b.qty + ')</div>'
+            + '<table class="sd-jual-table"><thead><tr><th>Tier</th><th>Harga</th></tr></thead>'
+            + '<tbody>' + rows + '</tbody></table>';
         }).join('');
       } else {
         dom.sdBundlingSection.classList.add('d-none');

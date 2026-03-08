@@ -226,7 +226,7 @@ async def preview_fp(pool, supplier_id, items, order_date=None, shipping_cost=0)
     }
 
 
-async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
+async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True):
     """Create Faktur Pembelian in two phases to minimise lock contention with MyPosse POS.
 
     Phase 1 (single transaction):
@@ -271,12 +271,13 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                         isupdateprice, islocked)
                        VALUES (%s, '1', %s, %s, %s, %s,
                                %s, 'LAPANGAN', %s,
-                               1, 0)""",
+                               %s, 0)""",
                     (fp_number, fp_becreff, supplier_id, order_date, order_date,
-                     preview['grand_total'], userid)
+                     preview['grand_total'], userid, 1 if update_price else 0)
                 )
 
                 # Insert line items into sthist
+                iup = 1 if update_price else 0
                 for line in preview['lines']:
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
@@ -302,7 +303,7 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                                    %s, %s, %s, %s, %s,
                                    %s, %s,
                                    %s, 'LAPANGAN', %s, %s, 1,
-                                   1, 1)""",
+                                   %s, %s)""",
                         (line['artno'], line['artpabrik'], line['artname'], order_date,
                          line['qty'], float(qty_small), line['packing'],
                          line['satuanbsr'], line['satuankcl'],
@@ -313,7 +314,8 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                          line['hjual'], line['hjual2'], line['hjual3'],
                          line['hjual4'], line['hjual5'],
                          line['amount'], line.get('foc', 0),
-                         supplier_id, fp_number, fp_becreff)
+                         supplier_id, fp_number, fp_becreff,
+                         iup, iup)
                     )
 
                 # Batch stock balance updates
@@ -346,57 +348,80 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                 raise
 
     # ------------------------------------------------------------------
-    # Phase 2 — Deferred stock price + bundling updates.
+    # Phase 2 — Deferred stock updates.
+    # Harga beli, discounts, tax, satuan, packing: ALWAYS updated.
+    # Harga jual + bundling: only when update_price=True.
     # ------------------------------------------------------------------
     for line in preview['lines']:
+        # Always update harga beli
         try:
-            await execute_modify(
-                pool,
-                """UPDATE stock
-                   SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
-                       pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                       jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
-                       pctppn = %s, jlhppn = %s,
-                       hjual = %s, hjual2 = %s, hjual3 = %s,
-                       hjual4 = %s, hjual5 = %s,
-                       satbesar = %s, packing = %s
-                   WHERE artno = %s""",
-                (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
-                 line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                 line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
-                 line['pctppn'], line['jlhppn_kcl'],
-                 line['hjual'], line['hjual2'], line['hjual3'],
-                 line['hjual4'], line['hjual5'],
-                 line['satuanbsr'], line['packing'],
-                 line['artno']),
-            )
+            if update_price:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
+                           hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           satbesar = %s, packing = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
+                     line['hjual'], line['hjual2'], line['hjual3'],
+                     line['hjual4'], line['hjual5'],
+                     line['satuanbsr'], line['packing'],
+                     line['artno']),
+                )
+            else:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
+                           satbesar = %s, packing = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
+                     line['satuanbsr'], line['packing'],
+                     line['artno']),
+                )
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 
-        b1 = line.get('bundling1') or {}
-        b2 = line.get('bundling2') or {}
-        has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
-        try:
-            await execute_modify(
-                pool,
-                """UPDATE stock
-                   SET ispaketprc = %s,
-                       over1 = %s,
-                       hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                       over2 = %s,
-                       hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                   WHERE artno = %s""",
-                (has_bundling,
-                 b1.get('min_qty') or 0,
-                 b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
-                 b1.get('hjual4') or 0, b1.get('hjual5') or 0,
-                 b2.get('min_qty') or 0,
-                 b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
-                 b2.get('hjual4') or 0, b2.get('hjual5') or 0,
-                 line['artno']),
-            )
-        except Exception:
-            logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
+        # Harga jual bundling: only when update_price=True
+        if update_price:
+            b1 = line.get('bundling1') or {}
+            b2 = line.get('bundling2') or {}
+            has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET ispaketprc = %s,
+                           over1 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           over2 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (has_bundling,
+                     b1.get('min_qty') or 0,
+                     b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
+                     b1.get('hjual4') or 0, b1.get('hjual5') or 0,
+                     b2.get('min_qty') or 0,
+                     b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
+                     b2.get('hjual4') or 0, b2.get('hjual5') or 0,
+                     line['artno']),
+                )
+            except Exception:
+                logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
 
     from services.stock_search import invalidate_cache
     invalidate_cache()
@@ -429,12 +454,12 @@ async def delete_fp(pool, fp_number: str) -> dict:
     """Delete a Faktur Pembelian: reverse stock balance, restore prices from snapshot, hard-delete rows."""
     header = await execute_single(
         pool,
-        "SELECT nofaktur, becreff, isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        "SELECT nofaktur, becreff, islocked FROM icbym WHERE nofaktur = %s AND tipe = '1'",
         (fp_number,),
     )
     if not header:
         return {'error': 'Faktur not found'}
-    if header['isupdateprice']:
+    if header['islocked']:
         return {'error': 'Faktur terkunci, tidak bisa dihapus'}
 
     becreff = header['becreff']
@@ -547,7 +572,7 @@ async def get_fp_history(pool, page=1, per_page=20,
         f"""SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
                   b.userid, v.name AS supplier_name,
                   (SELECT COUNT(*) FROM sthist s WHERE s.becreff = b.becreff AND s.tipetrans = 1) AS line_count,
-                  b.isupdateprice
+                  b.isupdateprice, b.islocked
            FROM icbym b
            LEFT JOIN vendor v ON v.id = b.suppid
            {where_sql}
@@ -564,20 +589,120 @@ async def get_fp_history(pool, page=1, per_page=20,
 
 
 async def toggle_fp_lock(pool, fp_number: str) -> dict:
-    """Toggle isupdateprice on icbym. Returns new state."""
+    """Toggle islocked on icbym. Returns new state."""
     row = await execute_single(
         pool,
-        "SELECT isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        "SELECT islocked FROM icbym WHERE nofaktur = %s AND tipe = '1'",
         (fp_number,),
     )
     if not row:
         return {'error': 'Faktur not found'}
-    new_val = 0 if row['isupdateprice'] else 1
+    new_val = 0 if row['islocked'] else 1
+    await execute_modify(
+        pool,
+        "UPDATE icbym SET islocked = %s WHERE nofaktur = %s AND tipe = '1'",
+        (new_val, fp_number),
+    )
+    return {'ok': True, 'fp_number': fp_number, 'islocked': new_val}
+
+
+async def toggle_fp_update_price(pool, fp_number: str) -> dict:
+    """Toggle isupdateprice on icbym and apply/revert harga jual+bundling in stock."""
+    row = await execute_single(
+        pool,
+        "SELECT isupdateprice, becreff FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
+    )
+    if not row:
+        return {'error': 'Faktur not found'}
+
+    old_val = row['isupdateprice']
+    new_val = 0 if old_val else 1
+    fp_becreff = row['becreff']
+
+    # Get snapshot for before/after states
+    from services.snapshot_service import get_snapshot
+    snap = await get_snapshot(pool, fp_number)
+    if not snap:
+        return {'error': 'Snapshot not found — cannot toggle update price'}
+
+    items = snap.get('items', [])
+
+    if new_val:
+        # Turning ON: apply harga jual + bundling from snapshot "after" state
+        for item in items:
+            after = item.get('after')
+            if not after:
+                continue
+            artno = item['artno']
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           ispaketprc = %s, over1 = %s, over2 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (after.get('hjual', 0), after.get('hjual2', 0), after.get('hjual3', 0),
+                     after.get('hjual4', 0), after.get('hjual5', 0),
+                     after.get('ispaketprc', 0), after.get('over1', 0), after.get('over2', 0),
+                     after.get('hjualo1', 0), after.get('hjual2o1', 0), after.get('hjual3o1', 0),
+                     after.get('hjual4o1', 0), after.get('hjual5o1', 0),
+                     after.get('hjualo2', 0), after.get('hjual2o2', 0), after.get('hjual3o2', 0),
+                     after.get('hjual4o2', 0), after.get('hjual5o2', 0),
+                     artno),
+                )
+            except Exception:
+                logger.warning("Toggle update price: apply hjual failed for %s", artno, exc_info=True)
+    else:
+        # Turning OFF: revert harga jual + bundling from snapshot "before" state
+        for item in items:
+            before = item.get('before')
+            if not before:
+                continue
+            artno = item['artno']
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           ispaketprc = %s, over1 = %s, over2 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (before.get('hjual', 0), before.get('hjual2', 0), before.get('hjual3', 0),
+                     before.get('hjual4', 0), before.get('hjual5', 0),
+                     before.get('ispaketprc', 0), before.get('over1', 0), before.get('over2', 0),
+                     before.get('hjualo1', 0), before.get('hjual2o1', 0), before.get('hjual3o1', 0),
+                     before.get('hjual4o1', 0), before.get('hjual5o1', 0),
+                     before.get('hjualo2', 0), before.get('hjual2o2', 0), before.get('hjual3o2', 0),
+                     before.get('hjual4o2', 0), before.get('hjual5o2', 0),
+                     artno),
+                )
+            except Exception:
+                logger.warning("Toggle update price: revert hjual failed for %s", artno, exc_info=True)
+
+    # Update header flag
     await execute_modify(
         pool,
         "UPDATE icbym SET isupdateprice = %s WHERE nofaktur = %s AND tipe = '1'",
         (new_val, fp_number),
     )
+
+    # Update sthist lines
+    await execute_modify(
+        pool,
+        "UPDATE sthist SET isupdateprice = %s, isupdatepurchprice = %s WHERE becreff = %s AND tipetrans = 1",
+        (new_val, new_val, fp_becreff),
+    )
+
+    from services.stock_search import invalidate_cache
+    invalidate_cache()
+
+    logger.info("Toggle update price for %s: %s -> %s", fp_number, old_val, new_val)
     return {'ok': True, 'fp_number': fp_number, 'isupdateprice': new_val}
 
 
@@ -586,7 +711,7 @@ async def get_fp_detail(pool, fp_number):
     header = await execute_single(
         pool,
         """SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
-                  b.userid, v.name AS supplier_name
+                  b.userid, v.name AS supplier_name, b.isupdateprice, b.islocked
            FROM icbym b
            LEFT JOIN vendor v ON v.id = b.suppid
            WHERE b.nofaktur = %s AND b.tipe = '1'""",
@@ -655,7 +780,7 @@ async def get_fp_detail(pool, fp_number):
     return header
 
 
-async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0):
+async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True):
     """Update an existing Faktur Pembelian: reverse old stock, replace sthist lines, apply new stock.
 
     Same two-phase approach as commit_fp.
@@ -684,11 +809,25 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     # Build new preview
     preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
-    # Capture before-state for snapshot
-    from services.snapshot_service import capture_before, build_after, save_snapshot
+    # Capture before-state for snapshot — preserve original "before" from first snapshot
+    from services.snapshot_service import capture_before, build_after, save_snapshot, get_snapshot
     artnos = [line['artno'] for line in preview['lines']]
-    before_state = await capture_before(pool, artnos)
     after_state = build_after(preview['lines'])
+
+    # Keep the original "before" state so comparison hints always show pre-FP stock values
+    orig_snap = await get_snapshot(pool, fp_number)
+    if orig_snap:
+        before_state = {}
+        for item in orig_snap.get('items', []):
+            if item.get('before'):
+                before_state[item['artno']] = item['before']
+        # For any new artnos not in original snapshot, capture from live stock
+        new_artnos = [a for a in artnos if a not in before_state]
+        if new_artnos:
+            new_before = await capture_before(pool, new_artnos)
+            before_state.update(new_before)
+    else:
+        before_state = await capture_before(pool, artnos)
 
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
@@ -710,10 +849,10 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                 await cursor.execute(
                     """UPDATE icbym
                        SET suppid = %s, tglfaktur = %s, duedate = %s,
-                           jlhfaktur = %s, userid = %s
+                           jlhfaktur = %s, userid = %s, isupdateprice = %s
                        WHERE nofaktur = %s AND tipe = '1'""",
                     (supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, fp_number)
+                     preview['grand_total'], userid, 1 if update_price else 0, fp_number)
                 )
 
                 # Insert new sthist lines
@@ -721,6 +860,7 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
 
+                    iup = 1 if update_price else 0
                     await cursor.execute(
                         """INSERT INTO sthist
                            (stockid, artpabrik, artname, tanggal,
@@ -742,7 +882,7 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                                    %s, %s, %s, %s, %s,
                                    %s, %s,
                                    %s, 'LAPANGAN', %s, %s, 1,
-                                   1, 1)""",
+                                   %s, %s)""",
                         (line['artno'], line['artpabrik'], line['artname'], order_date,
                          line['qty'], float(qty_small), line['packing'],
                          line['satuanbsr'], line['satuankcl'],
@@ -753,7 +893,8 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                          line['hjual'], line['hjual2'], line['hjual3'],
                          line['hjual4'], line['hjual5'],
                          line['amount'], line.get('foc', 0),
-                         supplier_id, fp_number, fp_becreff)
+                         supplier_id, fp_number, fp_becreff,
+                         iup, iup)
                     )
 
                 # Apply new stlastbal
@@ -780,56 +921,116 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                 logger.exception("Faktur update failed (Phase 1)")
                 raise
 
-    # Phase 2 — Deferred stock price + bundling updates
+    # Phase 2 — Deferred stock updates.
+    # Harga beli, discounts, tax, satuan, packing: ALWAYS updated.
+    # Harga jual + bundling: only when update_price=True.
+    # When update_price=False, revert hjual + bundling to original snapshot "before" state.
+
+    # Load original snapshot "before" state for reverting hjual when unchecked
+    orig_before = {}
+    if not update_price:
+        try:
+            from services.snapshot_service import get_snapshot
+            snap = await get_snapshot(pool, fp_number)
+            if snap:
+                for item in snap.get('items', []):
+                    if item.get('before'):
+                        orig_before[item['artno']] = item['before']
+        except Exception:
+            logger.warning("Failed to load snapshot for hjual revert on %s", fp_number, exc_info=True)
+
     for line in preview['lines']:
         try:
-            await execute_modify(
-                pool,
-                """UPDATE stock
-                   SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
-                       pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                       jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
-                       pctppn = %s, jlhppn = %s,
-                       hjual = %s, hjual2 = %s, hjual3 = %s,
-                       hjual4 = %s, hjual5 = %s,
-                       satbesar = %s, packing = %s
-                   WHERE artno = %s""",
-                (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
-                 line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                 line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
-                 line['pctppn'], line['jlhppn_kcl'],
-                 line['hjual'], line['hjual2'], line['hjual3'],
-                 line['hjual4'], line['hjual5'],
-                 line['satuanbsr'], line['packing'],
-                 line['artno']),
-            )
+            if update_price:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
+                           hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           satbesar = %s, packing = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
+                     line['hjual'], line['hjual2'], line['hjual3'],
+                     line['hjual4'], line['hjual5'],
+                     line['satuanbsr'], line['packing'],
+                     line['artno']),
+                )
+            else:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
+                           satbesar = %s, packing = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
+                     line['satuanbsr'], line['packing'],
+                     line['artno']),
+                )
+                # Revert hjual + bundling to original "before" snapshot values
+                ob = orig_before.get(line['artno'])
+                if ob:
+                    try:
+                        await execute_modify(
+                            pool,
+                            """UPDATE stock
+                               SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                                   hjual4 = %s, hjual5 = %s,
+                                   ispaketprc = %s, over1 = %s, over2 = %s,
+                                   hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                                   hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                               WHERE artno = %s""",
+                            (ob.get('hjual', 0), ob.get('hjual2', 0), ob.get('hjual3', 0),
+                             ob.get('hjual4', 0), ob.get('hjual5', 0),
+                             ob.get('ispaketprc', 0), ob.get('over1', 0), ob.get('over2', 0),
+                             ob.get('hjualo1', 0), ob.get('hjual2o1', 0), ob.get('hjual3o1', 0),
+                             ob.get('hjual4o1', 0), ob.get('hjual5o1', 0),
+                             ob.get('hjualo2', 0), ob.get('hjual2o2', 0), ob.get('hjual3o2', 0),
+                             ob.get('hjual4o2', 0), ob.get('hjual5o2', 0),
+                             line['artno']),
+                        )
+                    except Exception:
+                        logger.warning("Revert hjual from snapshot failed for %s", line['artno'], exc_info=True)
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 
-        b1 = line.get('bundling1') or {}
-        b2 = line.get('bundling2') or {}
-        has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
-        try:
-            await execute_modify(
-                pool,
-                """UPDATE stock
-                   SET ispaketprc = %s,
-                       over1 = %s,
-                       hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                       over2 = %s,
-                       hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                   WHERE artno = %s""",
-                (has_bundling,
-                 b1.get('min_qty') or 0,
-                 b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
-                 b1.get('hjual4') or 0, b1.get('hjual5') or 0,
-                 b2.get('min_qty') or 0,
-                 b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
-                 b2.get('hjual4') or 0, b2.get('hjual5') or 0,
-                 line['artno']),
-            )
-        except Exception:
-            logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
+        if update_price:
+            b1 = line.get('bundling1') or {}
+            b2 = line.get('bundling2') or {}
+            has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET ispaketprc = %s,
+                           over1 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           over2 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (has_bundling,
+                     b1.get('min_qty') or 0,
+                     b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
+                     b1.get('hjual4') or 0, b1.get('hjual5') or 0,
+                     b2.get('min_qty') or 0,
+                     b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
+                     b2.get('hjual4') or 0, b2.get('hjual5') or 0,
+                     line['artno']),
+                )
+            except Exception:
+                logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
 
     from services.stock_search import invalidate_cache
     invalidate_cache()

@@ -54,6 +54,7 @@
             <th>Supplier</th>
             <th class="text-end">Total</th>
             <th class="text-center">Items</th>
+            <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
         </thead>
@@ -88,15 +89,23 @@
           <div class="col-md-4 text-end"><strong>Total:</strong> <span id="detailTotal" class="fw-bold"></span></div>
         </div>
         <div class="table-responsive">
-          <table class="table table-sm table-bordered">
-            <thead class="table-light">
+          <table class="fp-preview-table">
+            <thead>
               <tr>
                 <th>#</th>
                 <th>Artno</th>
                 <th>Nama</th>
                 <th class="text-end">Qty</th>
                 <th>Satuan Besar</th>
-                <th class="text-end">Harga Beli</th>
+                <th class="text-end">Qty Kcl</th>
+                <th>Sat.Kcl</th>
+                <th class="text-end">H.Beli</th>
+                <th class="text-end">H.Kcl</th>
+                <th class="text-end">Disc1</th>
+                <th class="text-end">Disc2</th>
+                <th class="text-end">Disc3</th>
+                <th class="text-end">PPN</th>
+                <th class="text-end">Netto</th>
                 <th class="text-end">Jumlah</th>
               </tr>
             </thead>
@@ -117,9 +126,17 @@
       </button>
       <h5 class="mb-0 text-white" id="editTitle">Edit Faktur</h5>
     </div>
-    <button class="btn btn-sm btn-success" id="editBtnSave">
-      <i class="bi bi-check-lg"></i> Simpan
-    </button>
+    <div class="d-flex align-items-center gap-3">
+      <div class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+        <input type="checkbox" class="form-check-input mt-0" role="switch" id="editUpdatePrice" checked style="width:2.5em;height:1.25em">
+        <label class="form-check-label fw-semibold text-white" for="editUpdatePrice">
+          <i class="bi bi-arrow-repeat"></i> Update Harga Jual
+        </label>
+      </div>
+      <button class="btn btn-sm btn-success" id="editBtnSave">
+        <i class="bi bi-check-lg"></i> Simpan
+      </button>
+    </div>
   </div>
   <div class="fp-edit-body">
     <div class="row g-2 mb-3">
@@ -298,25 +315,29 @@
         items.forEach(function(o) {
           var tr = document.createElement('tr');
           var actions = '<button class="btn btn-sm btn-outline-primary btn-view-fp" data-fp="' + o.nofaktur + '" title="Lihat"><i class="bi bi-eye"></i></button>';
-          if (canEdit) {
-            var editCls = o.isupdateprice ? 'btn-outline-secondary' : 'btn-outline-warning';
-            var editDis = o.isupdateprice ? ' disabled' : '';
-            actions += ' <button class="btn btn-sm btn-edit-fp ' + editCls + '" data-fp="' + o.nofaktur + '" title="Edit"' + editDis + '><i class="bi bi-pencil"></i></button>';
+          if (canEdit && !o.islocked && !o.isupdateprice) {
+            actions += ' <button class="btn btn-sm btn-outline-success btn-edit-fp" data-fp="' + o.nofaktur + '" title="Edit"><i class="bi bi-pencil"></i></button>';
           }
-          if (canDelete && !o.isupdateprice) {
+          if (canDelete && !o.islocked) {
             actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-fp" data-fp="' + o.nofaktur + '" title="Hapus"><i class="bi bi-trash"></i></button>';
           }
           if (canLock) {
-            var lockCls = o.isupdateprice ? 'btn-warning' : 'btn-outline-secondary';
-            var lockIcon = o.isupdateprice ? 'lock-fill' : 'unlock';
-            var lockTitle = o.isupdateprice ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
-            actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.isupdateprice ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+            var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
+            var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
+            var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+            actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
           }
+          var priceChecked = o.isupdateprice ? ' checked' : '';
+          var priceDisabled = o.islocked ? ' disabled' : '';
+          var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
+            + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
+            + '</div>';
           tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
             + '<td>' + (o.tglfaktur || '-') + '</td>'
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);
         });
@@ -383,15 +404,30 @@
         document.getElementById('detailTotal').textContent = fmtNum(data.jlhfaktur || 0);
         var tbody = document.getElementById('detailLines');
         tbody.innerHTML = '';
+        var fmtDisc = function(v) {
+          if (!v) return '<span class="fp-disc-zero">-</span>';
+          var n = parseFloat(v);
+          if (n === 0) return '<span class="fp-disc-zero">-</span>';
+          return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+        };
         (data.lines || []).forEach(function(line, i) {
+          var qtyKcl = Math.round(line.packing || 1);
           var tr = document.createElement('tr');
-          tr.innerHTML = '<td>' + (i + 1) + '</td>'
-            + '<td><code>' + (line.stockid || '') + '</code></td>'
+          tr.innerHTML = '<td class="fp-rownum">' + (i + 1) + '</td>'
+            + '<td class="fp-artno"><code>' + (line.stockid || '') + '</code></td>'
             + '<td>' + (line.artname || '') + '</td>'
-            + '<td class="text-end">' + line.qty + '</td>'
+            + '<td class="fp-num">' + line.qty + '</td>'
             + '<td>' + (line.satuanbsr || '') + '</td>'
-            + '<td class="text-end">' + fmtNum(line.hbelibsr || 0) + '</td>'
-            + '<td class="text-end">' + fmtNum(line.amount || 0) + '</td>';
+            + '<td class="fp-num">' + qtyKcl + '</td>'
+            + '<td>' + (line.satuankcl || '') + '</td>'
+            + '<td class="fp-num">' + fmtNum(line.hbelibsr || 0) + '</td>'
+            + '<td class="fp-num">' + fmtNum(line.hbelikcl || 0) + '</td>'
+            + '<td class="fp-num">' + fmtDisc(line.pctdisc1) + '</td>'
+            + '<td class="fp-num">' + fmtDisc(line.pctdisc2) + '</td>'
+            + '<td class="fp-num">' + fmtDisc(line.pctdisc3) + '</td>'
+            + '<td class="fp-num">' + fmtDisc(line.pctppn) + '</td>'
+            + '<td class="fp-num">' + fmtNum(line.hbelinetto || 0) + '</td>'
+            + '<td class="fp-num fp-amount">' + fmtNum(line.amount || 0) + '</td>';
           tbody.appendChild(tr);
         });
         new bootstrap.Modal(document.getElementById('fpDetailModal')).show();
@@ -431,15 +467,34 @@
           var res = await fetch('/api/fp/' + fp + '/toggle-lock', {method: 'POST'});
           var data = await res.json();
           if (data.ok) {
-            var newLocked = data.isupdateprice;
+            var newLocked = data.islocked;
             btn.dataset.locked = newLocked;
             btn.className = 'btn btn-sm btn-lock-fp ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
             btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
             btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
-            var editBtn = btn.closest('td').querySelector('.btn-edit-fp');
-            if (editBtn) {
-              editBtn.disabled = !!newLocked;
-              editBtn.className = 'btn btn-sm btn-edit-fp ' + (newLocked ? 'btn-outline-secondary' : 'btn-outline-warning');
+            if (canEdit) {
+              var td = btn.closest('td');
+              var editBtn = td.querySelector('.btn-edit-fp');
+              var row = btn.closest('tr');
+              var priceChk = row ? row.querySelector('.chk-update-price') : null;
+              var isUpdatePrice = priceChk ? priceChk.checked : false;
+              var shouldHideEdit = newLocked || isUpdatePrice;
+              if (shouldHideEdit && editBtn) {
+                editBtn.remove();
+              } else if (!shouldHideEdit && !editBtn) {
+                var newEdit = document.createElement('button');
+                newEdit.className = 'btn btn-sm btn-outline-success btn-edit-fp';
+                newEdit.dataset.fp = fp;
+                newEdit.title = 'Edit';
+                newEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+                var viewBtn = td.querySelector('.btn-view-fp');
+                if (viewBtn && viewBtn.nextSibling) {
+                  td.insertBefore(newEdit, viewBtn.nextSibling);
+                  newEdit.insertAdjacentText('afterend', ' ');
+                } else {
+                  td.insertBefore(newEdit, td.firstChild.nextSibling);
+                }
+              }
             }
             if (canDelete) {
               var td = btn.closest('td');
@@ -457,6 +512,11 @@
                 bindButtons();
               }
             }
+            // Enable/disable update price toggle based on lock state
+            var row = btn.closest('tr');
+            var priceChk = row ? row.querySelector('.chk-update-price') : null;
+            if (priceChk) priceChk.disabled = !!newLocked;
+
             window.showToast && showToast(newLocked ? 'Faktur dikunci' : 'Faktur dibuka kuncinya');
           }
         } catch(e) {
@@ -464,7 +524,66 @@
         }
       });
     });
+
   }
+
+  // Update price toggle — use event delegation (bind once, never duplicated)
+  elBody.addEventListener('change', async function(e) {
+    var chk = e.target.closest('.chk-update-price');
+    if (!chk) return;
+    var fp = chk.dataset.fp;
+    var msg = chk.checked
+      ? 'Update harga jual dari faktur ' + fp + ' ke stock?'
+      : 'Kembalikan harga jual ke sebelum faktur ' + fp + '?';
+    var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
+    if (!confirmed) {
+      chk.checked = !chk.checked;
+      return;
+    }
+    chk.disabled = true;
+    try {
+      var res = await fetch('/api/fp/' + encodeURIComponent(fp) + '/toggle-update-price', {method: 'POST'});
+      var data = await res.json();
+      if (data.ok) {
+        chk.checked = !!data.isupdateprice;
+        // Show/hide edit button based on new update price state
+        if (canEdit) {
+          var row = chk.closest('tr');
+          var td = row ? row.querySelector('td:last-child') : null;
+          if (td) {
+            var editBtn = td.querySelector('.btn-edit-fp');
+            var lockBtn = td.querySelector('.btn-lock-fp');
+            var isLocked = lockBtn ? lockBtn.dataset.locked === '1' : false;
+            if (data.isupdateprice && editBtn) {
+              editBtn.remove();
+            } else if (!data.isupdateprice && !isLocked && !editBtn) {
+              var newEdit = document.createElement('button');
+              newEdit.className = 'btn btn-sm btn-outline-success btn-edit-fp';
+              newEdit.dataset.fp = fp;
+              newEdit.title = 'Edit';
+              newEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+              var viewBtn = td.querySelector('.btn-view-fp');
+              if (viewBtn && viewBtn.nextSibling) {
+                td.insertBefore(newEdit, viewBtn.nextSibling);
+                newEdit.insertAdjacentText('afterend', ' ');
+              } else {
+                td.insertBefore(newEdit, td.firstChild.nextSibling);
+              }
+            }
+          }
+        }
+        window.showToast && showToast(data.isupdateprice ? 'Harga jual diupdate' : 'Harga jual dikembalikan');
+      } else {
+        chk.checked = !chk.checked;
+        window.showToast && showToast(data.error || 'Gagal', 'danger');
+      }
+    } catch(e) {
+      chk.checked = !chk.checked;
+      window.showToast && showToast('Error: ' + e.message, 'danger');
+    } finally {
+      chk.disabled = false;
+    }
+  });
 
   elBtnSearch.addEventListener('click', function() { loadData(1); });
   elDateFrom.addEventListener('change', function() { loadData(1); });

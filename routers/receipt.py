@@ -142,7 +142,7 @@ async def commit_fp(data: FPCommitRequest, db: aiomysql.Pool = Depends(get_db)):
 
     try:
         from services.fp_service import commit_fp as _commit
-        result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
+        result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price)
         return result
     except Exception as e:
         logger.exception("FP commit failed")
@@ -198,6 +198,15 @@ async def toggle_fp_lock(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     return result
 
 
+@router.post('/api/fp/{fp_number}/toggle-update-price')
+async def toggle_fp_update_price(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.fp_service import toggle_fp_update_price as _toggle
+    result = await _toggle(db, fp_number)
+    if 'error' in result:
+        return JSONResponse(result, status_code=400)
+    return result
+
+
 @router.delete('/api/fp/{fp_number}')
 async def delete_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     from services.fp_service import delete_fp as _delete
@@ -224,7 +233,7 @@ async def update_fp(data: FPUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
 
     try:
         from services.fp_service import update_fp as _update
-        result = await _update(db, fp_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost)
+        result = await _update(db, fp_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price)
         return result
     except Exception as e:
         logger.exception("Faktur update failed")

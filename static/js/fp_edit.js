@@ -33,12 +33,12 @@
   // ------- Helpers -------
   function fmtNum(n) {
     var v = Number(n);
-    if (isNaN(v)) return '0.00';
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (isNaN(v)) return '0,00';
+    return v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parseNum(s) {
-    return parseFloat(String(s).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
+    return parseFloat(String(s).replace(/\./g, '').replace(',', '.').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
   function trunc2(n) { return Math.floor(n * 100) / 100; }
@@ -514,17 +514,18 @@
     }
     var pack = line.packing || 1;
     var amtPcs = pack > 0 ? amt / pack : 0;
-    var stkAmtPcsHint = '';
+    var stkAmtPcsHint = '', pcsCls = '';
     if (stk.hbelibsr != null) {
       var stkPk = stk.packing || 1;
       var stkAmtPcs = stkPk > 0 ? (stkAmtMap[field] || 0) / stkPk : 0;
       stkAmtPcsHint = '<div class="sblm-hint">' + (stkAmtPcs ? fmtNum(stkAmtPcs) : '—') + '</div>';
+      pcsCls = fmtNum(stkAmtPcs) !== fmtNum(amtPcs) ? ' value-changed' : '';
     }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
       '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
       '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td class="text-end text-muted disc-pcs" data-idx="' + idx + '" data-field="' + field + '">' + stkAmtPcsHint + (amtPcs ? fmtNum(amtPcs) : '0') + '</td>' +
+      '<td class="disc-pcs" data-idx="' + idx + '" data-field="' + field + '">' + stkAmtPcsHint + '<input type="text" class="amt-input' + pcsCls + '" value="' + (amtPcs ? fmtNum(amtPcs) : '0') + '" readonly tabindex="-1"></td>' +
       '<td>' + hint + '<input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
       '</tr>';
   }
@@ -588,14 +589,10 @@
       var totEl = document.querySelector('.edit-disc-total[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (totEl && document.activeElement !== totEl) totEl.value = amtMap[f] ? fmtNum(amtMap[f] * qtyBsr) : '';
       var pcsEl = document.querySelector('.disc-pcs[data-idx="' + idx + '"][data-field="' + f + '"]');
+      var amtPcs = (pk > 0 && amtMap[f]) ? amtMap[f] / pk : 0;
       if (pcsEl) {
-        var amtPcs = (pk > 0 && amtMap[f]) ? amtMap[f] / pk : 0;
-        var stkAmtPcsHtml = '';
-        if (hasStk) {
-          var stkPcsAmt = (stk.packing || 1) > 0 ? (stkAmtMap2[f] || 0) / (stk.packing || 1) : 0;
-          stkAmtPcsHtml = '<div class="sblm-hint">' + (stkPcsAmt ? fmtNum(stkPcsAmt) : '—') + '</div>';
-        }
-        pcsEl.innerHTML = stkAmtPcsHtml + (amtPcs ? fmtNum(amtPcs) : '0');
+        var pcsInput = pcsEl.querySelector('input');
+        if (pcsInput) pcsInput.value = amtPcs ? fmtNum(amtPcs) : '0';
       }
       var pctEl = document.querySelector('.edit-disc-pct[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (hasStk) {
@@ -610,6 +607,12 @@
         if (amtEl) amtEl.classList.toggle('value-changed', amtDiff);
         if (totEl) totEl.classList.toggle('value-changed', totalDiff);
         if (pctEl) pctEl.classList.toggle('value-changed', pctDiff);
+        // Highlight /Pcs cell
+        if (pcsEl) {
+          var stkPcsAmt = (stk.packing || 1) > 0 ? stkAmt / (stk.packing || 1) : 0;
+          var pcsInput2 = pcsEl.querySelector('input');
+          if (pcsInput2) pcsInput2.classList.toggle('value-changed', fmtNum(stkPcsAmt) !== fmtNum(amtPcs));
+        }
       }
     });
 

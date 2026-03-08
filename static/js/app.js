@@ -64,11 +64,11 @@
   function formatNumber(n) {
     const num = Number(n);
     if (isNaN(num)) return '0';
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parsePrice(str) {
-    return parseFloat(String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
+    return parseFloat(String(str).replace(/\./g, '').replace(',', '.').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
   /** Truncate (floor) a number to 2 decimal places — no rounding up. */
@@ -908,7 +908,8 @@
       const pcsEl = document.querySelector(`.disc-pcs[data-idx="${idx}"][data-field="${f}"]`);
       if (pcsEl) {
         const amtPcs = (qtyKcl > 0 && amtMap[f]) ? amtMap[f] / qtyKcl : 0;
-        pcsEl.textContent = amtPcs ? formatNumber(amtPcs) : '0';
+        const pcsInput = pcsEl.querySelector('input');
+        if (pcsInput) pcsInput.value = amtPcs ? formatNumber(amtPcs) : '0';
       }
     });
 
@@ -1221,7 +1222,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
-                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc1">0</td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc1"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1231,7 +1232,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
-                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc2">0</td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc2"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1241,7 +1242,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
                                value="" placeholder="0" inputmode="decimal"></td>
-                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="ppn">0</td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="ppn"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1251,7 +1252,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
                                value="" placeholder="0" inputmode="decimal"></td>
-                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc3">0</td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc3"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
                                value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>

@@ -171,8 +171,8 @@
     if (editPO) return; // Don't save drafts in edit mode
     var orders = {};
     poItems.forEach(function(item) {
-      if ((item._orderBsr || 0) > 0 || (item._orderRemKcl || 0) > 0) {
-        orders[item.artno] = { bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0 };
+      if ((item._orderBsr || 0) > 0 || (item._orderRemKcl || 0) > 0 || item._checked === false) {
+        orders[item.artno] = { bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0, chk: item._checked !== false };
       }
     });
     var draft = {
@@ -230,6 +230,7 @@
       if (saved) {
         item._orderBsr = saved.bsr || 0;
         item._orderRemKcl = saved.kcl || 0;
+        if (saved.chk === false) item._checked = false;
       }
     });
 
@@ -300,7 +301,7 @@
     return MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
   }
 
-  function fmtNum(n) { return new Intl.NumberFormat('en-US').format(Math.round(n)); }
+  function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
   function fmtDec(n) { return n % 1 === 0 ? n.toString() : n.toFixed(1); }
 
   document.getElementById('poLoadItems').addEventListener('click', loadItems);
@@ -604,6 +605,7 @@
     tbody.querySelectorAll('.po-row-check').forEach(function(cb) {
       cb.addEventListener('change', function() {
         poItems[parseInt(cb.dataset.idx)]._checked = cb.checked;
+        saveDraft();
       });
     });
 
@@ -616,6 +618,7 @@
           cb.checked = val;
           poItems[parseInt(cb.dataset.idx)]._checked = val;
         });
+        saveDraft();
       });
     }
   }

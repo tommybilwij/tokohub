@@ -58,7 +58,10 @@ async def lifespan(app: FastAPI):
         from services.schema import ensure_tokohub_schema
         await ensure_tokohub_schema(pool)
         from services.app_settings import get_all
-        await get_all(pool)  # populate in-memory cache
+        all_settings = await get_all(pool)  # populate in-memory cache
+        app.state.setup_complete = all_settings.get('setup_complete') == '1'
+    else:
+        app.state.setup_complete = False
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1

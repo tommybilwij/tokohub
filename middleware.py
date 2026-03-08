@@ -14,10 +14,14 @@ _LOCALHOST = {'127.0.0.1', '::1'}
 
 
 class SetupGateMiddleware(BaseHTTPMiddleware):
-    """Redirect to /setup if .envrc doesn't exist or DB is not connected."""
+    """Redirect to /setup if .envrc doesn't exist, DB not connected, or setup incomplete."""
 
     async def dispatch(self, request, call_next):
-        needs_setup = not _ENVRC_PATH.exists() or getattr(request.app.state, 'db_pool', None) is None
+        needs_setup = (
+            not _ENVRC_PATH.exists()
+            or getattr(request.app.state, 'db_pool', None) is None
+            or not getattr(request.app.state, 'setup_complete', False)
+        )
         if needs_setup:
             path = request.url.path
             if not any(path.startswith(p) for p in _SETUP_PASSTHROUGH):

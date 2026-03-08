@@ -57,6 +57,7 @@ async def api_settings_get(db: aiomysql.Pool = Depends(get_db)):
         'lan_mode': config.settings.lan_mode,
         'mdns_hostname': config.settings.mdns_hostname,
         'store_name': config.settings.store_name,
+        'store_location': config.settings.store_location,
     }
 
 

@@ -32,3 +32,4 @@ class SettingsUpdate(BaseModel):
     lan_mode: bool | None = None
     mdns_hostname: str | None = None
     store_name: str | None = None
+    store_location: str | None = None

@@ -250,6 +250,65 @@ async def save_pesanan(pool, suppid: str, items: list[dict],
     return {'ok': True, 'po_number': po_number, 'total_items': len(order_items)}
 
 
+async def update_pesanan(pool, po_number: str, items: list[dict],
+                         order_date: str, date_from: str, date_to: str) -> dict:
+    """Update an existing pesanan pembelian (replace all detail lines)."""
+    header = await execute_single(
+        pool,
+        "SELECT id FROM tokohub.pesanan_pembelian WHERE po_number = %s",
+        (po_number,),
+    )
+    if not header:
+        return {'error': 'Pesanan tidak ditemukan'}
+
+    def _has_order(it):
+        packing = float(it.get('packing', 1)) or 1
+        bsr = float(it.get('qty_order', 0))
+        rem = float(it.get('qty_order_kcl_remainder', 0))
+        return (bsr * packing + rem) > 0
+
+    order_items = [it for it in items if _has_order(it)]
+    if not order_items:
+        return {'error': 'Tidak ada item dengan qty > 0'}
+
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            # Delete old detail lines
+            await cur.execute(
+                "DELETE FROM tokohub.pesanan_pembelian_detail WHERE po_number = %s",
+                (po_number,),
+            )
+
+            # Update header
+            await cur.execute(
+                """UPDATE tokohub.pesanan_pembelian
+                   SET tgl_pesanan = %s, date_from = %s, date_to = %s, total_items = %s
+                   WHERE po_number = %s""",
+                (order_date, date_from, date_to, len(order_items), po_number),
+            )
+
+            # Insert new detail lines
+            for it in order_items:
+                qty_bsr = float(it.get('qty_order', 0))
+                packing = float(it.get('packing', 1)) or 1
+                rem_kcl = float(it.get('qty_order_kcl_remainder', 0))
+                qty_kcl = qty_bsr * packing + rem_kcl
+                await cur.execute(
+                    """INSERT INTO tokohub.pesanan_pembelian_detail
+                       (po_number, artno, artpabrik, artname, packing, satbesar, satkecil,
+                        qty_order, qty_order_kcl, hbelibsr)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (po_number, it['artno'], it.get('artpabrik', ''),
+                     it.get('artname', ''), packing,
+                     it.get('satbesar', ''), it.get('satkecil', ''),
+                     qty_bsr, qty_kcl, float(it.get('hbelibsr', 0))),
+                )
+
+            await conn.commit()
+
+    return {'ok': True, 'po_number': po_number, 'total_items': len(order_items)}
+
+
 async def get_po_list(pool, page: int = 1, per_page: int = 20,
                       date_from: str = None, date_to: str = None,
                       supplier: str = None) -> tuple[list, int]:

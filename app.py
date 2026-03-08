@@ -73,6 +73,7 @@ app.mount('/static', StaticFiles(directory=str(_BASE_DIR / 'static')), name='sta
 templates = Jinja2Templates(directory=str(_BASE_DIR / 'templates'))
 templates.env.globals['url_for'] = lambda name, filename='': f'/static/{filename}'
 templates.env.globals['store_name'] = settings.store_name
+templates.env.globals['store_location'] = settings.store_location
 app.state.templates = templates
 app.state.lan_active = settings.lan_mode
 app.state.https_port = None
@@ -96,6 +97,7 @@ for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, pric
 @app.middleware('http')
 async def inject_branding(request, call_next):
     templates.env.globals['store_name'] = settings.store_name
+    templates.env.globals['store_location'] = settings.store_location
     return await call_next(request)
 
 

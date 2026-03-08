@@ -7,7 +7,7 @@ from fastapi.responses import Response, JSONResponse
 from dependencies import get_db
 from services.po_service import (
     get_vendor_items, get_sales_data, get_sales_monthly, get_stock_balances,
-    save_pesanan, get_po_list, get_po_detail, delete_po, export_po_csv,
+    save_pesanan, update_pesanan, get_po_list, get_po_detail, delete_po, export_po_csv,
 )
 
 router = APIRouter()
@@ -47,6 +47,22 @@ async def api_save_po(request: Request, db: aiomysql.Pool = Depends(get_db)):
         date_from=body['date_from'],
         date_to=body['date_to'],
         created_by=body.get('created_by', ''),
+    )
+    if 'error' in result:
+        return JSONResponse(result, status_code=400)
+    return result
+
+
+@router.post('/api/po/{po_number}/update')
+async def api_update_po(po_number: str, request: Request, db: aiomysql.Pool = Depends(get_db)):
+    body = await request.json()
+    result = await update_pesanan(
+        db,
+        po_number=po_number,
+        items=body['items'],
+        order_date=body['order_date'],
+        date_from=body['date_from'],
+        date_to=body['date_to'],
     )
     if 'error' in result:
         return JSONResponse(result, status_code=400)

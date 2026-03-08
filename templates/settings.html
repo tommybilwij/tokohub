@@ -87,6 +87,10 @@
             <input type="text" class="form-control form-control-sm" name="store_name" placeholder="Toko Segar">
           </div>
           <div class="col-md-4">
+            <label class="form-label">Lokasi Toko</label>
+            <input type="text" class="form-control form-control-sm" name="store_location" placeholder="Jl. Contoh No. 1">
+          </div>
+          <div class="col-md-4">
             <label class="form-label">Host</label>
             <input type="text" class="form-control form-control-sm" name="server_host">
           </div>
@@ -253,6 +257,7 @@
 
       // Server
       setVal('formServer', 'store_name', cfg.store_name);
+      setVal('formServer', 'store_location', cfg.store_location);
       setVal('formServer', 'server_host', cfg.server_host);
       setVal('formServer', 'server_port', cfg.server_port);
       document.getElementById('lanModeCheck').checked = cfg.lan_mode;

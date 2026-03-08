@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Buat Pesanan Pembelian{% endblock %}
+{% block title %}Pesanan Pembelian{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex align-items-center justify-content-between mb-2">
+<!-- Normal (create) header -->
+<div class="page-header d-flex align-items-center justify-content-between mb-2" id="poHeaderCreate">
   <div class="d-flex align-items-center gap-3">
     <a href="/pesanan-pembelian" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left"></i> Kembali
@@ -11,6 +12,15 @@
       <h4 class="page-title mb-0">Buat Pesanan Pembelian</h4>
       <small class="text-muted">Pilih supplier, analisa penjualan, lalu simpan pesanan</small>
     </div>
+  </div>
+</div>
+<!-- Edit header (hidden by default) -->
+<div class="page-header d-flex align-items-center justify-content-between mb-2 d-none" id="poHeaderEdit">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/pesanan-pembelian" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <h4 class="page-title mb-0">Edit Pesanan: <span id="poEditNumber"></span></h4>
   </div>
 </div>
 
@@ -127,6 +137,15 @@
   var today = new Date().toISOString().split('T')[0];
   var STORAGE_KEY = 'po_input_draft';
 
+  // Edit mode detection
+  var editPO = new URLSearchParams(window.location.search).get('edit') || '';
+  if (editPO) {
+    document.getElementById('poHeaderCreate').classList.add('d-none');
+    document.getElementById('poHeaderEdit').classList.remove('d-none');
+    document.getElementById('poEditNumber').textContent = editPO;
+    document.getElementById('poCreateSave').innerHTML = '<i class="bi bi-check-circle"></i> Update Pesanan';
+  }
+
   // Default sales period: last 3 months
   var d90 = new Date(); d90.setMonth(d90.getMonth() - 3);
   document.getElementById('poSalesFrom').value = d90.toISOString().split('T')[0];
@@ -134,6 +153,7 @@
 
   // --- Draft persistence ---
   function saveDraft() {
+    if (editPO) return; // Don't save drafts in edit mode
     var orders = {};
     poItems.forEach(function(item) {
       if ((item._orderBsr || 0) > 0 || (item._orderRemKcl || 0) > 0) {
@@ -210,8 +230,11 @@
       allVendors = vendors.map(function(v) {
         return { id: v.id, label: v.id + ' - ' + (v.name || v.id) };
       });
-      // Restore draft after vendors loaded
-      restoreDraft();
+      if (editPO) {
+        loadEditPO(editPO);
+      } else {
+        restoreDraft();
+      }
     });
 
   var suppInput = document.getElementById('poSuppInput');
@@ -589,6 +612,41 @@
     saveDraft();
   });
 
+  // --- Edit mode: load existing PO data ---
+  async function loadEditPO(poNumber) {
+    try {
+      var res = await fetch('/api/po/' + encodeURIComponent(poNumber));
+      var data = await res.json();
+      if (data.error) { window.showToast && showToast(data.error, 'danger'); return; }
+
+      // Set supplier
+      suppHidden.value = data.suppid;
+      var vendor = allVendors.find(function(v) { return v.id === data.suppid; });
+      suppInput.value = vendor ? vendor.label : data.supplier_name || data.suppid;
+
+      // Set dates
+      if (data.tgl_pesanan) document.getElementById('poOrderDate').value = data.tgl_pesanan;
+      if (data.date_from) document.getElementById('poSalesFrom').value = data.date_from;
+      if (data.date_to) document.getElementById('poSalesTo').value = data.date_to;
+
+      // Build order map from existing PO lines: {artno: {bsr, kcl}}
+      var orderMap = {};
+      (data.lines || []).forEach(function(line) {
+        var packing = line.packing || 1;
+        var totalKcl = Math.round(line.qty_order_kcl || 0);
+        var bsr = Math.floor(line.qty_order || 0);
+        var remKcl = Math.round(totalKcl - bsr * packing);
+        orderMap[line.artno] = { bsr: bsr, kcl: remKcl };
+      });
+
+      // Set pending orders and load items
+      _pendingDraftOrders = orderMap;
+      await loadItems();
+    } catch (err) {
+      window.showToast && showToast('Gagal memuat pesanan: ' + err.message, 'danger');
+    }
+  }
+
   // Save
   document.getElementById('poCreateSave').addEventListener('click', async function() {
     var suppid = suppHidden.value;
@@ -622,28 +680,40 @@
       return;
     }
 
+    var isEdit = !!editPO;
+    var confirmMsg = isEdit
+      ? 'Update pesanan ' + editPO + ' dengan ' + itemsToSave.length + ' item?'
+      : 'Simpan pesanan dengan ' + itemsToSave.length + ' item?';
     var confirmed = await (window.showConfirm
-      ? showConfirm('Simpan pesanan dengan ' + itemsToSave.length + ' item?')
-      : Promise.resolve(confirm('Simpan pesanan?')));
+      ? showConfirm(confirmMsg)
+      : Promise.resolve(confirm(confirmMsg)));
     if (!confirmed) return;
 
     try {
-      var res = await fetch('/api/po/save', {
+      var url = isEdit
+        ? '/api/po/' + encodeURIComponent(editPO) + '/update'
+        : '/api/po/save';
+      var payload = {
+        suppid: suppid,
+        items: itemsToSave,
+        order_date: orderDate,
+        date_from: salesFrom,
+        date_to: salesTo,
+      };
+      if (!isEdit) payload.created_by = currentUser;
+
+      var res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suppid: suppid,
-          items: itemsToSave,
-          order_date: orderDate,
-          date_from: salesFrom,
-          date_to: salesTo,
-          created_by: currentUser,
-        }),
+        body: JSON.stringify(payload),
       });
       var data = await res.json();
       if (data.ok) {
         clearDraft();
-        window.showToast && showToast('Pesanan ' + data.po_number + ' berhasil disimpan (' + data.total_items + ' item)');
+        var msg = isEdit
+          ? 'Pesanan ' + data.po_number + ' berhasil diupdate (' + data.total_items + ' item)'
+          : 'Pesanan ' + data.po_number + ' berhasil disimpan (' + data.total_items + ' item)';
+        window.showToast && showToast(msg);
         window.location.href = '/pesanan-pembelian';
       } else {
         window.showToast && showToast(data.error || 'Gagal menyimpan', 'danger');

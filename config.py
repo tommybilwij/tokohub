@@ -111,6 +111,7 @@ class Settings(BaseSettings):
 
     # Branding
     store_name: str = ''
+    store_location: str = ''
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -189,6 +190,7 @@ _KEY_TO_ENV = {
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
     'store_name': 'STORE_NAME',
+    'store_location': 'STORE_LOCATION',
     'session_max_age': 'SESSION_MAX_AGE',
 }
 

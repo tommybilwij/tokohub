@@ -412,8 +412,9 @@
       var summaryHtml = '<div class="item-summary">'
         + '<div class="is-row">'
         + '<div class="is-cell"><span class="is-label">Qty</span><span class="is-val">' + (line.qty || 0) + ' ' + esc(sat) + '</span></div>'
-        + '<div class="is-cell"><span class="is-label">Total</span><span class="is-val">' + fmtNum((line.hbelibsr || 0) * (line.qty || 0)) + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Bruto</span><span class="is-val">' + fmtNum((line.hbelibsr || 0) * (line.qty || 0)) + '</span></div>'
         + '<div class="is-cell"><span class="is-label">Disc</span><span class="is-val">' + discStr + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Netto</span><span class="is-val">' + fmtNum(trunc2(_nettoBsr * (line.qty || 0))) + '</span></div>'
         + '</div>';
       if (jualParts.length || _nettoPcs) {
         summaryHtml += '<div class="is-row is-jual">'

@@ -842,7 +842,8 @@ body {
 }
 .beli-table td:nth-child(2) .sblm-hint { width: 140px; }
 .beli-table td:nth-child(3) .sblm-hint { width: 120px; }
-.beli-table td:nth-child(4) .sblm-hint { width: 90px; }
+.beli-table td:nth-child(4) .sblm-hint { width: 120px; }
+.beli-table td:nth-child(5) .sblm-hint { width: 90px; }
 
 .jual-table .jual-margin {
   font-weight: var(--fw-bold);

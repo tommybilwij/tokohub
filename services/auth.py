@@ -45,6 +45,7 @@ PAGES = {
     'pesanan':                  'Pesanan Pembelian',
     'pesanan:input':            'Buat Pesanan Pembelian',
     'pesanan:daftar':           'Daftar Pesanan Pembelian',
+    'pesanan:daftar:edit':      'Edit Pesanan',
     'pesanan:daftar:delete':    'Hapus Pesanan',
     'laporan':                  'Laporan',
     'laporan:penjualan':        'Laporan Penjualan',

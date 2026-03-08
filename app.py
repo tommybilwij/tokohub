@@ -158,17 +158,14 @@ def main():
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
 
-            https_port = None
-            for try_port in (443, port + 1):
-                try:
-                    import socket
-                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    s.bind(('0.0.0.0', try_port))
-                    s.close()
-                    https_port = try_port
-                    break
-                except (PermissionError, OSError) as e:
-                    logger.info("Cannot bind port %d (%s), trying next", try_port, e)
+            https_port = 443
+            try:
+                import socket
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.bind(('0.0.0.0', https_port))
+                s.close()
+            except (PermissionError, OSError) as e:
+                raise RuntimeError(f"Cannot bind HTTPS port 443: {e}. Run with sudo for port 443.") from e
 
             if https_port:
                 app.state.https_port = https_port

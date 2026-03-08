@@ -127,9 +127,10 @@ async def pesanan_pembelian_page(
     if not has_entry and not has_list:
         denied = await _check_page(request, user, 'pesanan')
         if denied: return denied
+    can_edit = await has_page_access(pool, user['role'], 'pesanan:daftar:edit')
     can_delete = await has_page_access(pool, user['role'], 'pesanan:daftar:delete')
     return templates.TemplateResponse(request, 'pesanan_pembelian.html', {
-        'can_entry': has_entry, 'can_delete': can_delete,
+        'can_entry': has_entry, 'can_edit': can_edit, 'can_delete': can_delete,
         **await _user_ctx(request, user),
     })
 

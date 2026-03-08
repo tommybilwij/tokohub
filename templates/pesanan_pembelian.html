@@ -2,7 +2,7 @@
 {% block title %}Pesanan Pembelian{% endblock %}
 
 {% block content %}
-<div class="sh-page" data-can-delete="{{ can_delete | default(false) | tojson }}">
+<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-delete="{{ can_delete | default(false) | tojson }}">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0"><i class="bi bi-cart-check"></i> Pesanan Pembelian</h5>
     {% if can_entry | default(false) %}
@@ -126,6 +126,7 @@
   var storeLocation = {{ store_location | default('', true) | tojson }};
 
   var pageEl = document.querySelector('.sh-page');
+  var canEdit = pageEl.dataset.canEdit === 'true';
   var canDelete = pageEl.dataset.canDelete === 'true';
 
   var elDateFrom = document.getElementById('hDateFrom');
@@ -236,7 +237,9 @@
         items.forEach(function(o) {
           var tr = document.createElement('tr');
           var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.po_number + '" title="Lihat"><i class="bi bi-eye"></i></button>';
-          actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+          if (canEdit) {
+            actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+          }
           actions += ' <button class="btn btn-sm btn-outline-danger btn-pdf-po" data-po="' + o.po_number + '" title="Export PDF"><i class="bi bi-file-earmark-pdf"></i></button>';
           if (canDelete) {
             actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-po" data-po="' + o.po_number + '" title="Hapus"><i class="bi bi-trash"></i></button>';
@@ -290,7 +293,9 @@
     sorted.forEach(function(o) {
       var tr = document.createElement('tr');
       var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.po_number + '" title="Lihat"><i class="bi bi-eye"></i></button>';
-      actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+      if (canEdit) {
+        actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+      }
       actions += ' <button class="btn btn-sm btn-outline-danger btn-pdf-po" data-po="' + o.po_number + '" title="Export PDF"><i class="bi bi-file-earmark-pdf"></i></button>';
       if (canDelete) {
         actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-po" data-po="' + o.po_number + '" title="Hapus"><i class="bi bi-trash"></i></button>';

@@ -809,11 +809,25 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     # Build new preview
     preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
-    # Capture before-state for snapshot
-    from services.snapshot_service import capture_before, build_after, save_snapshot
+    # Capture before-state for snapshot — preserve original "before" from first snapshot
+    from services.snapshot_service import capture_before, build_after, save_snapshot, get_snapshot
     artnos = [line['artno'] for line in preview['lines']]
-    before_state = await capture_before(pool, artnos)
     after_state = build_after(preview['lines'])
+
+    # Keep the original "before" state so comparison hints always show pre-FP stock values
+    orig_snap = await get_snapshot(pool, fp_number)
+    if orig_snap:
+        before_state = {}
+        for item in orig_snap.get('items', []):
+            if item.get('before'):
+                before_state[item['artno']] = item['before']
+        # For any new artnos not in original snapshot, capture from live stock
+        new_artnos = [a for a in artnos if a not in before_state]
+        if new_artnos:
+            new_before = await capture_before(pool, new_artnos)
+            before_state.update(new_before)
+    else:
+        before_state = await capture_before(pool, artnos)
 
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:

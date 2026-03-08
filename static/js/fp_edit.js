@@ -357,12 +357,14 @@
 
       // Price change indicator on main row
       var hasChanges = false;
-      if (stk.hjual !== undefined) {
-        var fields = ['hbelibsr', 'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn'];
-        fields.forEach(function (f) { if (Math.abs((Number(stk[f]) || 0) - (Number(line[f]) || 0)) >= 0.001) hasChanges = true; });
-        if (Math.abs((Number(stk.hjual) || 0) - (Number(line.hjual) || 0)) >= 0.001) hasChanges = true;
+      if (stk.hbelibsr != null || stk.hjual != null || stk.packing != null) {
+        var diff = function(a, b) { return Math.abs((Number(a) || 0) - (Number(b) || 0)) >= 0.001; };
+        var fields = ['packing', 'hbelibsr', 'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5'];
+        fields.forEach(function(f) { if (diff(stk[f], line[f])) hasChanges = true; });
       }
-      var changeIcon = hasChanges ? ' <span class="badge bg-warning text-dark" style="font-size:0.7em;vertical-align:middle"><i class="bi bi-exclamation-triangle-fill"></i> Harga berubah</span>' : '';
+      var changeIcon = hasChanges
+        ? ' <span class="badge bg-warning text-dark" style="font-size:0.7em;vertical-align:middle"><i class="bi bi-exclamation-triangle-fill"></i> Berubah</span>'
+        : '';
 
       // Main row
       var tr = document.createElement('tr');
@@ -414,9 +416,9 @@
                 '</div>' +
               '</div>' +
               '<div class="dp-input-group">' +
-                '<label class="dp-input-label">Total Harga Beli' + (aft.amount ? ' <span class="sblm-hint" style="display:inline">' + fmtNum(aft.amount) + '</span>' : '') + '</label>' +
+                '<label class="dp-input-label">Total Harga Beli' + (stk.hbelibsr != null ? ' <span class="sblm-hint" style="display:inline">' + fmtNum((stk.hbelibsr || 0) * (line.qty || 1)) + '</span>' : '') + '</label>' +
                 '<div class="d-flex align-items-center" style="height:100%">' +
-                  '<input type="text" class="form-control edit-price-total text-end' + (aft.amount ? changedCls(aft.amount, line.hbelibsr * line.qty) : '') + '" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
+                  '<input type="text" class="form-control edit-price-total text-end' + (stk.hbelibsr != null ? changedCls((stk.hbelibsr || 0) * (line.qty || 1), line.hbelibsr * line.qty) : '') + '" data-idx="' + idx + '" value="' + (line.hbelibsr * line.qty ? fmtNum(line.hbelibsr * line.qty) : '') + '" inputmode="decimal">' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -541,6 +543,14 @@
       var nChanged = fmtNum(stkNetC.final) !== fmtNum(finalBsr);
       if (nBsr) nBsr.classList.toggle('value-changed', nChanged);
       if (nPcs) nPcs.classList.toggle('value-changed', nChanged);
+    }
+
+    // Total Harga Beli highlight
+    var totalEl = document.querySelector('.edit-price-total[data-idx="' + idx + '"]');
+    if (totalEl && hasStk) {
+      var stkTotal = (stk.hbelibsr || 0) * (line.qty || 1);
+      var curTotal = h * (line.qty || 1);
+      totalEl.classList.toggle('value-changed', fmtNum(stkTotal) !== fmtNum(curTotal));
     }
 
     // Beli

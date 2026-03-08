@@ -535,7 +535,6 @@
         addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto',  [item], item.artno,
                 parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
         dom.itemNameInput.value = '';
-        dom.itemNameInput.focus();
       });
 
       dom.searchResults.appendChild(el);
@@ -562,7 +561,6 @@
         addItem(item.artname, item.artpabrik || '', 1, item.packing || 1, item.satbesar || 'CTN', item.packing || 1, item.hbelibsr || 0, 'auto', [item], item.artno,
                 parseFloat(item.pctdisc1) || null, parseFloat(item.pctdisc2) || null, parseFloat(item.pctdisc3) || null, parseFloat(item.pctppn) || null);
         dom.itemNameInput.value = '';
-        dom.itemNameInput.focus();
         return;
       }
     } catch (e) {
@@ -571,7 +569,6 @@
 
     addItem(name, '', 1, 0, 'CTN', 1, 0);
     dom.itemNameInput.value = '';
-    dom.itemNameInput.focus();
     dom.searchResults.classList.add('d-none');
   }
 
@@ -640,11 +637,18 @@
       added._refHjual = { hjual1: added.hjual1, hjual2: added.hjual2, hjual3: added.hjual3, hjual4: added.hjual4, hjual5: added.hjual5 };
     }
     renderItemTable();
-    // Scroll to newly added item
+    // Collapse all existing items, expand only the new one, and scroll to it
     const newIdx = state.items.length - 1;
     requestAnimationFrame(() => {
+      // Collapse all
+      document.querySelectorAll('#itemTable .item-main.has-detail-open').forEach(r => r.classList.remove('has-detail-open'));
+      document.querySelectorAll('#itemTable .item-detail.open').forEach(r => r.classList.remove('open'));
+      // Expand new item
       const row = document.querySelector(`.item-main[data-idx="${newIdx}"]`);
-      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const detail = document.querySelector(`.item-detail[data-idx="${newIdx}"]`);
+      if (row) row.classList.add('has-detail-open');
+      if (detail) detail.classList.add('open');
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     showToast(`"${name}" ditambahkan`, 'success');
   }

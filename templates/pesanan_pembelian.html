@@ -427,8 +427,8 @@
 
         // Build QTY Order with space between qty and unit
         var qtyParts = [];
-        if (qtyBsr > 0) qtyParts.push(qtyBsr + ' ' + satBesar);
-        if (remKcl > 0) qtyParts.push(remKcl + ' ' + satKecil);
+        if (qtyBsr > 0) qtyParts.push(fmtNum(qtyBsr) + ' ' + satBesar);
+        if (remKcl > 0) qtyParts.push(fmtNum(remKcl) + ' ' + satKecil);
         var qtyStr = qtyParts.length ? qtyParts.join('  ') : '0';
 
         tableBody.push([
@@ -445,19 +445,34 @@
         startY: y,
         head: tableHead,
         body: tableBody,
-        theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 1, lineColor: [0, 0, 0], lineWidth: 0.2 },
-        headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
+        theme: 'plain',
+        styles: { fontSize: 7, cellPadding: 1 },
+        headStyles: { fillColor: false, textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineColor: [0, 0, 0], lineWidth: 0.2 },
         columnStyles: {
           0: { halign: 'center', cellWidth: 8 },
           1: { cellWidth: 28 },
           2: { cellWidth: 'auto' },
           3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' },
-          4: { halign: 'center', cellWidth: 16 },
-          5: { halign: 'center', cellWidth: 26 },
+          4: { halign: 'right', cellWidth: 16 },
+          5: { halign: 'right', cellWidth: 26 },
         },
         margin: { left: marginL, right: marginR },
         tableWidth: contentW,
+        didParseCell: function(data) {
+          // Add top/bottom borders on header row only
+          if (data.section === 'head') {
+            data.cell.styles.lineColor = [0, 0, 0];
+            data.cell.styles.lineWidth = 0.2;
+          }
+        },
+        didDrawCell: function(data) {
+          // Draw horizontal line under each body row
+          if (data.section === 'body' && data.column.index === 0) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.1);
+            doc.line(marginL, data.cell.y + data.cell.height, pageW - marginR, data.cell.y + data.cell.height);
+          }
+        },
       });
 
       var afterTableY = doc.lastAutoTable.finalY || y + 40;

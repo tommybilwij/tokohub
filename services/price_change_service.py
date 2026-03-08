@@ -555,18 +555,27 @@ async def get_ph_detail(pool, ph_number: str) -> dict | None:
         pool,
         """SELECT stockid, artpabrik, artname, oprice, hjual, hjual2, hjual3, hjual4, hjual5,
                   hbelibsr, hbelikcl, hbelinetto, packing, satuanbsr, satuankcl,
-                  pctdisc1, pctdisc2, pctdisc3, pctppn
+                  pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  over1, over2, ispaketprc,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
            FROM sthist WHERE becreff = %s AND tipetrans = 0 ORDER BY noindex""",
         (header['becreff'],),
     )
     result = dict(header)
     result['tglberlaku'] = result['tglberlaku'].isoformat() if result['tglberlaku'] else ''
     result['lines'] = []
+    _float_keys = (
+        'oprice', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
+        'hbelibsr', 'hbelikcl', 'hbelinetto', 'packing',
+        'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn',
+        'over1', 'over2',
+        'hjualo1', 'hjual2o1', 'hjual3o1', 'hjual4o1', 'hjual5o1',
+        'hjualo2', 'hjual2o2', 'hjual3o2', 'hjual4o2', 'hjual5o2',
+    )
     for l in lines:
         d = dict(l)
-        for k in ('oprice', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
-                  'hbelibsr', 'hbelikcl', 'hbelinetto', 'packing',
-                  'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn'):
+        for k in _float_keys:
             d[k] = float(d.get(k) or 0)
         result['lines'].append(d)
     return result

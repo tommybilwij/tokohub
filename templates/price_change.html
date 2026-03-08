@@ -121,6 +121,22 @@
   </div>
 </div>
 
+<!-- Search Results Modal -->
+<div class="modal fade" id="pcFuzzyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white py-2">
+        <h6 class="modal-title mb-0"><i class="bi bi-search me-1"></i> Hasil Pencarian</h6>
+        <small class="ms-2 opacity-75" id="pcFuzzyCount"></small>
+        <button type="button" class="btn-close btn-close-white btn-close-sm ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:70vh;overflow:auto">
+        <div id="pcFuzzyBody" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Success Modal -->
 <div class="modal fade" id="pcSuccessModal" tabindex="-1">
   <div class="modal-dialog">

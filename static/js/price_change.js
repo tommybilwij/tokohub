@@ -181,63 +181,126 @@
         .then(r => r.json())
         .then(data => {
           lastResults = data.results || data || [];
-          renderSearchResults(lastResults);
+          renderDropdown(lastResults);
         });
     }, 300);
   }
 
-  function renderSearchResults(results) {
+  function renderDropdown(results) {
     searchResults.innerHTML = '';
-    results.forEach(m => {
-      const scoreCls = m.score >= 90 ? 'text-primary fw-bold' : m.score >= 70 ? 'text-primary' : 'text-muted';
-      const el = document.createElement('a');
+    var existingArtnos = {};
+    items.forEach(function(it) { existingArtnos[it.artno] = true; });
+    results.forEach(function(m) {
+      var inList = existingArtnos[m.artno];
+      var scoreCls = m.score >= 90 ? 'text-primary fw-bold' : m.score >= 70 ? 'text-primary' : 'text-muted';
+      var el = document.createElement('a');
       el.href = '#';
-      el.className = 'list-group-item list-group-item-action';
-      el.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="fw-semibold">${m.artname}</div>
-            <small class="text-muted">${m.artno}${m.artpabrik ? ' | ' + m.artpabrik : ''}</small>
-          </div>
-          <span class="${scoreCls}" style="white-space:nowrap;margin-left:8px">${m.score?.toFixed(1) || ''}%</span>
-        </div>`;
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        addItem(m);
-        searchResults.classList.add('d-none');
-        searchInput.value = '';
-        searchInput.focus();
-      });
+      el.className = 'list-group-item list-group-item-action' + (inList ? ' bg-light' : '');
+      el.innerHTML =
+        '<div class="d-flex justify-content-between align-items-start">'
+        + '<div>'
+        + '<div class="fw-semibold">' + (m.artname || '') + '</div>'
+        + '<small class="text-muted">' + (m.artno || '') + (m.artpabrik ? ' | ' + m.artpabrik : '') + '</small>'
+        + '</div>'
+        + (inList
+          ? '<span class="badge bg-secondary ms-2">sudah ada</span>'
+          : '<span class="' + scoreCls + '" style="white-space:nowrap;margin-left:8px">' + (m.score ? m.score.toFixed(1) : '') + '%</span>')
+        + '</div>';
+      if (!inList) {
+        el.addEventListener('click', function(e) {
+          e.preventDefault();
+          addItem(m);
+          searchResults.classList.add('d-none');
+          searchInput.value = '';
+          searchInput.focus();
+        });
+      } else {
+        el.addEventListener('click', function(e) { e.preventDefault(); });
+      }
       searchResults.appendChild(el);
     });
     searchResults.classList.toggle('d-none', !results.length);
   }
 
+  function openFuzzyModal(results) {
+    var body = document.getElementById('pcFuzzyBody');
+    var countEl = document.getElementById('pcFuzzyCount');
+    body.innerHTML = '';
+    var existingArtnos = {};
+    items.forEach(function(it) { existingArtnos[it.artno] = true; });
+    results.forEach(function(r, i) {
+      var inList = existingArtnos[r.artno];
+      var score = Math.round(r.score || 0);
+      var scoreColor = score >= 80 ? '#198754' : score >= 60 ? '#fd7e14' : score >= 40 ? '#ffc107' : '#adb5bd';
+      var el = document.createElement('div');
+      el.className = 'list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3' + (inList ? ' bg-light text-muted' : '');
+      el.innerHTML =
+        '<div style="min-width:48px;text-align:center">'
+        + '<div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" style="width:40px;height:40px;font-size:0.75rem;background:' + scoreColor + '">' + score + '%</div>'
+        + '</div>'
+        + '<div class="flex-grow-1" style="min-width:0">'
+        + '<div class="fw-semibold text-truncate">' + (r.artname || '') + '</div>'
+        + '<small class="text-muted"><code>' + (r.artno || '') + '</code>' + (r.artpabrik ? ' | ' + r.artpabrik : '') + '</small>'
+        + '</div>'
+        + '<div style="min-width:90px;text-align:right">'
+        + (inList
+          ? '<span class="badge bg-secondary">sudah ada</span>'
+          : '<button class="btn btn-sm btn-success pc-fuzzy-add" data-idx="' + i + '"><i class="bi bi-plus-lg me-1"></i>Tambah</button>')
+        + '</div>';
+      body.appendChild(el);
+    });
+    countEl.textContent = results.length + ' hasil';
+
+    body.querySelectorAll('.pc-fuzzy-add').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var idx = parseInt(btn.dataset.idx);
+        var r = results[idx];
+        if (r) {
+          addItem(r);
+          var row = btn.closest('.list-group-item');
+          row.classList.add('bg-light', 'text-muted');
+          btn.outerHTML = '<span class="badge bg-info text-white"><i class="bi bi-check-lg me-1"></i>Ditambahkan</span>';
+        }
+      });
+    });
+
+    var modal = new bootstrap.Modal(document.getElementById('pcFuzzyModal'));
+    modal.show();
+  }
+
+  function triggerSearch() {
+    var q = searchInput.value.trim();
+    if (q.length < 2) return;
+    fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=pc')
+      .then(r => r.json())
+      .then(data => {
+        lastResults = data.results || data || [];
+        if (lastResults.length) {
+          openFuzzyModal(lastResults);
+        } else {
+          window.showToast && showToast('Tidak ada hasil untuk "' + q + '"', 'warning');
+        }
+      });
+  }
+
   searchInput.addEventListener('input', doSearch);
 
-  // + button: add all search results (same as Enter)
-  document.getElementById('pcBtnAdd').addEventListener('click', () => {
-    if (lastResults.length) {
-      lastResults.forEach(m => addItem(m));
-      searchResults.classList.add('d-none');
-      searchInput.value = '';
-      searchInput.focus();
-    }
+  // + button: open search modal
+  document.getElementById('pcBtnAdd').addEventListener('click', function() {
+    searchResults.classList.add('d-none');
+    triggerSearch();
   });
 
-  // Enter: add ALL search results at once
+  // Enter: open search modal
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (lastResults.length) {
-        lastResults.forEach(m => addItem(m));
-        searchResults.classList.add('d-none');
-        searchInput.value = '';
-        searchInput.focus();
-      }
+      searchResults.classList.add('d-none');
+      triggerSearch();
     }
   });
 
+  // Click outside dropdown to close
   document.addEventListener('click', (e) => {
     if (!searchResults.contains(e.target) && e.target !== searchInput) {
       searchResults.classList.add('d-none');
@@ -586,14 +649,14 @@
         };
         if (i.bundling1.enabled) {
           p.bundling1 = {
-            minQty: i.bundling1.minQty,
+            min_qty: i.bundling1.minQty,
             hjual1: i.bundling1.newHjual1, hjual2: i.bundling1.newHjual2, hjual3: i.bundling1.newHjual3,
             hjual4: i.bundling1.newHjual4, hjual5: i.bundling1.newHjual5,
           };
         }
         if (i.bundling2.enabled) {
           p.bundling2 = {
-            minQty: i.bundling2.minQty,
+            min_qty: i.bundling2.minQty,
             hjual1: i.bundling2.newHjual1, hjual2: i.bundling2.newHjual2, hjual3: i.bundling2.newHjual3,
             hjual4: i.bundling2.newHjual4, hjual5: i.bundling2.newHjual5,
           };
@@ -677,49 +740,27 @@
         // Populate uraian for edit mode
         const editUraianEl = document.getElementById('pcEditUraianInput');
         if (editUraianEl) editUraianEl.value = data.uraian || '';
-        // Fetch current stock prices for all items to get bundling info
-        const artnos = (data.lines || []).map(l => l.stockid);
-        let stockMap = {};
-        if (artnos.length) {
-          const stockRes = await fetch('/api/price-change/stock-prices', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({artnos: artnos}),
-          });
-          const stockData = await stockRes.json();
-          stockMap = stockData.items || {};
-        }
 
-        // Also fetch search results to get bundling data
         for (const line of (data.lines || [])) {
           const artno = line.stockid;
-          const stock = stockMap[artno] || {};
-          // Fetch full item data including bundlings
-          let bundlings = [];
-          try {
-            const searchRes = await fetch('/api/stock/search?q=' + encodeURIComponent(artno) + '&limit=1');
-            const searchData = await searchRes.json();
-            if (searchData.length && searchData[0].artno === artno) {
-              bundlings = searchData[0]._bundlings || [];
-            }
-          } catch(e) {}
 
-          const b1 = bundlings[0] || {};
-          const b2 = bundlings[1] || {};
+          // Bundling data from sthist (over1/over2 = min qty, hjualo1/hjualo2 = prices)
+          const b1Qty = line.over1 || 0;
+          const b2Qty = line.over2 || 0;
 
           const item = {
             artno: artno,
-            artname: line.artname || stock.artname || '',
-            artpabrik: line.artpabrik || stock.artpabrik || '',
-            hbelibsr: line.hbelibsr || stock.hbelibsr || 0,
-            hbelikcl: line.hbelikcl || stock.hbelikcl || 0,
-            hbelinetto: line.hbelinetto || stock.hbelinetto || 0,
-            packing: line.packing || stock.packing || 1,
-            satbesar: line.satuanbsr || stock.satbesar || '',
-            pctdisc1: line.pctdisc1 || stock.pctdisc1 || 0,
-            pctdisc2: line.pctdisc2 || stock.pctdisc2 || 0,
-            pctdisc3: line.pctdisc3 || stock.pctdisc3 || 0,
-            pctppn: line.pctppn || stock.pctppn || 0,
+            artname: line.artname || '',
+            artpabrik: line.artpabrik || '',
+            hbelibsr: line.hbelibsr || 0,
+            hbelikcl: line.hbelikcl || 0,
+            hbelinetto: line.hbelinetto || 0,
+            packing: line.packing || 1,
+            satbesar: line.satuanbsr || '',
+            pctdisc1: line.pctdisc1 || 0,
+            pctdisc2: line.pctdisc2 || 0,
+            pctdisc3: line.pctdisc3 || 0,
+            pctppn: line.pctppn || 0,
             hjual: line.hjual || 0,
             hjual2: line.hjual2 || 0,
             hjual3: line.hjual3 || 0,
@@ -731,20 +772,20 @@
             newHjual4: line.hjual4 || 0,
             newHjual5: line.hjual5 || 0,
             bundling1: {
-              enabled: !!(b1.qty),
-              minQty: b1.qty || 0,
-              hjual1: b1.hjual1 || 0, hjual2: b1.hjual2 || 0, hjual3: b1.hjual3 || 0,
-              hjual4: b1.hjual4 || 0, hjual5: b1.hjual5 || 0,
-              newHjual1: b1.hjual1 || 0, newHjual2: b1.hjual2 || 0, newHjual3: b1.hjual3 || 0,
-              newHjual4: b1.hjual4 || 0, newHjual5: b1.hjual5 || 0,
+              enabled: !!b1Qty,
+              minQty: b1Qty,
+              hjual1: line.hjualo1 || 0, hjual2: line.hjual2o1 || 0, hjual3: line.hjual3o1 || 0,
+              hjual4: line.hjual4o1 || 0, hjual5: line.hjual5o1 || 0,
+              newHjual1: line.hjualo1 || 0, newHjual2: line.hjual2o1 || 0, newHjual3: line.hjual3o1 || 0,
+              newHjual4: line.hjual4o1 || 0, newHjual5: line.hjual5o1 || 0,
             },
             bundling2: {
-              enabled: !!(b2.qty),
-              minQty: b2.qty || 0,
-              hjual1: b2.hjual1 || 0, hjual2: b2.hjual2 || 0, hjual3: b2.hjual3 || 0,
-              hjual4: b2.hjual4 || 0, hjual5: b2.hjual5 || 0,
-              newHjual1: b2.hjual1 || 0, newHjual2: b2.hjual2 || 0, newHjual3: b2.hjual3 || 0,
-              newHjual4: b2.hjual4 || 0, newHjual5: b2.hjual5 || 0,
+              enabled: !!b2Qty,
+              minQty: b2Qty,
+              hjual1: line.hjualo2 || 0, hjual2: line.hjual2o2 || 0, hjual3: line.hjual3o2 || 0,
+              hjual4: line.hjual4o2 || 0, hjual5: line.hjual5o2 || 0,
+              newHjual1: line.hjualo2 || 0, newHjual2: line.hjual2o2 || 0, newHjual3: line.hjual3o2 || 0,
+              newHjual4: line.hjual4o2 || 0, newHjual5: line.hjual5o2 || 0,
             },
           };
           items.push(item);

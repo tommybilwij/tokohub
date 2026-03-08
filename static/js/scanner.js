@@ -1,10 +1,7 @@
 /**
  * Scanner Page - Barcode scanner + stock lookup
  *
- * Detection methods (user-selectable via dropdown):
- *   1. ZXing (default) — WebAssembly-based, fast and accurate
- *   2. Quagga2 — JS-based fallback
- *
+ * Detection: Quagga2 (JS-based) with multi-pass config cycling.
  * Anti-shake: requires CONFIRM_COUNT consecutive identical reads before accepting.
  * Center-crop: only scans the middle portion of the frame for faster, more accurate reads.
  */
@@ -19,7 +16,6 @@
     viewport:       $('#scannerViewport'),
     btnToggle:      $('#btnToggleCamera'),
     cameraSelect:   $('#cameraSelect'),
-    scanMethod:     $('#scanMethod'),
     placeholder:    $('.scanner-placeholder'),
     crosshair:      $('.scanner-crosshair'),
     searchInput:    $('#searchInput'),
@@ -89,23 +85,6 @@
   var isDecoding = false;
   var torchOn = false;
   var torchTrack = null;
-  var zxingReady = !!window.zxingReadBarcodes;
-
-  // Listen for ZXing WASM module ready
-  if (!zxingReady) {
-    window.addEventListener('zxing-ready', function(e) {
-      if (e.detail && e.detail.error) {
-        console.warn('[Scanner] ZXing failed to load');
-      } else {
-        zxingReady = true;
-        console.log('[Scanner] ZXing ready');
-      }
-    });
-  }
-
-  // ZXing: AllLinear catches all 1D barcode formats (v3 API)
-  var ZXING_FORMATS = ['AllLinear'];
-
   // Quagga readers
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader', 'i2of5_reader', 'codabar_reader'];
 
@@ -135,10 +114,6 @@
     var d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
-  }
-
-  function getSelectedMethod() {
-    return dom.scanMethod ? dom.scanMethod.value : 'zxing';
   }
 
   // -----------------------------------------------------------------------
@@ -257,12 +232,7 @@
     lastScanTime = timestamp;
     isDecoding = true;
 
-    var method = getSelectedMethod();
-    if (method === 'zxing') {
-      detectZXing();
-    } else {
-      detectQuagga();
-    }
+    detectQuagga();
   }
 
   // -----------------------------------------------------------------------
@@ -309,73 +279,6 @@
   }
 
   // -----------------------------------------------------------------------
-  // ZXing WASM detection
-  //
-  // ZXing WASM detection — simple and clean.
-  // Captures full video frame to canvas, passes ImageData to ZXing.
-  // ZXing's internal binarizer handles contrast/lighting automatically.
-  // No manual image processing — just raw pixels for best results.
-  // -----------------------------------------------------------------------
-  var zxingCanvas = document.createElement('canvas');
-  var zxingCtx = zxingCanvas.getContext('2d', { willReadFrequently: true });
-
-  function detectZXing() {
-    if (!zxingReady || !window.zxingReadBarcodes) {
-      isDecoding = false;
-      return;
-    }
-
-    // Match canvas to actual video resolution for pixel-perfect capture
-    var vw = videoEl.videoWidth;
-    var vh = videoEl.videoHeight;
-    if (zxingCanvas.width !== vw || zxingCanvas.height !== vh) {
-      zxingCanvas.width = vw;
-      zxingCanvas.height = vh;
-    }
-
-    // Draw full frame — let ZXing scan the entire image
-    zxingCtx.drawImage(videoEl, 0, 0, vw, vh);
-    var imageData = zxingCtx.getImageData(0, 0, vw, vh);
-
-    window.zxingReadBarcodes(imageData, {
-      tryHarder: true,
-      formats: ZXING_FORMATS,
-      maxNumberOfSymbols: 3
-    }).then(function(results) {
-      isDecoding = false;
-      if (results.length > 0) {
-        var best = pickClosestToCenter(results, vw, vh);
-        if (best && best.text) {
-          onBarcodeDetected(best.text);
-        }
-      }
-    }).catch(function(err) {
-      isDecoding = false;
-      console.error('[ZXing] decode error:', err);
-    });
-  }
-
-  function pickClosestToCenter(results, w, h) {
-    var cx = w / 2;
-    var cy = h / 2;
-    var best = null;
-    var bestDist = Infinity;
-    for (var i = 0; i < results.length; i++) {
-      var r = results[i];
-      if (!r.text) continue;
-      var pos = r.position;
-      if (pos && pos.topLeft && pos.bottomRight) {
-        var bx = (pos.topLeft.x + pos.bottomRight.x) / 2;
-        var by = (pos.topLeft.y + pos.bottomRight.y) / 2;
-        var dist = Math.abs(bx - cx) + Math.abs(by - cy);
-        if (dist < bestDist) { bestDist = dist; best = r; }
-      } else {
-        if (!best) best = r;
-      }
-    }
-    return best;
-  }
-
   // -----------------------------------------------------------------------
   // Quagga2 detection (center-cropped, contrast-enhanced)
   //
@@ -493,12 +396,6 @@
 
   dom.cameraSelect.addEventListener('change', function() {
     if (cameraRunning) { stopCamera(); startCamera(); }
-  });
-
-  // Method switch: reset confirmation state when switching
-  dom.scanMethod.addEventListener('change', function() {
-    pendingCode = null;
-    pendingCount = 0;
   });
 
   // -----------------------------------------------------------------------

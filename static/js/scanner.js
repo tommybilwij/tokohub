@@ -83,17 +83,21 @@
   var torchOn = false;
   var torchTrack = null;
   var zxingReady = !!window.zxingReadBarcodes;
-  var frameCount = 0;  // alternates fast/accurate passes for ZXing
 
   // Listen for ZXing WASM module ready
   if (!zxingReady) {
-    window.addEventListener('zxing-ready', function() {
-      zxingReady = true;
+    window.addEventListener('zxing-ready', function(e) {
+      if (e.detail && e.detail.error) {
+        console.warn('[Scanner] ZXing failed to load');
+      } else {
+        zxingReady = true;
+        console.log('[Scanner] ZXing ready');
+      }
     });
   }
 
-  // ZXing barcode formats
-  var ZXING_FORMATS = ['EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code128', 'Code39', 'ITF', 'Codabar'];
+  // ZXing: use LinearCodes to catch all 1D barcode formats
+  var ZXING_FORMATS = ['LinearCodes'];
 
   // Quagga readers
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader', 'i2of5_reader', 'codabar_reader'];
@@ -298,44 +302,57 @@
   }
 
   // -----------------------------------------------------------------------
-  // ZXing WASM detection (default, best accuracy)
+  // ZXing WASM detection
   //
-  // Alternates between fast pass (no tryHarder) and accurate pass (tryHarder)
-  // so easy barcodes decode in ~5ms while hard ones still get detected.
+  // Uses a separate larger canvas (800x600) for better resolution.
+  // Always tryHarder + LinearCodes for maximum detection rate.
+  // Scans full center-crop without contrast enhancement — ZXing's
+  // internal binarizer handles varying lighting better than manual stretch.
   // -----------------------------------------------------------------------
+  var zxingCanvas = document.createElement('canvas');
+  var ZX_W = 800, ZX_H = 600;
+  zxingCanvas.width = ZX_W;
+  zxingCanvas.height = ZX_H;
+  var zxingCtx = zxingCanvas.getContext('2d', { willReadFrequently: true });
+
   function detectZXing() {
     if (!zxingReady || !window.zxingReadBarcodes) {
       isDecoding = false;
       return;
     }
 
-    cropFrameToCanvas();
-    enhanceContrast();
-    var imageData = procCtx.getImageData(0, 0, PROC_W, PROC_H);
+    var vw = videoEl.videoWidth;
+    var vh = videoEl.videoHeight;
+    // Wider crop for ZXing — 80% width, 50% height
+    var cropW = Math.round(vw * 0.8);
+    var cropH = Math.round(vh * 0.5);
+    var cropX = Math.round((vw - cropW) / 2);
+    var cropY = Math.round((vh - cropH) / 2);
+    zxingCtx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, ZX_W, ZX_H);
 
-    frameCount++;
-    var useTryHarder = (frameCount % 2 === 0); // every other frame
+    var imageData = zxingCtx.getImageData(0, 0, ZX_W, ZX_H);
 
     window.zxingReadBarcodes(imageData, {
-      tryHarder: useTryHarder,
+      tryHarder: true,
       formats: ZXING_FORMATS,
-      maxNumberOfSymbols: 3
+      maxNumberOfSymbols: 5
     }).then(function(results) {
       isDecoding = false;
       if (results.length > 0) {
-        var best = pickClosestToCenter(results);
+        var best = pickClosestToCenter(results, ZX_W, ZX_H);
         if (best && best.text) {
           onBarcodeDetected(best.text);
         }
       }
-    }).catch(function() {
+    }).catch(function(err) {
       isDecoding = false;
+      console.error('[ZXing] decode error:', err);
     });
   }
 
-  function pickClosestToCenter(results) {
-    var cx = PROC_W / 2;
-    var cy = PROC_H / 2;
+  function pickClosestToCenter(results, w, h) {
+    var cx = w / 2;
+    var cy = h / 2;
     var best = null;
     var bestDist = Infinity;
     for (var i = 0; i < results.length; i++) {

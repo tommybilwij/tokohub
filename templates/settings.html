@@ -219,20 +219,6 @@
       </div>
     </div>
 
-    <!-- Hapus Data -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-trash3"></i> Hapus Data</h5>
-        <div class="d-flex align-items-center justify-content-between">
-          <div>
-            <p class="mb-0 text-muted small">Hapus semua Faktur Pembelian Snapshots untuk edit Riwayat Faktur Pembelian.</p>
-          </div>
-          <button class="btn btn-outline-danger btn-sm" id="btnCleanupSnapshots">
-            <i class="bi bi-trash"></i> Hapus Semua Snapshot
-          </button>
-        </div>
-      </div>
-    </div>
 
   </div>
 </div>
@@ -447,26 +433,6 @@
   });
 })();
 
-// Snapshot cleanup
-document.getElementById('btnCleanupSnapshots').addEventListener('click', async function() {
-  const confirmed = await (window.showConfirm
-    ? showConfirm('Hapus semua data snapshot perubahan harga?')
-    : Promise.resolve(confirm('Hapus semua data snapshot perubahan harga?')));
-  if (!confirmed) return;
-  this.disabled = true;
-  try {
-    const res = await fetch('/api/snapshots/cleanup', { method: 'POST' });
-    const data = await res.json();
-    if (data.ok) {
-      window.showToast && showToast(`${data.deleted} snapshot dihapus`, 'success');
-    } else {
-      window.showToast && showToast('Gagal: ' + (data.error || 'Unknown'), 'danger');
-    }
-  } catch (e) {
-    window.showToast && showToast('Error: ' + e.message, 'danger');
-  }
-  this.disabled = false;
-});
 
 function copyUrl(id) {
   const input = document.getElementById(id);

@@ -244,12 +244,6 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
     order_date = order_date or date.today()
     preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
-    # Capture before-state for snapshot
-    from services.snapshot_service import capture_before, build_after, save_snapshot
-    artnos = [line['artno'] for line in preview['lines']]
-    before_state = await capture_before(pool, artnos)
-    after_state = build_after(preview['lines'])
-
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
@@ -439,13 +433,6 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
 
     _write_audit_log(fp_number, result)
 
-    # Save before/after snapshot
-    try:
-        snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
-        await save_snapshot(pool, fp_number, before_state, after_state, userid or '', meta=snap_meta)
-    except Exception:
-        logger.warning("Failed to save snapshot for %s", fp_number, exc_info=True)
-
     logger.info("Faktur Pembelian created: %s (becreff=%d, total=%.2f)",
                 fp_number, fp_becreff, preview['grand_total'])
     return result
@@ -484,7 +471,7 @@ async def delete_fp(pool, fp_number: str) -> dict:
             item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
             item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
-    # Phase 1 — Atomic: reverse stlastbal, delete sthist + icbym + snapshots
+    # Phase 1 — Atomic: reverse stlastbal, delete sthist + icbym
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
@@ -502,10 +489,6 @@ async def delete_fp(pool, fp_number: str) -> dict:
                 )
                 await cursor.execute(
                     "DELETE FROM icbym WHERE nofaktur = %s AND tipe = '1'", (fp_number,),
-                )
-                # Clean up old snapshots if they exist
-                await cursor.execute(
-                    "DELETE FROM tokohub.faktur_pembelian_snapshots WHERE po_number = %s", (fp_number,),
                 )
                 await conn.commit()
             except Exception:
@@ -857,26 +840,6 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     # Build new preview
     preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
 
-    # Capture before-state for snapshot — preserve original "before" from first snapshot
-    from services.snapshot_service import capture_before, build_after, save_snapshot, get_snapshot
-    artnos = [line['artno'] for line in preview['lines']]
-    after_state = build_after(preview['lines'])
-
-    # Keep the original "before" state so comparison hints always show pre-FP stock values
-    orig_snap = await get_snapshot(pool, fp_number)
-    if orig_snap:
-        before_state = {}
-        for item in orig_snap.get('items', []):
-            if item.get('before'):
-                before_state[item['artno']] = item['before']
-        # For any new artnos not in original snapshot, capture from live stock
-        new_artnos = [a for a in artnos if a not in before_state]
-        if new_artnos:
-            new_before = await capture_before(pool, new_artnos)
-            before_state.update(new_before)
-    else:
-        before_state = await capture_before(pool, artnos)
-
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
@@ -973,7 +936,7 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     # Phase 2 — Deferred stock updates.
     # Harga beli, discounts, tax, satuan, packing: ALWAYS updated.
     # Harga jual + bundling: only when update_price=True.
-    # When update_price=False, revert hjual + bundling to original snapshot "before" state.
+    # When update_price=False, revert hjual + bundling to previous sthist state.
 
     for line in preview['lines']:
         try:
@@ -1068,13 +1031,6 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     }
 
     _write_audit_log(f"{fp_number}_edit", result)
-
-    # Save before/after snapshot
-    try:
-        snap_meta = {'shipping_cost': preview.get('shipping_cost', 0), 'grand_total': preview.get('grand_total', 0)}
-        await save_snapshot(pool, fp_number, before_state, after_state, userid or '', meta=snap_meta)
-    except Exception:
-        logger.warning("Failed to save snapshot for %s", fp_number, exc_info=True)
 
     logger.info("Faktur updated: %s (total=%.2f)", fp_number, preview['grand_total'])
     return result

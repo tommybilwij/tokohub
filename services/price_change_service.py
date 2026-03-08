@@ -4,7 +4,6 @@ Handles reading stock prices, writing price changes to
 myposse.sthist (tipetrans=0) and icphg header.
 """
 
-import json
 import logging
 from datetime import date
 from decimal import Decimal
@@ -592,38 +591,45 @@ async def get_price_change_report(pool, report_date: date | None = None) -> list
     return result
 
 
-async def get_price_change_from_snapshots(pool, report_date: date | None = None) -> list[dict]:
-    """Get harga jual changes from FP snapshots (faktur) for a date.
-    Returns items where hjual changed, showing old→new hjual1 only."""
+async def get_price_change_from_fp(pool, report_date: date | None = None) -> list[dict]:
+    """Get harga jual changes from FP sthist (tipetrans=1, isupdateprice=1) for a date.
+    Returns items where hjual changed compared to previous sthist entry."""
     report_date = report_date or date.today()
     rows = await execute_query(
         pool,
-        """SELECT po_number, snapshot_json, created_by, created_at
-           FROM tokohub.faktur_pembelian_snapshots
-           WHERE DATE(created_at) = %s
-           ORDER BY id DESC""",
+        """SELECT s.nofaktur, s.stockid AS artno, s.artpabrik, s.artname, s.noindex,
+                  s.hjual, s.posttime, b.userid
+           FROM sthist s
+           LEFT JOIN icbym b ON b.nofaktur = s.nofaktur AND b.tipe = '1'
+           WHERE s.tipetrans = 1 AND s.isupdateprice = 1 AND s.tanggal = %s
+           ORDER BY s.noindex DESC""",
         (report_date,),
     )
-    # Collect all artnos to look up barcode & department
     all_items = []
     for r in rows:
-        data = json.loads(r['snapshot_json'])
-        for item in data.get('items', []):
-            b = item.get('before') or {}
-            a = item.get('after') or {}
-            old_hjual = float(b.get('hjual') or 0)
-            new_hjual = float(a.get('hjual') or 0)
-            if old_hjual != new_hjual and new_hjual > 0:
-                all_items.append({
-                    'source': 'faktur',
-                    'ref_number': r['po_number'],
-                    'artno': item['artno'],
-                    'artname': a.get('artname') or b.get('artname') or '',
-                    'old_hjual': old_hjual,
-                    'new_hjual': new_hjual,
-                    'created_by': r['created_by'],
-                    'created_at': r['created_at'].isoformat() if r['created_at'] else '',
-                })
+        artno = r['artno']
+        new_hjual = float(r['hjual'] or 0)
+        # Find previous hjual from sthist
+        prev = await execute_single(
+            pool,
+            """SELECT hjual FROM sthist
+               WHERE stockid = %s AND noindex < %s
+                 AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
+               ORDER BY noindex DESC LIMIT 1""",
+            (artno, r['noindex']),
+        )
+        old_hjual = float(prev['hjual'] or 0) if prev else 0
+        if old_hjual != new_hjual and new_hjual > 0:
+            all_items.append({
+                'source': 'faktur',
+                'ref_number': r['nofaktur'],
+                'artno': artno,
+                'artname': r['artname'] or '',
+                'old_hjual': old_hjual,
+                'new_hjual': new_hjual,
+                'created_by': r['userid'] or '',
+                'created_at': r['posttime'].isoformat() if r['posttime'] else '',
+            })
     # Look up barcode & department from stock
     artnos = list({it['artno'] for it in all_items})
     stock_map = {}

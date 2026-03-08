@@ -13,7 +13,7 @@ from services.price_change_service import (
     commit_price_change,
     update_ph,
     get_price_change_report,
-    get_price_change_from_snapshots,
+    get_price_change_from_fp,
     get_ph_history,
     get_ph_detail,
     toggle_ph_lock,
@@ -134,5 +134,5 @@ async def api_price_change_report(
     """Get price change report for a date."""
     d = date.fromisoformat(report_date) if report_date else date.today()
     manual = await get_price_change_report(db, d)
-    from_faktur = await get_price_change_from_snapshots(db, d)
+    from_faktur = await get_price_change_from_fp(db, d)
     return {'date': d.isoformat(), 'manual': manual, 'from_faktur': from_faktur}

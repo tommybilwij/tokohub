@@ -1932,7 +1932,7 @@ body {
    Sales History Page
    ----------------------------------------------------------------------- */
 .sh-page {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -2452,7 +2452,7 @@ body {
 }
 
 /* -----------------------------------------------------------------------
-   Snapshot Comparison Cards
+   Price Comparison Cards
    ----------------------------------------------------------------------- */
 .snap-item-card { border-color: var(--clr-card-border); }
 .snap-item-card .card-header {

@@ -95,8 +95,8 @@
     });
   }
 
-  // ZXing: use LinearCodes to catch all 1D barcode formats
-  var ZXING_FORMATS = ['LinearCodes'];
+  // ZXing: AllLinear catches all 1D barcode formats (v3 API)
+  var ZXING_FORMATS = ['AllLinear'];
 
   // Quagga readers
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader', 'i2of5_reader', 'codabar_reader'];
@@ -303,15 +303,12 @@
   // -----------------------------------------------------------------------
   // ZXing WASM detection
   //
-  // Uses a separate larger canvas (800x600) for better resolution.
-  // Always tryHarder + LinearCodes for maximum detection rate.
-  // Scans full center-crop without contrast enhancement — ZXing's
-  // internal binarizer handles varying lighting better than manual stretch.
+  // ZXing WASM detection — simple and clean.
+  // Captures full video frame to canvas, passes ImageData to ZXing.
+  // ZXing's internal binarizer handles contrast/lighting automatically.
+  // No manual image processing — just raw pixels for best results.
   // -----------------------------------------------------------------------
   var zxingCanvas = document.createElement('canvas');
-  var ZX_W = 800, ZX_H = 600;
-  zxingCanvas.width = ZX_W;
-  zxingCanvas.height = ZX_H;
   var zxingCtx = zxingCanvas.getContext('2d', { willReadFrequently: true });
 
   function detectZXing() {
@@ -320,25 +317,26 @@
       return;
     }
 
+    // Match canvas to actual video resolution for pixel-perfect capture
     var vw = videoEl.videoWidth;
     var vh = videoEl.videoHeight;
-    // Wider crop for ZXing — 80% width, 50% height
-    var cropW = Math.round(vw * 0.8);
-    var cropH = Math.round(vh * 0.5);
-    var cropX = Math.round((vw - cropW) / 2);
-    var cropY = Math.round((vh - cropH) / 2);
-    zxingCtx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, ZX_W, ZX_H);
+    if (zxingCanvas.width !== vw || zxingCanvas.height !== vh) {
+      zxingCanvas.width = vw;
+      zxingCanvas.height = vh;
+    }
 
-    var imageData = zxingCtx.getImageData(0, 0, ZX_W, ZX_H);
+    // Draw full frame — let ZXing scan the entire image
+    zxingCtx.drawImage(videoEl, 0, 0, vw, vh);
+    var imageData = zxingCtx.getImageData(0, 0, vw, vh);
 
     window.zxingReadBarcodes(imageData, {
       tryHarder: true,
       formats: ZXING_FORMATS,
-      maxNumberOfSymbols: 5
+      maxNumberOfSymbols: 3
     }).then(function(results) {
       isDecoding = false;
       if (results.length > 0) {
-        var best = pickClosestToCenter(results, ZX_W, ZX_H);
+        var best = pickClosestToCenter(results, vw, vh);
         if (best && best.text) {
           onBarcodeDetected(best.text);
         }

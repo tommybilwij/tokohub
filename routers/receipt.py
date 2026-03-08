@@ -198,6 +198,15 @@ async def toggle_fp_lock(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     return result
 
 
+@router.post('/api/fp/{fp_number}/toggle-update-price')
+async def toggle_fp_update_price(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
+    from services.fp_service import toggle_fp_update_price as _toggle
+    result = await _toggle(db, fp_number)
+    if 'error' in result:
+        return JSONResponse(result, status_code=400)
+    return result
+
+
 @router.delete('/api/fp/{fp_number}')
 async def delete_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
     from services.fp_service import delete_fp as _delete

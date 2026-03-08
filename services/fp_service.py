@@ -606,6 +606,106 @@ async def toggle_fp_lock(pool, fp_number: str) -> dict:
     return {'ok': True, 'fp_number': fp_number, 'islocked': new_val}
 
 
+async def toggle_fp_update_price(pool, fp_number: str) -> dict:
+    """Toggle isupdateprice on icbym and apply/revert harga jual+bundling in stock."""
+    row = await execute_single(
+        pool,
+        "SELECT isupdateprice, becreff FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
+    )
+    if not row:
+        return {'error': 'Faktur not found'}
+
+    old_val = row['isupdateprice']
+    new_val = 0 if old_val else 1
+    fp_becreff = row['becreff']
+
+    # Get snapshot for before/after states
+    from services.snapshot_service import get_snapshot
+    snap = await get_snapshot(pool, fp_number)
+    if not snap:
+        return {'error': 'Snapshot not found — cannot toggle update price'}
+
+    items = snap.get('items', [])
+
+    if new_val:
+        # Turning ON: apply harga jual + bundling from snapshot "after" state
+        for item in items:
+            after = item.get('after')
+            if not after:
+                continue
+            artno = item['artno']
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           ispaketprc = %s, over1 = %s, over2 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (after.get('hjual', 0), after.get('hjual2', 0), after.get('hjual3', 0),
+                     after.get('hjual4', 0), after.get('hjual5', 0),
+                     after.get('ispaketprc', 0), after.get('over1', 0), after.get('over2', 0),
+                     after.get('hjualo1', 0), after.get('hjual2o1', 0), after.get('hjual3o1', 0),
+                     after.get('hjual4o1', 0), after.get('hjual5o1', 0),
+                     after.get('hjualo2', 0), after.get('hjual2o2', 0), after.get('hjual3o2', 0),
+                     after.get('hjual4o2', 0), after.get('hjual5o2', 0),
+                     artno),
+                )
+            except Exception:
+                logger.warning("Toggle update price: apply hjual failed for %s", artno, exc_info=True)
+    else:
+        # Turning OFF: revert harga jual + bundling from snapshot "before" state
+        for item in items:
+            before = item.get('before')
+            if not before:
+                continue
+            artno = item['artno']
+            try:
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                           hjual4 = %s, hjual5 = %s,
+                           ispaketprc = %s, over1 = %s, over2 = %s,
+                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                       WHERE artno = %s""",
+                    (before.get('hjual', 0), before.get('hjual2', 0), before.get('hjual3', 0),
+                     before.get('hjual4', 0), before.get('hjual5', 0),
+                     before.get('ispaketprc', 0), before.get('over1', 0), before.get('over2', 0),
+                     before.get('hjualo1', 0), before.get('hjual2o1', 0), before.get('hjual3o1', 0),
+                     before.get('hjual4o1', 0), before.get('hjual5o1', 0),
+                     before.get('hjualo2', 0), before.get('hjual2o2', 0), before.get('hjual3o2', 0),
+                     before.get('hjual4o2', 0), before.get('hjual5o2', 0),
+                     artno),
+                )
+            except Exception:
+                logger.warning("Toggle update price: revert hjual failed for %s", artno, exc_info=True)
+
+    # Update header flag
+    await execute_modify(
+        pool,
+        "UPDATE icbym SET isupdateprice = %s WHERE nofaktur = %s AND tipe = '1'",
+        (new_val, fp_number),
+    )
+
+    # Update sthist lines
+    await execute_modify(
+        pool,
+        "UPDATE sthist SET isupdateprice = %s, isupdatepurchprice = %s WHERE becreff = %s AND tipetrans = 1",
+        (new_val, new_val, fp_becreff),
+    )
+
+    from services.stock_search import invalidate_cache
+    invalidate_cache()
+
+    logger.info("Toggle update price for %s: %s -> %s", fp_number, old_val, new_val)
+    return {'ok': True, 'fp_number': fp_number, 'isupdateprice': new_val}
+
+
 async def get_fp_detail(pool, fp_number):
     """Get full detail of a specific Faktur Pembelian."""
     header = await execute_single(

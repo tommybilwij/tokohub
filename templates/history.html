@@ -54,6 +54,7 @@
             <th>Supplier</th>
             <th class="text-end">Total</th>
             <th class="text-center">Items</th>
+            <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
         </thead>
@@ -326,11 +327,17 @@
             var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
             actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
           }
+          var priceChecked = o.isupdateprice ? ' checked' : '';
+          var priceDisabled = o.islocked ? ' disabled' : '';
+          var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
+            + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
+            + '</div>';
           tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
             + '<td>' + (o.tglfaktur || '-') + '</td>'
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);
         });
@@ -501,10 +508,48 @@
                 bindButtons();
               }
             }
+            // Enable/disable update price toggle based on lock state
+            var row = btn.closest('tr');
+            var priceChk = row ? row.querySelector('.chk-update-price') : null;
+            if (priceChk) priceChk.disabled = !!newLocked;
+
             window.showToast && showToast(newLocked ? 'Faktur dikunci' : 'Faktur dibuka kuncinya');
           }
         } catch(e) {
           window.showToast && showToast('Error: ' + e.message, 'danger');
+        }
+      });
+    });
+
+    // Update price toggle
+    document.querySelectorAll('#hTableBody .chk-update-price').forEach(function(chk) {
+      chk.addEventListener('change', async function() {
+        var fp = chk.dataset.fp;
+        var turning = chk.checked ? 'on' : 'off';
+        var msg = chk.checked
+          ? 'Update harga jual dari faktur ' + fp + ' ke stock?'
+          : 'Kembalikan harga jual ke sebelum faktur ' + fp + '?';
+        var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
+        if (!confirmed) {
+          chk.checked = !chk.checked;
+          return;
+        }
+        chk.disabled = true;
+        try {
+          var res = await fetch('/api/fp/' + encodeURIComponent(fp) + '/toggle-update-price', {method: 'POST'});
+          var data = await res.json();
+          if (data.ok) {
+            chk.checked = !!data.isupdateprice;
+            window.showToast && showToast(data.isupdateprice ? 'Harga jual diupdate' : 'Harga jual dikembalikan');
+          } else {
+            chk.checked = !chk.checked;
+            window.showToast && showToast(data.error || 'Gagal', 'danger');
+          }
+        } catch(e) {
+          chk.checked = !chk.checked;
+          window.showToast && showToast('Error: ' + e.message, 'danger');
+        } finally {
+          chk.disabled = false;
         }
       });
     });

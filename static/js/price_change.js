@@ -541,30 +541,41 @@
 
   // Commit
   btnCommit.addEventListener('click', async () => {
-    const changed = items.filter(i => {
-      const mainChanged = i.newHjual !== i.hjual || i.newHjual2 !== i.hjual2 ||
-        i.newHjual3 !== i.hjual3 || i.newHjual4 !== i.hjual4 || i.newHjual5 !== i.hjual5;
-      const b1Changed = i.bundling1.enabled && (
-        i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
-        i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 || i.bundling1.newHjual5 !== i.bundling1.hjual5);
-      const b2Changed = i.bundling2.enabled && (
-        i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
-        i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 || i.bundling2.newHjual5 !== i.bundling2.hjual5);
-      return mainChanged || b1Changed || b2Changed;
-    });
-    if (!changed.length) {
-      window.showToast && showToast('Tidak ada perubahan harga', 'warning');
-      return;
+    // In edit mode, send ALL items (update deletes old lines then recreates).
+    // In create mode, only send items with actual price changes.
+    var toSend;
+    if (editPH) {
+      toSend = items;
+      if (!toSend.length) {
+        window.showToast && showToast('Tidak ada item untuk disimpan', 'warning');
+        return;
+      }
+    } else {
+      toSend = items.filter(i => {
+        const mainChanged = i.newHjual !== i.hjual || i.newHjual2 !== i.hjual2 ||
+          i.newHjual3 !== i.hjual3 || i.newHjual4 !== i.hjual4 || i.newHjual5 !== i.hjual5;
+        const b1Changed = i.bundling1.enabled && (
+          i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
+          i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 || i.bundling1.newHjual5 !== i.bundling1.hjual5);
+        const b2Changed = i.bundling2.enabled && (
+          i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
+          i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 || i.bundling2.newHjual5 !== i.bundling2.hjual5);
+        return mainChanged || b1Changed || b2Changed;
+      });
+      if (!toSend.length) {
+        window.showToast && showToast('Tidak ada perubahan harga', 'warning');
+        return;
+      }
     }
 
     const confirmed = await (window.showConfirm
-      ? showConfirm(`Simpan perubahan harga untuk ${changed.length} item?`)
-      : Promise.resolve(confirm(`Simpan perubahan harga untuk ${changed.length} item?`)));
+      ? showConfirm(`Simpan perubahan harga untuk ${toSend.length} item?`)
+      : Promise.resolve(confirm(`Simpan perubahan harga untuk ${toSend.length} item?`)));
     if (!confirmed) return;
 
     btnCommit.disabled = true;
     try {
-      const payload = changed.map(i => {
+      const payload = toSend.map(i => {
         const p = {
           artno: i.artno,
           hjual: i.newHjual,

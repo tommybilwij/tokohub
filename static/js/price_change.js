@@ -46,12 +46,51 @@
     searchResults = editSearchResultsEl;
 
     if (btnCommit) btnCommit.innerHTML = '<i class="bi bi-check-lg"></i> Simpan Perubahan';
-    var newLabel = document.getElementById('pcBtnNewLabel');
-    if (newLabel) newLabel.textContent = 'Kembali ke Riwayat';
+    // In edit mode, hide "Entry Baru" and make "Lihat Riwayat" the primary button
+    document.getElementById('pcBtnNew').classList.add('d-none');
+    var histBtn = document.getElementById('pcBtnHistory');
+    if (histBtn) { histBtn.className = 'btn btn-primary-app'; }
   } else {
     // Normal mode: hide edit header and edit search row
     document.getElementById('pcEditHeader').classList.add('d-none');
     document.getElementById('pcEditSearchRow').classList.add('d-none');
+  }
+
+  // --- Draft persistence (input mode only) ---
+  var PC_DRAFT_KEY = 'pc_input_draft';
+
+  function saveDraft() {
+    if (editPH) return;
+    try {
+      var draft = items.map(function(it) {
+        return {
+          artno: it.artno, artname: it.artname, artpabrik: it.artpabrik,
+          hbelibsr: it.hbelibsr, hbelikcl: it.hbelikcl, hbelinetto: it.hbelinetto,
+          packing: it.packing, satbesar: it.satbesar,
+          pctdisc1: it.pctdisc1, pctdisc2: it.pctdisc2, pctdisc3: it.pctdisc3, pctppn: it.pctppn,
+          hjual: it.hjual, hjual2: it.hjual2, hjual3: it.hjual3, hjual4: it.hjual4, hjual5: it.hjual5,
+          newHjual: it.newHjual, newHjual2: it.newHjual2, newHjual3: it.newHjual3, newHjual4: it.newHjual4, newHjual5: it.newHjual5,
+          bundling1: it.bundling1, bundling2: it.bundling2,
+        };
+      });
+      localStorage.setItem(PC_DRAFT_KEY, JSON.stringify(draft));
+    } catch(e) {}
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(PC_DRAFT_KEY); } catch(e) {}
+  }
+
+  function restoreDraft() {
+    if (editPH) return;
+    try {
+      var raw = localStorage.getItem(PC_DRAFT_KEY);
+      if (!raw) return;
+      var draft = JSON.parse(raw);
+      if (!Array.isArray(draft) || !draft.length) return;
+      draft.forEach(function(it) { items.push(it); });
+      render();
+    } catch(e) {}
   }
 
   function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }
@@ -111,7 +150,7 @@
           </label>
           <span class="bundling-qty-wrap">Qty &ge;
             <input type="number" class="bundling-minqty pc-bundling-minqty" data-idx="${itemIdx}" data-tier="${tier}"
-                   value="${b.minQty || ''}" placeholder="0" min="1" step="0.01" ${b.enabled ? '' : 'disabled'}>
+                   value="${b.minQty || ''}" placeholder="0" min="0" step="1" ${b.enabled ? '' : 'disabled'}>
             <span style="text-transform:none">Pcs</span>
           </span>
         </div>
@@ -120,6 +159,16 @@
         </div>
       </div>`;
   }
+
+  // Expand / Collapse all
+  document.getElementById('pcExpandAll').addEventListener('click', function() {
+    document.querySelectorAll('#pcTable .pc-detail').forEach(function(d) { d.classList.add('open'); });
+    document.querySelectorAll('#pcTable .pc-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+  });
+  document.getElementById('pcCollapseAll').addEventListener('click', function() {
+    document.querySelectorAll('#pcTable .pc-detail').forEach(function(d) { d.classList.remove('open'); });
+    document.querySelectorAll('#pcTable .pc-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
+  });
 
   // --- Search ---
   let searchTimer;
@@ -134,63 +183,126 @@
         .then(r => r.json())
         .then(data => {
           lastResults = data.results || data || [];
-          renderSearchResults(lastResults);
+          renderDropdown(lastResults);
         });
     }, 300);
   }
 
-  function renderSearchResults(results) {
+  function renderDropdown(results) {
     searchResults.innerHTML = '';
-    results.forEach(m => {
-      const scoreCls = m.score >= 90 ? 'text-primary fw-bold' : m.score >= 70 ? 'text-primary' : 'text-muted';
-      const el = document.createElement('a');
+    var existingArtnos = {};
+    items.forEach(function(it) { existingArtnos[it.artno] = true; });
+    results.forEach(function(m) {
+      var inList = existingArtnos[m.artno];
+      var scoreCls = m.score >= 90 ? 'text-primary fw-bold' : m.score >= 70 ? 'text-primary' : 'text-muted';
+      var el = document.createElement('a');
       el.href = '#';
-      el.className = 'list-group-item list-group-item-action';
-      el.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <div class="fw-semibold">${m.artname}</div>
-            <small class="text-muted">${m.artno}${m.artpabrik ? ' | ' + m.artpabrik : ''}</small>
-          </div>
-          <span class="${scoreCls}" style="white-space:nowrap;margin-left:8px">${m.score?.toFixed(1) || ''}%</span>
-        </div>`;
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        addItem(m);
-        searchResults.classList.add('d-none');
-        searchInput.value = '';
-        searchInput.focus();
-      });
+      el.className = 'list-group-item list-group-item-action' + (inList ? ' bg-light' : '');
+      el.innerHTML =
+        '<div class="d-flex justify-content-between align-items-start">'
+        + '<div>'
+        + '<div class="fw-semibold">' + (m.artname || '') + '</div>'
+        + '<small class="text-muted">' + (m.artno || '') + (m.artpabrik ? ' | ' + m.artpabrik : '') + '</small>'
+        + '</div>'
+        + (inList
+          ? '<span class="badge bg-secondary ms-2">sudah ada</span>'
+          : '<span class="' + scoreCls + '" style="white-space:nowrap;margin-left:8px">' + (m.score ? m.score.toFixed(1) : '') + '%</span>')
+        + '</div>';
+      if (!inList) {
+        el.addEventListener('click', function(e) {
+          e.preventDefault();
+          addItem(m);
+          searchResults.classList.add('d-none');
+          searchInput.value = '';
+          searchInput.focus();
+        });
+      } else {
+        el.addEventListener('click', function(e) { e.preventDefault(); });
+      }
       searchResults.appendChild(el);
     });
     searchResults.classList.toggle('d-none', !results.length);
   }
 
+  function openFuzzyModal(results) {
+    var body = document.getElementById('pcFuzzyBody');
+    var countEl = document.getElementById('pcFuzzyCount');
+    body.innerHTML = '';
+    var existingArtnos = {};
+    items.forEach(function(it) { existingArtnos[it.artno] = true; });
+    results.forEach(function(r, i) {
+      var inList = existingArtnos[r.artno];
+      var score = Math.round(r.score || 0);
+      var scoreColor = score >= 80 ? '#198754' : score >= 60 ? '#fd7e14' : score >= 40 ? '#ffc107' : '#adb5bd';
+      var el = document.createElement('div');
+      el.className = 'list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3' + (inList ? ' bg-light text-muted' : '');
+      el.innerHTML =
+        '<div style="min-width:48px;text-align:center">'
+        + '<div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" style="width:40px;height:40px;font-size:0.75rem;background:' + scoreColor + '">' + score + '%</div>'
+        + '</div>'
+        + '<div class="flex-grow-1" style="min-width:0">'
+        + '<div class="fw-semibold text-truncate">' + (r.artname || '') + '</div>'
+        + '<small class="text-muted"><code>' + (r.artno || '') + '</code>' + (r.artpabrik ? ' | ' + r.artpabrik : '') + '</small>'
+        + '</div>'
+        + '<div style="min-width:90px;text-align:right">'
+        + (inList
+          ? '<span class="badge bg-secondary">sudah ada</span>'
+          : '<button class="btn btn-sm btn-success pc-fuzzy-add" data-idx="' + i + '"><i class="bi bi-plus-lg me-1"></i>Tambah</button>')
+        + '</div>';
+      body.appendChild(el);
+    });
+    countEl.textContent = results.length + ' hasil';
+
+    body.querySelectorAll('.pc-fuzzy-add').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var idx = parseInt(btn.dataset.idx);
+        var r = results[idx];
+        if (r) {
+          addItem(r);
+          var row = btn.closest('.list-group-item');
+          row.classList.add('bg-light', 'text-muted');
+          btn.outerHTML = '<span class="badge bg-info text-white"><i class="bi bi-check-lg me-1"></i>Ditambahkan</span>';
+        }
+      });
+    });
+
+    var modal = new bootstrap.Modal(document.getElementById('pcFuzzyModal'));
+    modal.show();
+  }
+
+  function triggerSearch() {
+    var q = searchInput.value.trim();
+    if (q.length < 2) return;
+    fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=pc')
+      .then(r => r.json())
+      .then(data => {
+        lastResults = data.results || data || [];
+        if (lastResults.length) {
+          openFuzzyModal(lastResults);
+        } else {
+          window.showToast && showToast('Tidak ada hasil untuk "' + q + '"', 'warning');
+        }
+      });
+  }
+
   searchInput.addEventListener('input', doSearch);
 
-  // + button: add all search results (same as Enter)
-  document.getElementById('pcBtnAdd').addEventListener('click', () => {
-    if (lastResults.length) {
-      lastResults.forEach(m => addItem(m));
-      searchResults.classList.add('d-none');
-      searchInput.value = '';
-      searchInput.focus();
-    }
+  // + button: open search modal
+  document.getElementById('pcBtnAdd').addEventListener('click', function() {
+    searchResults.classList.add('d-none');
+    triggerSearch();
   });
 
-  // Enter: add ALL search results at once
+  // Enter: open search modal
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (lastResults.length) {
-        lastResults.forEach(m => addItem(m));
-        searchResults.classList.add('d-none');
-        searchInput.value = '';
-        searchInput.focus();
-      }
+      searchResults.classList.add('d-none');
+      triggerSearch();
     }
   });
 
+  // Click outside dropdown to close
   document.addEventListener('click', (e) => {
     if (!searchResults.contains(e.target) && e.target !== searchInput) {
       searchResults.classList.add('d-none');
@@ -255,6 +367,7 @@
     };
     items.push(item);
     render();
+    saveDraft();
   }
 
   function render() {
@@ -329,7 +442,6 @@
                 <thead>
                   <tr>
                     <th></th>
-                    <th class="dp-th-total">/${sat} &times; 1 =</th>
                     <th>/${sat}</th>
                     <th>%</th>
                   </tr>
@@ -338,24 +450,20 @@
                   <tr>
                     <td class="bt-label">Diskon 1</td>
                     <td class="text-end text-muted">${net.disc1Amt ? fmt(net.disc1Amt) : '0'}</td>
-                    <td class="text-end text-muted">${net.disc1Amt ? fmt(net.disc1Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc1 || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 2</td>
-                    <td class="text-end text-muted">${net.disc2Amt ? fmt(net.disc2Amt) : '0'}</td>
                     <td class="text-end text-muted">${net.disc2Amt ? fmt(net.disc2Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc2 || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">PPN</td>
                     <td class="text-end text-muted">${net.ppnAmt ? fmt(net.ppnAmt) : '0'}</td>
-                    <td class="text-end text-muted">${net.ppnAmt ? fmt(net.ppnAmt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctppn || '—'}</td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 3</td>
-                    <td class="text-end text-muted">${net.disc3Amt ? fmt(net.disc3Amt) : '0'}</td>
                     <td class="text-end text-muted">${net.disc3Amt ? fmt(net.disc3Amt) : '0'}</td>
                     <td class="text-end text-muted">${item.pctdisc3 || '—'}</td>
                   </tr>
@@ -363,8 +471,7 @@
               </table>
               <div class="beli-row-foc">
                 <span class="bt-label">F.O.C</span>
-                <span class="text-muted">0</span>
-                <span class="bt-unit">Pcs</span>
+                <span class="text-muted">0 Pcs</span>
               </div>
               <div class="beli-row-shipping">
                 <span class="bt-label">B.Kirim</span>
@@ -448,6 +555,7 @@
 
         // Update main row display
         updateMainRow(idx);
+        saveDraft();
       });
     });
 
@@ -466,6 +574,7 @@
         if (minqty) minqty.disabled = !el.checked;
         // Toggle disabled on jual inputs within
         fields?.querySelectorAll('.pc-hjual').forEach(inp => inp.disabled = !el.checked);
+        saveDraft();
       });
     });
 
@@ -476,6 +585,7 @@
         const idx = parseInt(el.dataset.idx);
         const tier = el.dataset.tier;
         items[idx][`bundling${tier}`].minQty = parseFloat(el.value) || 0;
+        saveDraft();
       });
     });
 
@@ -485,6 +595,7 @@
         e.stopPropagation();
         items.splice(parseInt(el.dataset.idx), 1);
         render();
+        saveDraft();
       });
     });
   }
@@ -495,30 +606,41 @@
 
   // Commit
   btnCommit.addEventListener('click', async () => {
-    const changed = items.filter(i => {
-      const mainChanged = i.newHjual !== i.hjual || i.newHjual2 !== i.hjual2 ||
-        i.newHjual3 !== i.hjual3 || i.newHjual4 !== i.hjual4 || i.newHjual5 !== i.hjual5;
-      const b1Changed = i.bundling1.enabled && (
-        i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
-        i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 || i.bundling1.newHjual5 !== i.bundling1.hjual5);
-      const b2Changed = i.bundling2.enabled && (
-        i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
-        i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 || i.bundling2.newHjual5 !== i.bundling2.hjual5);
-      return mainChanged || b1Changed || b2Changed;
-    });
-    if (!changed.length) {
-      window.showToast && showToast('Tidak ada perubahan harga', 'warning');
-      return;
+    // In edit mode, send ALL items (update deletes old lines then recreates).
+    // In create mode, only send items with actual price changes.
+    var toSend;
+    if (editPH) {
+      toSend = items;
+      if (!toSend.length) {
+        window.showToast && showToast('Tidak ada item untuk disimpan', 'warning');
+        return;
+      }
+    } else {
+      toSend = items.filter(i => {
+        const mainChanged = i.newHjual !== i.hjual || i.newHjual2 !== i.hjual2 ||
+          i.newHjual3 !== i.hjual3 || i.newHjual4 !== i.hjual4 || i.newHjual5 !== i.hjual5;
+        const b1Changed = i.bundling1.enabled && (
+          i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
+          i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 || i.bundling1.newHjual5 !== i.bundling1.hjual5);
+        const b2Changed = i.bundling2.enabled && (
+          i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
+          i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 || i.bundling2.newHjual5 !== i.bundling2.hjual5);
+        return mainChanged || b1Changed || b2Changed;
+      });
+      if (!toSend.length) {
+        window.showToast && showToast('Tidak ada perubahan harga', 'warning');
+        return;
+      }
     }
 
     const confirmed = await (window.showConfirm
-      ? showConfirm(`Simpan perubahan harga untuk ${changed.length} item?`)
-      : Promise.resolve(confirm(`Simpan perubahan harga untuk ${changed.length} item?`)));
+      ? showConfirm(`Simpan perubahan harga untuk ${toSend.length} item?`)
+      : Promise.resolve(confirm(`Simpan perubahan harga untuk ${toSend.length} item?`)));
     if (!confirmed) return;
 
     btnCommit.disabled = true;
     try {
-      const payload = changed.map(i => {
+      const payload = toSend.map(i => {
         const p = {
           artno: i.artno,
           hjual: i.newHjual,
@@ -529,14 +651,14 @@
         };
         if (i.bundling1.enabled) {
           p.bundling1 = {
-            minQty: i.bundling1.minQty,
+            min_qty: i.bundling1.minQty,
             hjual1: i.bundling1.newHjual1, hjual2: i.bundling1.newHjual2, hjual3: i.bundling1.newHjual3,
             hjual4: i.bundling1.newHjual4, hjual5: i.bundling1.newHjual5,
           };
         }
         if (i.bundling2.enabled) {
           p.bundling2 = {
-            minQty: i.bundling2.minQty,
+            min_qty: i.bundling2.minQty,
             hjual1: i.bundling2.newHjual1, hjual2: i.bundling2.newHjual2, hjual3: i.bundling2.newHjual3,
             hjual4: i.bundling2.newHjual4, hjual5: i.bundling2.newHjual5,
           };
@@ -549,10 +671,17 @@
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({items: payload}),
+        body: JSON.stringify({
+          items: payload,
+          uraian: (editPH
+            ? (document.getElementById('pcEditUraianInput') || {}).value
+            : (document.getElementById('pcUraianInput') || {}).value
+          ) || '',
+        }),
       });
       const data = await res.json();
       if (data.ok) {
+        clearDraft();
         document.getElementById('pcSuccessNumber').textContent = data.ph_number;
         document.getElementById('pcSuccessCount').textContent = data.item_count;
         new bootstrap.Modal(document.getElementById('pcSuccessModal')).show();
@@ -573,6 +702,7 @@
       return;
     }
     items.length = 0;
+    clearDraft();
     render();
     bootstrap.Modal.getInstance(document.getElementById('pcSuccessModal'))?.hide();
     searchInput.focus();
@@ -585,9 +715,15 @@
       : Promise.resolve(confirm(`Hapus semua ${items.length} item?`)));
     if (!confirmed) return;
     items.length = 0;
+    clearDraft();
     render();
     searchInput.focus();
   });
+
+  // -----------------------------------------------------------------------
+  // Restore draft on page load (input mode only)
+  // -----------------------------------------------------------------------
+  restoreDraft();
 
   // -----------------------------------------------------------------------
   // Edit mode: load existing PH data
@@ -603,49 +739,30 @@
           window.showToast && showToast('Error: ' + data.error, 'danger');
           return;
         }
-        // Fetch current stock prices for all items to get bundling info
-        const artnos = (data.lines || []).map(l => l.stockid);
-        let stockMap = {};
-        if (artnos.length) {
-          const stockRes = await fetch('/api/price-change/stock-prices', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({artnos: artnos}),
-          });
-          const stockData = await stockRes.json();
-          stockMap = stockData.items || {};
-        }
+        // Populate uraian for edit mode
+        const editUraianEl = document.getElementById('pcEditUraianInput');
+        if (editUraianEl) editUraianEl.value = data.uraian || '';
 
-        // Also fetch search results to get bundling data
         for (const line of (data.lines || [])) {
           const artno = line.stockid;
-          const stock = stockMap[artno] || {};
-          // Fetch full item data including bundlings
-          let bundlings = [];
-          try {
-            const searchRes = await fetch('/api/stock/search?q=' + encodeURIComponent(artno) + '&limit=1');
-            const searchData = await searchRes.json();
-            if (searchData.length && searchData[0].artno === artno) {
-              bundlings = searchData[0]._bundlings || [];
-            }
-          } catch(e) {}
 
-          const b1 = bundlings[0] || {};
-          const b2 = bundlings[1] || {};
+          // Bundling data from sthist (over1/over2 = min qty, hjualo1/hjualo2 = prices)
+          const b1Qty = line.over1 || 0;
+          const b2Qty = line.over2 || 0;
 
           const item = {
             artno: artno,
-            artname: line.artname || stock.artname || '',
-            artpabrik: line.artpabrik || stock.artpabrik || '',
-            hbelibsr: line.hbelibsr || stock.hbelibsr || 0,
-            hbelikcl: line.hbelikcl || stock.hbelikcl || 0,
-            hbelinetto: line.hbelinetto || stock.hbelinetto || 0,
-            packing: line.packing || stock.packing || 1,
-            satbesar: line.satuanbsr || stock.satbesar || '',
-            pctdisc1: line.pctdisc1 || stock.pctdisc1 || 0,
-            pctdisc2: line.pctdisc2 || stock.pctdisc2 || 0,
-            pctdisc3: line.pctdisc3 || stock.pctdisc3 || 0,
-            pctppn: line.pctppn || stock.pctppn || 0,
+            artname: line.artname || '',
+            artpabrik: line.artpabrik || '',
+            hbelibsr: line.hbelibsr || 0,
+            hbelikcl: line.hbelikcl || 0,
+            hbelinetto: line.hbelinetto || 0,
+            packing: line.packing || 1,
+            satbesar: line.satuanbsr || '',
+            pctdisc1: line.pctdisc1 || 0,
+            pctdisc2: line.pctdisc2 || 0,
+            pctdisc3: line.pctdisc3 || 0,
+            pctppn: line.pctppn || 0,
             hjual: line.hjual || 0,
             hjual2: line.hjual2 || 0,
             hjual3: line.hjual3 || 0,
@@ -657,20 +774,20 @@
             newHjual4: line.hjual4 || 0,
             newHjual5: line.hjual5 || 0,
             bundling1: {
-              enabled: !!(b1.qty),
-              minQty: b1.qty || 0,
-              hjual1: b1.hjual1 || 0, hjual2: b1.hjual2 || 0, hjual3: b1.hjual3 || 0,
-              hjual4: b1.hjual4 || 0, hjual5: b1.hjual5 || 0,
-              newHjual1: b1.hjual1 || 0, newHjual2: b1.hjual2 || 0, newHjual3: b1.hjual3 || 0,
-              newHjual4: b1.hjual4 || 0, newHjual5: b1.hjual5 || 0,
+              enabled: !!b1Qty,
+              minQty: b1Qty,
+              hjual1: line.hjualo1 || 0, hjual2: line.hjual2o1 || 0, hjual3: line.hjual3o1 || 0,
+              hjual4: line.hjual4o1 || 0, hjual5: line.hjual5o1 || 0,
+              newHjual1: line.hjualo1 || 0, newHjual2: line.hjual2o1 || 0, newHjual3: line.hjual3o1 || 0,
+              newHjual4: line.hjual4o1 || 0, newHjual5: line.hjual5o1 || 0,
             },
             bundling2: {
-              enabled: !!(b2.qty),
-              minQty: b2.qty || 0,
-              hjual1: b2.hjual1 || 0, hjual2: b2.hjual2 || 0, hjual3: b2.hjual3 || 0,
-              hjual4: b2.hjual4 || 0, hjual5: b2.hjual5 || 0,
-              newHjual1: b2.hjual1 || 0, newHjual2: b2.hjual2 || 0, newHjual3: b2.hjual3 || 0,
-              newHjual4: b2.hjual4 || 0, newHjual5: b2.hjual5 || 0,
+              enabled: !!b2Qty,
+              minQty: b2Qty,
+              hjual1: line.hjualo2 || 0, hjual2: line.hjual2o2 || 0, hjual3: line.hjual3o2 || 0,
+              hjual4: line.hjual4o2 || 0, hjual5: line.hjual5o2 || 0,
+              newHjual1: line.hjualo2 || 0, newHjual2: line.hjual2o2 || 0, newHjual3: line.hjual3o2 || 0,
+              newHjual4: line.hjual4o2 || 0, newHjual5: line.hjual5o2 || 0,
             },
           };
           items.push(item);

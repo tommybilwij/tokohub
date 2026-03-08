@@ -15,6 +15,8 @@
   var elSuppInput = document.getElementById('editSuppInput');
   var elSuppMenu = document.getElementById('editSuppMenu');
   var elDate = document.getElementById('editDate');
+  var elDueDate = document.getElementById('editDueDate');
+  var elUraian = document.getElementById('editUraian');
   var elUser = document.getElementById('editUser');
   var elBody = document.getElementById('editTableBody');
   var elBtnSave = document.getElementById('editBtnSave');
@@ -27,18 +29,18 @@
   var currentFP = null;
   var editLines = [];
   var vendors = [];
-  var beforePrices = {}; // snapshot "before" prices keyed by artno (stok sebelum input faktur)
-  var afterPrices = {};  // snapshot "after" prices keyed by artno (values submitted in input faktur)
+  var beforePrices = {}; // previous sthist prices keyed by artno (stok sebelum input faktur)
+  var afterPrices = {};  // this FP's sthist prices keyed by artno (values submitted in input faktur)
 
   // ------- Helpers -------
   function fmtNum(n) {
     var v = Number(n);
-    if (isNaN(v)) return '0.00';
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (isNaN(v)) return '0,00';
+    return v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parseNum(s) {
-    return parseFloat(String(s).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
+    return parseFloat(String(s).replace(/\./g, '').replace(',', '.').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
   function trunc2(n) { return Math.floor(n * 100) / 100; }
@@ -175,6 +177,8 @@
     elTitle.textContent = 'Edit Faktur Pembelian: ' + data.nofaktur;
     setEditSupplier(data.suppid || '');
     elDate.value = data.tglfaktur || '';
+    if (elDueDate) elDueDate.value = data.duedate || data.tglfaktur || '';
+    if (elUraian) elUraian.value = data.uraian || '';
     if (elUpdatePrice) elUpdatePrice.checked = !!data.isupdateprice;
 
     editLines = (data.lines || []).map(function (l) {
@@ -205,21 +209,16 @@
       };
     });
 
-    // Fetch snapshot data for comparison
+    // Fetch comparison data from sthist history
     var snap = await fetchSnapshot(fpNumber);
     beforePrices = snap.before;
     afterPrices = snap.after;
-
-    // Backfill bkirim from snapshot after data (not stored in sthist)
-    editLines.forEach(function (line) {
-      var af = afterPrices[line.stockid];
-      if (af && af.shipping_cost) line.bkirim = af.shipping_cost;
-    });
 
     renderTable();
     overlay.classList.remove('d-none');
     var mainContent = document.querySelector('.sh-page');
     if (mainContent) mainContent.classList.add('d-none');
+    history.replaceState(null, '', '#edit=' + encodeURIComponent(fpNumber));
   }
 
   // ------- Close overlay -------
@@ -227,6 +226,7 @@
     overlay.classList.add('d-none');
     var mainContent = document.querySelector('.sh-page');
     if (mainContent) mainContent.classList.remove('d-none');
+    history.replaceState(null, '', window.location.pathname + window.location.search);
     currentFP = null;
     editLines = [];
     beforePrices = {};
@@ -307,11 +307,11 @@
       }
       return '<tr>' +
         '<td class="jt-label">' + r.label + '</td>' +
-        '<td>' + hint + '<input type="text" class="jual-input' + cls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
-        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-pct">' + pctHint + '<input type="text" class="jual-pct-input' + pctCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
-        ' value="" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-margin">' + mrgHint + '<span class="jual-margin' + mrgCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
+        '<td><input type="text" class="jual-input' + cls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '>' + hint + '</td>' +
+        '<td class="jt-pct"><input type="text" class="jual-pct-input' + pctCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        ' value="" placeholder="—" inputmode="decimal" ' + dis + '>' + pctHint + '</td>' +
+        '<td class="jt-margin"><span class="jual-margin' + mrgCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span>' + mrgHint + '</td>' +
         '</tr>';
     }).join('');
     return '<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>' + rowsHTML + '</tbody></table>';
@@ -366,6 +366,63 @@
         ? ' <span class="badge bg-warning text-dark" style="font-size:0.7em;vertical-align:middle"><i class="bi bi-exclamation-triangle-fill"></i> Berubah</span>'
         : '';
 
+      // Pre-compute for summary
+      var _net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
+      var _nettoBsr = _net.final + (line.bkirim || 0);
+      var _nettoPcs = line.packing > 0 ? _nettoBsr / line.packing : 0;
+      var _hbeliKcl = line.packing > 0 ? line.hbelibsr / line.packing : 0;
+
+      // Build discount summary — always show all 4
+      function _fmtPct(v) { return v ? (Number.isInteger(v) ? v : (+v).toFixed(2)) + '%' : '-'; }
+      var discStr = 'D1:' + _fmtPct(line.pctdisc1) + ' D2:' + _fmtPct(line.pctdisc2) + ' D3:' + _fmtPct(line.pctdisc3) + ' PPN:' + _fmtPct(line.pctppn);
+
+      // Build harga jual summary with margin (main + bundling tiers)
+      var jualParts = [];
+      var jualKeys = ['hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5'];
+      var jualLabels = ['HJ1', 'Mem', 'HJ3', 'HJ4', 'HJ5'];
+      function _jualEntry(label, hj) {
+        if (!hj) return '';
+        var margin = _nettoPcs > 0 ? hj - _nettoPcs : 0;
+        var marginPct = _nettoPcs > 0 ? (margin / _nettoPcs * 100) : 0;
+        var sign = margin >= 0 ? '+' : '';
+        return '<span class="is-label">' + label + ':</span> <span class="is-val">' + fmtNum(hj) + '</span>'
+          + ' <span class="' + (margin < 0 ? 'text-danger' : 'text-success') + '">(' + sign + fmtNum(margin) + ' / ' + sign + marginPct.toFixed(1) + '%)</span>';
+      }
+      // Main jual
+      jualKeys.forEach(function(k, i) {
+        var entry = _jualEntry(jualLabels[i], line[k]);
+        if (entry) jualParts.push(entry);
+      });
+      // Bundling tiers (bundling uses hjual1..hjual5, not hjual)
+      var bJualKeys = ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'];
+      [1, 2].forEach(function(t) {
+        var b = line['bundling' + t];
+        if (!b || !b.enabled) return;
+        var bParts = [];
+        bJualKeys.forEach(function(k, i) {
+          var entry = _jualEntry(jualLabels[i], b[k]);
+          if (entry) bParts.push(entry);
+        });
+        if (bParts.length) jualParts.push('<span class="text-info">B' + t + ' &ge;' + (b.minQty || 0) + '</span> ' + bParts.join(' | '));
+      });
+
+      // Summary grid
+      var summaryHtml = '<div class="item-summary">'
+        + '<div class="is-row">'
+        + '<div class="is-cell"><span class="is-label">Qty</span><span class="is-val">' + (line.qty || 0) + ' ' + esc(sat) + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Bruto</span><span class="is-val">' + fmtNum((line.hbelibsr || 0) * (line.qty || 0)) + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Disc</span><span class="is-val">' + discStr + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Netto</span><span class="is-val">' + fmtNum(trunc2(_nettoBsr * (line.qty || 0))) + '</span></div>'
+        + '</div>';
+      if (jualParts.length || _nettoPcs) {
+        summaryHtml += '<div class="is-row is-jual">'
+          + '<div class="is-cell"><span class="is-label">Netto/Pcs</span><span class="is-val">' + fmtNum(trunc2(_nettoPcs)) + '</span></div>'
+          + jualParts.map(function(p) {
+            return '<div class="is-cell">' + p + '</div>';
+          }).join('') + '</div>';
+      }
+      summaryHtml += '</div>';
+
       // Main row
       var tr = document.createElement('tr');
       tr.className = 'item-main';
@@ -373,15 +430,16 @@
       tr.innerHTML =
         '<td class="row-num"><span class="expand-toggle"><i class="bi bi-chevron-right"></i></span> ' + (idx + 1) + '</td>' +
         '<td><div><strong>' + esc(line.artname) + '</strong>' + changeIcon + '</div>' +
-          '<small class="text-muted"><code>' + esc(line.stockid) + '</code> &middot; ' + esc(sat) + ' (' + line.packing + ')</small></td>' +
+          '<small class="text-muted"><code>' + esc(line.stockid) + '</code> &middot; ' + esc(sat) + ' (' + line.packing + ')</small>' +
+          summaryHtml + '</td>' +
         '<td><code>' + esc(line.artpabrik) + '</code></td>' +
         '<td><button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="' + idx + '" title="Hapus"><i class="bi bi-x-lg"></i></button></td>';
       elBody.appendChild(tr);
 
       // Detail row
-      var net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
-      var nettoBsr = net.final + (line.bkirim || 0);
-      var nettoPcs = line.packing > 0 ? nettoBsr / line.packing : 0;
+      var net = _net;
+      var nettoBsr = _nettoBsr;
+      var nettoPcs = _nettoPcs;
       var mainJual = { hjual1: line.hjual, hjual2: line.hjual2, hjual3: line.hjual3, hjual4: line.hjual4, hjual5: line.hjual5, _enabled: true };
 
       var detailTr = document.createElement('tr');
@@ -436,6 +494,7 @@
               '<th></th>' +
               '<th class="dp-th-total"><span class="dp-unit-bsr">/' + esc(sat) + '</span> &times; <span class="dp-qty-bsr">' + (line.qty || 1) + '</span> =</th>' +
               '<th class="dp-unit-bsr">/' + esc(sat) + '</th>' +
+              '<th>/Pcs</th>' +
               '<th>%</th>' +
             '</tr></thead><tbody>' +
               _discRow(idx, 'Diskon 1', 'pctdisc1', line, stk) +
@@ -444,13 +503,12 @@
               _discRow(idx, 'Diskon 3', 'pctdisc3', line, stk) +
             '</tbody></table>' +
             '<div class="beli-row-foc"><span class="bt-label">F.O.C</span>' +
-              '<input type="number" class="amt-input edit-foc' + (aft.foc != null ? changedCls(aft.foc, line.qtybonus) : '') + '" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
+              '<input type="number" class="amt-input edit-foc' + (stk.foc != null ? changedCls(stk.foc, line.qtybonus) : '') + '" data-idx="' + idx + '" value="' + (line.qtybonus || '') + '" placeholder="0" min="0" step="1">' +
               '<span class="bt-unit">Pcs</span>' +
-              (aft.foc != null ? '<span class="sblm-right">' + (aft.foc ? aft.foc + ' Pcs' : '—') + '</span>' : '') +
+              (stk.foc != null ? '<span class="sblm-right">' + (stk.foc ? stk.foc + ' Pcs' : '—') + '</span>' : '') +
             '</div>' +
             '<div class="beli-row-shipping"><span class="bt-label">B.Kirim</span>' +
-              '<input type="text" class="amt-input edit-bkirim' + (aft.shipping_cost != null ? changedCls(aft.shipping_cost, line.bkirim) : '') + '" data-idx="' + idx + '" value="' + (line.bkirim ? fmtNum(line.bkirim) : '') + '" placeholder="0" inputmode="decimal">' +
-              (aft.shipping_cost != null ? '<span class="sblm-right">' + (aft.shipping_cost ? fmtNum(aft.shipping_cost) : '—') + '</span>' : '') +
+              '<span class="text-muted small">Sudah masuk ke PPN</span>' +
             '</div>' +
             (function () {
               var nettoCls = '';
@@ -491,6 +549,35 @@
     // Update computed prices (margin displays)
     editLines.forEach(function (_, idx) { updateComputedPrices(idx); });
     elItemCount.textContent = editLines.length + ' item';
+    updateTotalsBar();
+  }
+
+  function updateTotalsBar() {
+    var bar = document.getElementById('editTotalsBar');
+    if (!bar) return;
+    var totalBeli = 0, totalJual = 0;
+    editLines.forEach(function(line) {
+      var net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
+      var nettoBsr = net.final + (line.bkirim || 0);
+      var nettoPcs = line.packing > 0 ? nettoBsr / line.packing : 0;
+      var qtyKcl = (line.qty || 0) * (line.packing || 1) + (line.qtybonus || 0);
+      totalBeli += nettoPcs * qtyKcl;
+      var hj1 = line.hjual || 0;
+      if (hj1) totalJual += hj1 * qtyKcl;
+    });
+    document.getElementById('editTotalBeli').textContent = fmtNum(totalBeli);
+    document.getElementById('editTotalJual').textContent = fmtNum(totalJual);
+    var marginEl = document.getElementById('editTotalMargin');
+    if (totalBeli > 0 && totalJual > 0) {
+      var margin = totalJual - totalBeli;
+      var marginPct = (margin / totalBeli * 100);
+      var sign = margin >= 0 ? '+' : '';
+      var cls = margin >= 0 ? 'text-success' : 'text-danger';
+      marginEl.innerHTML = 'Margin: <b class="' + cls + '">' + sign + fmtNum(margin) + ' (' + sign + marginPct.toFixed(1) + '%)</b>';
+    } else {
+      marginEl.innerHTML = '';
+    }
+    bar.classList.remove('d-none');
   }
 
   function _discRow(idx, label, field, line, stk) {
@@ -511,11 +598,21 @@
       amtCls = changedCls(stkAmt, amt);
       totalCls = changedCls(stkAmt * qtyBsr, amt * qtyBsr);
     }
+    var pack = line.packing || 1;
+    var amtPcs = pack > 0 ? amt / pack : 0;
+    var stkAmtPcsHint = '', pcsCls = '';
+    if (stk.hbelibsr != null) {
+      var stkPk = stk.packing || 1;
+      var stkAmtPcs = stkPk > 0 ? (stkAmtMap[field] || 0) / stkPk : 0;
+      stkAmtPcsHint = '<div class="sblm-hint">' + (stkAmtPcs ? fmtNum(stkAmtPcs) : '—') + '</div>';
+      pcsCls = fmtNum(stkAmtPcs) !== fmtNum(amtPcs) ? ' value-changed' : '';
+    }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
-      '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td>' + hint + '<input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
+      '<td><input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal">' + stkTotalHint + '</td>' +
+      '<td><input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal">' + stkAmtHint + '</td>' +
+      '<td class="disc-pcs" data-idx="' + idx + '" data-field="' + field + '"><input type="text" class="amt-input' + pcsCls + '" value="' + (amtPcs ? fmtNum(amtPcs) : '0') + '" readonly tabindex="-1">' + stkAmtPcsHint + '</td>' +
+      '<td><input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100">' + hint + '</td>' +
       '</tr>';
   }
 
@@ -577,6 +674,12 @@
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? fmtNum(amtMap[f]) : '';
       var totEl = document.querySelector('.edit-disc-total[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (totEl && document.activeElement !== totEl) totEl.value = amtMap[f] ? fmtNum(amtMap[f] * qtyBsr) : '';
+      var pcsEl = document.querySelector('.disc-pcs[data-idx="' + idx + '"][data-field="' + f + '"]');
+      var amtPcs = (pk > 0 && amtMap[f]) ? amtMap[f] / pk : 0;
+      if (pcsEl) {
+        var pcsInput = pcsEl.querySelector('input');
+        if (pcsInput) pcsInput.value = amtPcs ? fmtNum(amtPcs) : '0';
+      }
       var pctEl = document.querySelector('.edit-disc-pct[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (hasStk) {
         var stkAmt = stkAmtMap2[f] || 0;
@@ -590,6 +693,12 @@
         if (amtEl) amtEl.classList.toggle('value-changed', amtDiff);
         if (totEl) totEl.classList.toggle('value-changed', totalDiff);
         if (pctEl) pctEl.classList.toggle('value-changed', pctDiff);
+        // Highlight /Pcs cell
+        if (pcsEl) {
+          var stkPcsAmt = (stk.packing || 1) > 0 ? stkAmt / (stk.packing || 1) : 0;
+          var pcsInput2 = pcsEl.querySelector('input');
+          if (pcsInput2) pcsInput2.classList.toggle('value-changed', fmtNum(stkPcsAmt) !== fmtNum(amtPcs));
+        }
       }
     });
 
@@ -658,6 +767,7 @@
         }
       });
     });
+    updateTotalsBar();
   }
 
   // ------- Bind table events -------
@@ -817,24 +927,10 @@
       el.addEventListener('change', function () {
         var idx = parseInt(el.dataset.idx);
         editLines[idx].qtybonus = parseInt(el.value) || 0;
-        var aft = afterPrices[editLines[idx].stockid] || {};
-        if (aft.foc != null) {
-          el.classList.toggle('value-changed', fmtNum(aft.foc) !== fmtNum(editLines[idx].qtybonus));
+        var stk = beforePrices[editLines[idx].stockid] || {};
+        if (stk.foc != null) {
+          el.classList.toggle('value-changed', fmtNum(stk.foc) !== fmtNum(editLines[idx].qtybonus));
         }
-      });
-    });
-
-    // B.Kirim
-    table.querySelectorAll('.edit-bkirim').forEach(function (el) {
-      el.addEventListener('change', function () {
-        var idx = parseInt(el.dataset.idx);
-        editLines[idx].bkirim = parseNum(el.value);
-        el.value = editLines[idx].bkirim ? fmtNum(editLines[idx].bkirim) : '';
-        var aft = afterPrices[editLines[idx].stockid] || {};
-        if (aft.shipping_cost != null) {
-          el.classList.toggle('value-changed', fmtNum(aft.shipping_cost) !== fmtNum(editLines[idx].bkirim));
-        }
-        updateComputedPrices(idx);
       });
     });
 
@@ -1098,6 +1194,8 @@
           userid: elUser.value,
           items: items,
           order_date: elDate.value,
+          due_date: elDueDate ? elDueDate.value : '',
+          uraian: elUraian ? elUraian.value : '',
           update_price: elUpdatePrice ? elUpdatePrice.checked : true,
         }),
       });
@@ -1113,6 +1211,17 @@
       elBtnSave.disabled = false;
       elBtnSave.innerHTML = '<i class="bi bi-check-lg"></i> Simpan';
     }
+  });
+
+  // ------- Expand / Collapse all -------
+  var table = document.getElementById('editItemTable');
+  document.getElementById('editExpandAll').addEventListener('click', function() {
+    table.querySelectorAll('.item-detail').forEach(function(d) { d.classList.add('open'); });
+    table.querySelectorAll('.item-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+  });
+  document.getElementById('editCollapseAll').addEventListener('click', function() {
+    table.querySelectorAll('.item-detail').forEach(function(d) { d.classList.remove('open'); });
+    table.querySelectorAll('.item-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
   });
 
   // ------- Back / Escape -------
@@ -1131,4 +1240,13 @@
       openEdit(btn.dataset.fp);
     }
   });
+
+  // ------- Auto-open edit from URL hash on page load -------
+  (function() {
+    var hash = window.location.hash;
+    if (hash && hash.indexOf('#edit=') === 0) {
+      var fp = decodeURIComponent(hash.substring(6));
+      if (fp) openEdit(fp);
+    }
+  })();
 })();

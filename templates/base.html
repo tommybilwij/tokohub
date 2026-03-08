@@ -39,6 +39,14 @@
             </a>
           </li>
           {% endif %}
+          {% if nav_pages is defined and ('pesanan' in nav_pages or 'pesanan:input' in nav_pages or 'pesanan:daftar' in nav_pages) %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.url.path.startswith('/pesanan-pembelian') %}active{% endif %}"
+               href="/pesanan-pembelian">
+              <i class="bi bi-cart-check"></i> Pesanan Pembelian
+            </a>
+          </li>
+          {% endif %}
           {% if nav_pages is defined and ('price_change' in nav_pages or 'price_change:daftar' in nav_pages or 'price_change:input' in nav_pages) %}
           <li class="nav-item">
             <a class="nav-link {% if request.url.path.startswith('/perubahan-harga') %}active{% endif %}"

@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
     if pool is not None:
         from services.schema import ensure_tokohub_schema
         await ensure_tokohub_schema(pool)
+        from services.app_settings import get_all
+        await get_all(pool)  # populate in-memory cache
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1
@@ -73,6 +75,7 @@ app.mount('/static', StaticFiles(directory=str(_BASE_DIR / 'static')), name='sta
 templates = Jinja2Templates(directory=str(_BASE_DIR / 'templates'))
 templates.env.globals['url_for'] = lambda name, filename='': f'/static/{filename}'
 templates.env.globals['store_name'] = settings.store_name
+templates.env.globals['store_location'] = settings.store_location
 app.state.templates = templates
 app.state.lan_active = settings.lan_mode
 app.state.https_port = None
@@ -87,8 +90,8 @@ if settings.lan_mode:
     app.add_middleware(LANAuthMiddleware)
 
 # Routers
-from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth, price_change
-for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, price_change]:
+from routers import pages, settings as settings_router, stock, receipt, sales, foc, health, auth, price_change, purchase_order
+for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, price_change, purchase_order]:
     app.include_router(r.router)
 
 
@@ -96,6 +99,7 @@ for r in [pages, settings_router, stock, receipt, sales, foc, health, auth, pric
 @app.middleware('http')
 async def inject_branding(request, call_next):
     templates.env.globals['store_name'] = settings.store_name
+    templates.env.globals['store_location'] = settings.store_location
     return await call_next(request)
 
 
@@ -156,17 +160,21 @@ def main():
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
 
-            https_port = None
-            for try_port in (443, port + 1):
+            https_port = 443
+            import socket, time as _time
+            max_retries = 10
+            for attempt in range(1, max_retries + 1):
                 try:
-                    import socket
                     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    s.bind(('0.0.0.0', try_port))
+                    s.bind(('0.0.0.0', https_port))
                     s.close()
-                    https_port = try_port
                     break
                 except (PermissionError, OSError) as e:
-                    logger.info("Cannot bind port %d (%s), trying next", try_port, e)
+                    if attempt == max_retries:
+                        raise RuntimeError(f"Cannot bind HTTPS port 443 after {max_retries} attempts: {e}. Run with sudo for port 443.") from e
+                    logger.warning("Port 443 unavailable (attempt %d/%d): %s — retrying in 2s", attempt, max_retries, e)
+                    _time.sleep(2)
+                    _time.sleep(attempt * 2)
 
             if https_port:
                 app.state.https_port = https_port

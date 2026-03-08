@@ -50,6 +50,8 @@ class FPPreviewRequest(BaseModel):
     supplier_id: str
     items: list[FPItem]
     order_date: str | None = None
+    due_date: str | None = None
+    uraian: str | None = None
     shipping_cost: float = 0  # legacy total fallback
 
 
@@ -58,6 +60,8 @@ class FPCommitRequest(BaseModel):
     userid: str
     items: list[FPItem]
     order_date: str | None = None
+    due_date: str | None = None
+    uraian: str | None = None
     shipping_cost: float = 0  # legacy total fallback
     update_price: bool = True
 
@@ -68,5 +72,7 @@ class FPUpdateRequest(BaseModel):
     userid: str
     items: list[FPItem]
     order_date: str | None = None
+    due_date: str | None = None
+    uraian: str | None = None
     shipping_cost: float = 0
     update_price: bool = True

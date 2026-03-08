@@ -13,7 +13,7 @@ from services.price_change_service import (
     commit_price_change,
     update_ph,
     get_price_change_report,
-    get_price_change_from_snapshots,
+    get_price_change_from_fp,
     get_ph_history,
     get_ph_detail,
     toggle_ph_lock,
@@ -48,7 +48,8 @@ async def api_commit_price_change(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
-        result = await commit_price_change(db, items, userid=user['username'] if user else '')
+        uraian = (data.get('uraian') or '').strip()[:50]
+        result = await commit_price_change(db, items, userid=user['username'] if user else '', uraian=uraian)
         return result
     except Exception as e:
         logger.exception("Price change commit failed")
@@ -68,8 +69,9 @@ async def api_ph_update(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
+        uraian = (data.get('uraian') or '').strip()[:50]
         result = await update_ph(db, ph_number, items,
-                                 userid=user['username'] if user else '')
+                                 userid=user['username'] if user else '', uraian=uraian)
         if 'error' in result:
             return JSONResponse(result, status_code=400)
         return result
@@ -132,5 +134,5 @@ async def api_price_change_report(
     """Get price change report for a date."""
     d = date.fromisoformat(report_date) if report_date else date.today()
     manual = await get_price_change_report(db, d)
-    from_faktur = await get_price_change_from_snapshots(db, d)
+    from_faktur = await get_price_change_from_fp(db, d)
     return {'date': d.isoformat(), 'manual': manual, 'from_faktur': from_faktur}

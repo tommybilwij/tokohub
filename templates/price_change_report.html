@@ -31,39 +31,21 @@
     </div>
   </div>
 
-  <!-- Riwayat Input Faktur -->
-  <h6 class="text-muted mt-3 mb-2"><i class="bi bi-receipt"></i> Riwayat Input Faktur</h6>
-  <div class="table-responsive mb-4">
-    <table class="sh-table" id="fakturTable">
+  <div class="table-responsive mt-3">
+    <table class="sh-table" id="combinedTable">
       <thead>
         <tr>
-          <th style="width:15%">No. Faktur</th>
-          <th style="width:5%">Dept</th>
-          <th style="width:14%">Barcode</th>
-          <th>Nama</th>
-          <th class="text-end" style="width:12%">HJual Lama</th>
-          <th class="text-end" style="width:12%">HJual Baru</th>
+          <th class="sh-sortable" style="width:9%" data-sort="source" data-table="combined">Sumber <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable" style="width:12%" data-sort="ref" data-table="combined">No. Ref <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable" style="width:5%" data-sort="dept" data-table="combined">Dept <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable" style="width:7%" data-sort="artno" data-table="combined">Artno <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable" style="width:11%" data-sort="barcode" data-table="combined">Barcode <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable" data-sort="name" data-table="combined">Nama <i class="bi bi-chevron-down"></i></th>
+          <th class="sh-sortable text-end" style="width:10%" data-sort="old" data-table="combined">HJual Lama <i class="bi bi-chevron-expand"></i></th>
+          <th class="sh-sortable text-end" style="width:10%" data-sort="new" data-table="combined">HJual Baru <i class="bi bi-chevron-expand"></i></th>
         </tr>
       </thead>
-      <tbody id="fakturBody"></tbody>
-    </table>
-  </div>
-
-  <!-- Riwayat Perubahan Harga -->
-  <h6 class="text-muted mb-2"><i class="bi bi-pencil-square"></i> Riwayat Perubahan Harga</h6>
-  <div class="table-responsive">
-    <table class="sh-table" id="manualTable">
-      <thead>
-        <tr>
-          <th style="width:15%">No. PH</th>
-          <th style="width:5%">Dept</th>
-          <th style="width:14%">Barcode</th>
-          <th>Nama</th>
-          <th class="text-end" style="width:12%">HJual Lama</th>
-          <th class="text-end" style="width:12%">HJual Baru</th>
-        </tr>
-      </thead>
-      <tbody id="manualBody"></tbody>
+      <tbody id="combinedBody"></tbody>
     </table>
   </div>
 </div>
@@ -78,7 +60,7 @@
   var elExportBtns = document.getElementById('pcExportBtns');
   var elBtnCsv = document.getElementById('pcBtnCsv');
   var elBtnPdf = document.getElementById('pcBtnPdf');
-  dateInput.value = new Date().toISOString().split('T')[0];
+  var _d = new Date(); dateInput.value = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
 
   var lastData = null;
 
@@ -91,81 +73,132 @@
     return d.innerHTML;
   }
 
+  // Combined data and sort state
+  var combinedRows = [];
+  var sortState = { key: 'name', asc: true };
+
+  function getSortValue(row, key) {
+    switch(key) {
+      case 'source': return row._source || '';
+      case 'ref': return row._ref || '';
+      case 'dept': return row.department || '';
+      case 'artno': return row.artno || '';
+      case 'barcode': return row.barcode || '';
+      case 'name': return row.artname || '';
+      case 'old': return Number(row.old_hjual) || 0;
+      case 'new': return Number(row.new_hjual) || 0;
+      default: return '';
+    }
+  }
+
+  function sortRows(rows, key, asc) {
+    return rows.slice().sort(function(a, b) {
+      var va = getSortValue(a, key);
+      var vb = getSortValue(b, key);
+      if (typeof va === 'number') return asc ? va - vb : vb - va;
+      va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+      if (va < vb) return asc ? -1 : 1;
+      if (va > vb) return asc ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function renderCombined(rows) {
+    var tb = document.getElementById('combinedBody');
+    tb.innerHTML = '';
+    if (!rows || !rows.length) {
+      tb.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Tidak ada riwayat perubahan harga.</td></tr>';
+      return;
+    }
+    rows.forEach(function(r) {
+      var srcBadge = r._source === 'Faktur'
+        ? '<span class="badge bg-info text-dark">Faktur Pembelian</span>'
+        : '<span class="badge bg-warning text-dark">Perubahan Harga</span>';
+      tb.innerHTML += '<tr>'
+        + '<td>' + srcBadge + '</td>'
+        + '<td><code>' + esc(r._ref) + '</code></td>'
+        + '<td>' + esc(r.department || '') + '</td>'
+        + '<td><code>' + esc(r.artno || '') + '</code></td>'
+        + '<td><code>' + esc(r.barcode || '') + '</code></td>'
+        + '<td>' + esc(r.artname) + '</td>'
+        + '<td class="text-end">' + fmt(r.old_hjual) + '</td>'
+        + '<td class="text-end fw-bold">' + fmt(r.new_hjual) + '</td>'
+        + '</tr>';
+    });
+  }
+
+  function updateSortIcons(activeKey, asc) {
+    document.querySelectorAll('#combinedTable th[data-sort]').forEach(function(th) {
+      var icon = th.querySelector('i');
+      if (th.dataset.sort === activeKey) {
+        icon.className = asc ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      } else {
+        icon.className = 'bi bi-chevron-expand';
+      }
+    });
+  }
+
+  // Attach sort click handlers
+  document.querySelectorAll('#combinedTable th[data-sort]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = th.dataset.sort;
+      if (sortState.key === key) { sortState.asc = !sortState.asc; }
+      else { sortState.key = key; sortState.asc = true; }
+      var sorted = sortRows(combinedRows, key, sortState.asc);
+      renderCombined(sorted);
+      updateSortIcons(key, sortState.asc);
+    });
+  });
+
   function loadReport() {
     var d = dateInput.value;
     fetch('/api/price-change/report?report_date=' + d)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         lastData = data;
-        var hasFaktur = data.from_faktur && data.from_faktur.length > 0;
-        var hasManual = data.manual && data.manual.length > 0;
 
-        // Show export buttons if there's data
-        if (hasFaktur || hasManual) {
+        // Build combined rows
+        combinedRows = [];
+        (data.from_faktur || []).forEach(function(r) {
+          r._source = 'Faktur';
+          r._ref = r.ref_number || '';
+          combinedRows.push(r);
+        });
+        (data.manual || []).forEach(function(r) {
+          r._source = 'PH';
+          r._ref = r.ph_number || '';
+          combinedRows.push(r);
+        });
+
+        if (combinedRows.length) {
           elExportBtns.classList.remove('d-none');
         } else {
           elExportBtns.classList.add('d-none');
         }
 
-        // Faktur changes
-        var fb = document.getElementById('fakturBody');
-        fb.innerHTML = '';
-        if (!hasFaktur) {
-          fb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada riwayat input faktur.</td></tr>';
-        } else {
-          data.from_faktur.forEach(function(r) {
-            fb.innerHTML += '<tr>'
-              + '<td><code>' + esc(r.ref_number) + '</code></td>'
-              + '<td>' + esc(r.department || '') + '</td>'
-              + '<td><code>' + esc(r.barcode || '') + '</code></td>'
-              + '<td>' + esc(r.artname) + '</td>'
-              + '<td class="text-end">' + fmt(r.old_hjual) + '</td>'
-              + '<td class="text-end fw-bold">' + fmt(r.new_hjual) + '</td>'
-              + '</tr>';
-          });
-        }
-
-        // Manual changes
-        var mb = document.getElementById('manualBody');
-        mb.innerHTML = '';
-        if (!hasManual) {
-          mb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada riwayat perubahan harga.</td></tr>';
-        } else {
-          data.manual.forEach(function(r) {
-            mb.innerHTML += '<tr>'
-              + '<td><code>' + esc(r.ph_number) + '</code></td>'
-              + '<td>' + esc(r.department || '') + '</td>'
-              + '<td><code>' + esc(r.barcode || '') + '</code></td>'
-              + '<td>' + esc(r.artname) + '</td>'
-              + '<td class="text-end">' + fmt(r.old_hjual) + '</td>'
-              + '<td class="text-end fw-bold">' + fmt(r.new_hjual) + '</td>'
-              + '</tr>';
-          });
-        }
+        // Default sort by Nama ascending
+        sortState = { key: 'name', asc: true };
+        var sorted = sortRows(combinedRows, 'name', true);
+        renderCombined(sorted);
+        updateSortIcons('name', true);
       });
   }
 
-  // Collect all rows for export (both sections combined)
-  function getAllRows() {
-    if (!lastData) return [];
-    var all = [];
-    (lastData.from_faktur || []).forEach(function(r) {
-      all.push({ source: 'Faktur', ref: r.ref_number || '', dept: r.department || '', barcode: r.barcode || '', artname: r.artname || '', old_hjual: r.old_hjual || 0, new_hjual: r.new_hjual || 0 });
-    });
-    (lastData.manual || []).forEach(function(r) {
-      all.push({ source: 'Perubahan Harga', ref: r.ph_number || '', dept: r.department || '', barcode: r.barcode || '', artname: r.artname || '', old_hjual: r.old_hjual || 0, new_hjual: r.new_hjual || 0 });
-    });
-    return all;
+  // Get currently displayed rows (respects current sort order)
+  function getExportRows() {
+    if (!combinedRows.length) return [];
+    return sortRows(combinedRows, sortState.key, sortState.asc);
   }
 
   // CSV Export
   elBtnCsv.addEventListener('click', function() {
-    var all = getAllRows();
+    var all = getExportRows();
     if (!all.length) return;
 
-    var csvRows = [['#', 'Sumber', 'No. Referensi', 'Dept', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']];
+    var srcLabel = function(r) { return r._source === 'Faktur' ? 'Faktur Pembelian' : 'Perubahan Harga'; };
+    var csvRows = [['#', 'Sumber', 'No. Ref', 'Dept', 'Artno', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']];
     all.forEach(function(r, i) {
-      csvRows.push([i + 1, r.source, r.ref, r.dept, '\t' + r.barcode, r.artname, Number(r.old_hjual).toFixed(2), Number(r.new_hjual).toFixed(2)]);
+      csvRows.push([i + 1, srcLabel(r), r._ref, r.department || '', '\t' + (r.artno || ''), '\t' + (r.barcode || ''), r.artname || '', Number(r.old_hjual).toFixed(2), Number(r.new_hjual).toFixed(2)]);
     });
 
     var csv = csvRows.map(function(row) {
@@ -188,9 +221,10 @@
 
   // PDF Export
   elBtnPdf.addEventListener('click', function() {
-    var all = getAllRows();
+    var all = getExportRows();
     if (!all.length) return;
 
+    var srcLabel = function(r) { return r._source === 'Faktur' ? 'Faktur Pembelian' : 'Perubahan Harga'; };
     var jsPDF = window.jspdf.jsPDF;
     var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
@@ -200,19 +234,19 @@
     doc.text('Tanggal: ' + dateInput.value, 14, 21);
 
     var tableRows = all.map(function(r, i) {
-      return [i + 1, r.source, r.ref, r.dept, r.barcode, r.artname, fmt(r.old_hjual), fmt(r.new_hjual)];
+      return [i + 1, srcLabel(r), r._ref, r.department || '', r.artno || '', r.barcode || '', r.artname || '', fmt(r.old_hjual), fmt(r.new_hjual)];
     });
 
     doc.autoTable({
       startY: 25,
-      head: [['#', 'Sumber', 'No. Referensi', 'Dept', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']],
+      head: [['#', 'Sumber', 'No. Ref', 'Dept', 'Artno', 'Barcode', 'Nama', 'HJual Lama', 'HJual Baru']],
       body: tableRows,
       styles: { fontSize: 8, cellPadding: 1.5 },
       headStyles: { fillColor: [255, 193, 7] , textColor: [0, 0, 0] },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 10 },
-        6: { halign: 'right' },
+        0: { halign: 'center', cellWidth: 8 },
         7: { halign: 'right' },
+        8: { halign: 'right' },
       },
     });
 

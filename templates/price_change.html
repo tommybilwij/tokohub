@@ -34,12 +34,16 @@
 <!-- Edit mode: inline search row (hidden by default) -->
 <div id="pcEditSearchRow" class="d-none mb-3">
   <div class="row g-2">
-    <div class="col-md-12">
+    <div class="col-md-8">
       <label class="form-label mb-1"><small>Tambah Item</small></label>
       <div class="position-relative">
         <input type="text" class="form-control form-control-sm" id="pcEditSearchInput" placeholder="Cari nama / barcode..." autocomplete="off">
         <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:200px;overflow-y:auto" id="pcEditSearchResults"></div>
       </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label mb-1"><small>Keterangan</small></label>
+      <input type="text" class="form-control form-control-sm" id="pcEditUraianInput" maxlength="50" placeholder="Maks 50 karakter">
     </div>
   </div>
 </div>
@@ -61,6 +65,10 @@
           </div>
           <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:300px;overflow-y:auto" id="pcSearchResults"></div>
         </div>
+        <div class="mt-2">
+          <label class="form-label fw-semibold mb-1">Keterangan</label>
+          <input type="text" class="form-control form-control-sm" id="pcUraianInput" maxlength="50" placeholder="Opsional, maks 50 karakter">
+        </div>
       </div>
     </div>
   </div>
@@ -70,7 +78,11 @@
     <div class="card">
       <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Perubahan Harga</h5>
-        <span class="badge badge-counter" id="pcItemCount">0 item</span>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-outline-light py-0 px-1" id="pcExpandAll" title="Buka semua"><i class="bi bi-chevron-expand"></i></button>
+          <button class="btn btn-sm btn-outline-light py-0 px-1" id="pcCollapseAll" title="Tutup semua"><i class="bi bi-chevron-contract"></i></button>
+          <span class="badge badge-counter" id="pcItemCount">0 item</span>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -109,6 +121,22 @@
   </div>
 </div>
 
+<!-- Search Results Modal -->
+<div class="modal fade" id="pcFuzzyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white py-2">
+        <h6 class="modal-title mb-0"><i class="bi bi-search me-1"></i> Hasil Pencarian</h6>
+        <small class="ms-2 opacity-75" id="pcFuzzyCount"></small>
+        <button type="button" class="btn-close btn-close-white btn-close-sm ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:70vh;overflow:auto">
+        <div id="pcFuzzyBody" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Success Modal -->
 <div class="modal fade" id="pcSuccessModal" tabindex="-1">
   <div class="modal-dialog">
@@ -125,7 +153,7 @@
         <button type="button" class="btn btn-primary-app" id="pcBtnNew">
           <i class="bi bi-plus-circle"></i> <span id="pcBtnNewLabel">Entry Baru</span>
         </button>
-        <a href="/perubahan-harga" class="btn btn-outline-secondary">
+        <a href="/perubahan-harga" class="btn btn-outline-secondary" id="pcBtnHistory">
           <i class="bi bi-list-ul"></i> Lihat Riwayat
         </a>
       </div>

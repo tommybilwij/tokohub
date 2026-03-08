@@ -46,14 +46,17 @@
       <small class="text-muted" id="hResultCount"></small>
     </div>
     <div class="table-responsive">
-      <table class="sh-table">
+      <table class="sh-table" style="white-space:nowrap">
         <thead>
           <tr>
-            <th>No. Order</th>
-            <th>Tanggal</th>
-            <th>Supplier</th>
-            <th class="text-end">Total</th>
-            <th class="text-center">Items</th>
+            <th class="sh-sortable" data-col="po_number">No. Order <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="tanggal">Tanggal <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="supplier_name">Supplier <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-end" data-col="total">Total <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="inputter">User <i class="bi bi-chevron-expand"></i></th>
+            <th class="text-center">Status</th>
+            <th>Ket.</th>
             <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
@@ -79,7 +82,7 @@
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detail Faktur: <span id="detailFPNumber"></span></h5>
+        <h5 class="modal-title">Detail Faktur Pembelian: <span id="detailFPNumber"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -95,10 +98,8 @@
                 <th>#</th>
                 <th>Artno</th>
                 <th>Nama</th>
-                <th class="text-end">Qty</th>
-                <th>Satuan Besar</th>
-                <th class="text-end">Qty Kcl</th>
-                <th>Sat.Kcl</th>
+                <th class="text-center">Isi</th>
+                <th class="text-end">Qty Order</th>
                 <th class="text-end">H.Beli</th>
                 <th class="text-end">H.Kcl</th>
                 <th class="text-end">Disc1</th>
@@ -153,11 +154,19 @@
         <input type="date" class="form-control form-control-sm" id="editDate">
       </div>
       <div class="col-md-2">
+        <label class="form-label mb-1"><small>Est. Terima</small></label>
+        <input type="date" class="form-control form-control-sm" id="editDueDate">
+      </div>
+      <div class="col-md-2">
         <label class="form-label mb-1"><small>User</small></label>
         <input type="text" class="form-control form-control-sm" id="editUserDisplay" value="{{ user.username if user else '' }}" readonly>
         <input type="hidden" id="editUser" value="{{ user.username if user else '' }}">
       </div>
-      <div class="col-md-5">
+      <div class="col-md-3">
+        <label class="form-label mb-1"><small>Keterangan</small></label>
+        <input type="text" class="form-control form-control-sm" id="editUraian" maxlength="50" placeholder="Maks 50 karakter">
+      </div>
+      <div class="col-md-4">
         <label class="form-label mb-1"><small>Tambah Item</small></label>
         <div class="position-relative">
           <input type="text" class="form-control form-control-sm" id="editSearchInput" placeholder="Cari nama / barcode...">
@@ -168,7 +177,11 @@
     <div class="card">
       <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
-        <span class="badge badge-counter" id="editItemCount">0 item</span>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-outline-light py-0 px-1" id="editExpandAll" title="Buka semua"><i class="bi bi-chevron-expand"></i></button>
+          <button class="btn btn-sm btn-outline-light py-0 px-1" id="editCollapseAll" title="Tutup semua"><i class="bi bi-chevron-contract"></i></button>
+          <span class="badge badge-counter" id="editItemCount">0 item</span>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -183,6 +196,13 @@
             </thead>
             <tbody id="editTableBody"></tbody>
           </table>
+        </div>
+      </div>
+      <div class="card-footer d-none" id="editTotalsBar">
+        <div class="d-flex gap-4 align-items-center flex-wrap" style="font-size:0.85rem">
+          <span><i class="bi bi-cart3"></i> Total Netto: <b id="editTotalBeli">0</b></span>
+          <span><i class="bi bi-tag"></i> Total Jual (HJ1): <b id="editTotalJual">0</b></span>
+          <span class="ms-auto" id="editTotalMargin"></span>
         </div>
       </div>
     </div>
@@ -215,7 +235,7 @@
   var perPage = 20;
 
   // Default date range: today
-  var today = new Date().toISOString().split('T')[0];
+  var _d = new Date(); var today = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
   elDateFrom.value = today;
   elDateTo.value = today;
 
@@ -283,6 +303,9 @@
   function fmtNum(n) {
     return new Intl.NumberFormat('id-ID').format(Math.round(n));
   }
+  function esc(s) {
+    var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+  }
 
   function loadData(page) {
     currentPage = page || 1;
@@ -311,6 +334,7 @@
         elResults.classList.remove('d-none');
         elCount.textContent = total + ' faktur ditemukan';
 
+        lastItems = items;
         elBody.innerHTML = '';
         items.forEach(function(o) {
           var tr = document.createElement('tr');
@@ -332,11 +356,15 @@
           var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
             + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
             + '</div>';
+          var statusBadge = o.isupdate ? '<span class="badge bg-warning text-dark">Berubah</span>' : '';
           tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
             + '<td>' + (o.tglfaktur || '-') + '</td>'
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td>' + (o.userid || '-') + '</td>'
+            + '<td class="text-center">' + statusBadge + '</td>'
+            + '<td class="text-center">' + (o.uraian ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.uraian) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
             + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);
@@ -347,6 +375,10 @@
 
         // Bind view/edit/lock buttons
         bindButtons();
+        // Init Bootstrap tooltips
+        elBody.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+          new bootstrap.Tooltip(el);
+        });
       });
   }
 
@@ -408,7 +440,7 @@
           if (!v) return '<span class="fp-disc-zero">-</span>';
           var n = parseFloat(v);
           if (n === 0) return '<span class="fp-disc-zero">-</span>';
-          return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+          return (Number.isInteger(n) ? n.toString() : n.toFixed(2)) + '%';
         };
         (data.lines || []).forEach(function(line, i) {
           var qtyKcl = Math.round(line.packing || 1);
@@ -416,10 +448,8 @@
           tr.innerHTML = '<td class="fp-rownum">' + (i + 1) + '</td>'
             + '<td class="fp-artno"><code>' + (line.stockid || '') + '</code></td>'
             + '<td>' + (line.artname || '') + '</td>'
-            + '<td class="fp-num">' + line.qty + '</td>'
-            + '<td>' + (line.satuanbsr || '') + '</td>'
-            + '<td class="fp-num">' + qtyKcl + '</td>'
-            + '<td>' + (line.satuankcl || '') + '</td>'
+            + '<td class="text-center">' + qtyKcl + '/' + (line.satuanbsr || 'Pcs') + '</td>'
+            + '<td class="fp-num">' + line.qty + ' ' + (line.satuanbsr || 'Pcs') + '</td>'
             + '<td class="fp-num">' + fmtNum(line.hbelibsr || 0) + '</td>'
             + '<td class="fp-num">' + fmtNum(line.hbelikcl || 0) + '</td>'
             + '<td class="fp-num">' + fmtDisc(line.pctdisc1) + '</td>'
@@ -583,6 +613,93 @@
     } finally {
       chk.disabled = false;
     }
+  });
+
+  // --- Client-side sorting ---
+  var lastItems = [];
+  var sortState = { key: null, asc: true };
+
+  function getSortVal(o, key) {
+    switch(key) {
+      case 'po_number': return o.nofaktur || '';
+      case 'tanggal': return o.tglfaktur || '';
+      case 'supplier_name': return (o.supplier_name || o.suppid || '').toLowerCase();
+      case 'total': return Number(o.jlhfaktur) || 0;
+      case 'total_items': return Number(o.line_count) || 0;
+      case 'inputter': return (o.userid || '').toLowerCase();
+      default: return '';
+    }
+  }
+
+  function sortAndRender() {
+    if (!lastItems.length) return;
+    var sorted = lastItems.slice();
+    if (sortState.key) {
+      sorted.sort(function(a, b) {
+        var va = getSortVal(a, sortState.key);
+        var vb = getSortVal(b, sortState.key);
+        if (typeof va === 'number') return sortState.asc ? va - vb : vb - va;
+        if (va < vb) return sortState.asc ? -1 : 1;
+        if (va > vb) return sortState.asc ? 1 : -1;
+        return 0;
+      });
+    }
+    elBody.innerHTML = '';
+    sorted.forEach(function(o) {
+      var tr = document.createElement('tr');
+      var actions = '<button class="btn btn-sm btn-outline-primary btn-view-fp" data-fp="' + o.nofaktur + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+      if (canEdit && !o.islocked && !o.isupdateprice) {
+        actions += ' <button class="btn btn-sm btn-outline-success btn-edit-fp" data-fp="' + o.nofaktur + '" title="Edit"><i class="bi bi-pencil"></i></button>';
+      }
+      if (canDelete && !o.islocked) {
+        actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-fp" data-fp="' + o.nofaktur + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+      }
+      if (canLock) {
+        var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
+        var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
+        var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+        actions += ' <button class="btn btn-sm btn-lock-fp ' + lockCls + '" data-fp="' + o.nofaktur + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+      }
+      var priceChecked = o.isupdateprice ? ' checked' : '';
+      var priceDisabled = o.islocked ? ' disabled' : '';
+      var priceSwitch = '<div class="form-check form-switch d-flex justify-content-center mb-0">'
+        + '<input type="checkbox" class="form-check-input mt-0 chk-update-price" role="switch" data-fp="' + o.nofaktur + '"' + priceChecked + priceDisabled + ' style="width:2.5em;height:1.25em">'
+        + '</div>';
+      var statusBadge = o.isupdate ? '<span class="badge bg-warning text-dark">Berubah</span>' : '';
+      tr.innerHTML = '<td><code>' + o.nofaktur + '</code></td>'
+        + '<td>' + (o.tglfaktur || '-') + '</td>'
+        + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+        + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
+        + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+        + '<td>' + (o.userid || '-') + '</td>'
+        + '<td class="text-center">' + statusBadge + '</td>'
+        + '<td class="text-center">' + (o.uraian ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.uraian) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
+        + '<td class="text-center">' + priceSwitch + '</td>'
+        + '<td class="text-nowrap">' + actions + '</td>';
+      elBody.appendChild(tr);
+    });
+    bindButtons();
+    updateSortIcons();
+  }
+
+  function updateSortIcons() {
+    document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+      var icon = th.querySelector('i');
+      if (th.dataset.col === sortState.key) {
+        icon.className = sortState.asc ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      } else {
+        icon.className = 'bi bi-chevron-expand';
+      }
+    });
+  }
+
+  document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = th.dataset.col;
+      if (sortState.key === key) { sortState.asc = !sortState.asc; }
+      else { sortState.key = key; sortState.asc = true; }
+      sortAndRender();
+    });
   });
 
   elBtnSearch.addEventListener('click', function() { loadData(1); });

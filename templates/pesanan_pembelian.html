@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+{% block title %}Pesanan Pembelian{% endblock %}
+
+{% block content %}
+<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-delete="{{ can_delete | default(false) | tojson }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-cart-check"></i> Pesanan Pembelian</h5>
+    {% if can_entry | default(false) %}
+    <a href="/pesanan-pembelian/input" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Buat Pesanan Pembelian
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="date" id="hDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="date" id="hDateTo" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Supplier
+        <div class="h-supp-dropdown" id="hSuppDropdown">
+          <input type="text" class="form-control form-control-sm" id="hSuppInput" placeholder="Semua" autocomplete="off" style="min-width:220px">
+          <input type="hidden" id="hSupplier" value="">
+          <div class="h-supp-menu d-none" id="hSuppMenu"></div>
+        </div>
+      </label>
+      <button class="btn btn-sm btn-primary" id="hBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="hLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results -->
+  <div class="d-none" id="hResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="hResultCount"></small>
+    </div>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th class="sh-sortable" data-col="po_number">No. Pesanan <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="tgl_pesanan">Tanggal <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="supplier_name">Supplier <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="date_from">Periode Sales <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="created_by">User <i class="bi bi-chevron-expand"></i></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="hTableBody"></tbody>
+      </table>
+    </div>
+    <nav class="mt-2" id="hPagination">
+      <ul class="pagination pagination-sm mb-0 justify-content-center" id="hPageList"></ul>
+    </nav>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="hEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada pesanan untuk filter ini.</p>
+  </div>
+</div>
+
+<!-- PO Detail Modal -->
+<div class="modal fade" id="poDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detail Pesanan Pembelian: <span id="detailPONumber"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4"><strong>Supplier:</strong> <span id="detailSupplier"></span></div>
+          <div class="col-md-4"><strong>Tanggal:</strong> <span id="detailDate"></span></div>
+          <div class="col-md-4"><strong>Periode:</strong> <span id="detailPeriod"></span></div>
+        </div>
+        <div class="table-responsive">
+          <table class="fp-preview-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Artno</th>
+                <th>Barcode</th>
+                <th>Nama Barang</th>
+                <th class="text-end">Isi</th>
+                <th class="text-end">QTY Order</th>
+                <th class="text-end">Total Harga Beli</th>
+              </tr>
+            </thead>
+            <tbody id="detailLines"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-danger" id="detailExportPDF">
+          <i class="bi bi-file-earmark-pdf"></i> Export PDF
+        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/jspdf.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jspdf.plugin.autotable.min.js') }}"></script>
+<script>
+(function() {
+  'use strict';
+
+  var storeName = {{ store_name | default('', true) | tojson }};
+  var storeLocation = {{ store_location | default('', true) | tojson }};
+
+  var pageEl = document.querySelector('.sh-page');
+  var canEdit = pageEl.dataset.canEdit === 'true';
+  var canDelete = pageEl.dataset.canDelete === 'true';
+
+  var elDateFrom = document.getElementById('hDateFrom');
+  var elDateTo = document.getElementById('hDateTo');
+  var elSupplier = document.getElementById('hSupplier');
+  var elLoading = document.getElementById('hLoading');
+  var elResults = document.getElementById('hResults');
+  var elEmpty = document.getElementById('hEmpty');
+  var elBody = document.getElementById('hTableBody');
+  var elCount = document.getElementById('hResultCount');
+  var elPageList = document.getElementById('hPageList');
+  var currentPage = 1;
+
+  function _localDate(dt) { return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); }
+  var today = _localDate(new Date());
+  var d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  elDateFrom.value = _localDate(d30);
+  elDateTo.value = today;
+
+  var allVendors = [];
+  fetch('/api/vendors')
+    .then(function(r) { return r.json(); })
+    .then(function(vendors) {
+      allVendors = vendors.map(function(v) {
+        return { id: v.id, label: v.id + ' - ' + (v.name || v.id) };
+      });
+      loadData(1);
+    });
+
+  function buildSuppMenu(inputEl, menuEl, hiddenEl, onSelect) {
+    function render(filter) {
+      var q = (filter || '').toLowerCase();
+      var items = q ? allVendors.filter(function(v) { return v.label.toLowerCase().indexOf(q) >= 0; }) : allVendors;
+      menuEl.innerHTML = '';
+      var semua = document.createElement('div');
+      semua.className = 'h-supp-item';
+      semua.textContent = 'Semua';
+      semua.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        hiddenEl.value = '';
+        inputEl.value = '';
+        inputEl.placeholder = 'Semua';
+        menuEl.classList.add('d-none');
+        if (onSelect) onSelect('', '');
+      });
+      menuEl.appendChild(semua);
+      items.slice(0, 50).forEach(function(v) {
+        var div = document.createElement('div');
+        div.className = 'h-supp-item';
+        div.textContent = v.label;
+        div.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          hiddenEl.value = v.id;
+          inputEl.value = v.label;
+          menuEl.classList.add('d-none');
+          if (onSelect) onSelect(v.id, v.label);
+        });
+        menuEl.appendChild(div);
+      });
+      menuEl.classList.remove('d-none');
+    }
+    var saved = '';
+    inputEl.addEventListener('focus', function() { saved = inputEl.value; inputEl.value = ''; render(''); });
+    inputEl.addEventListener('input', function() { render(inputEl.value); });
+    inputEl.addEventListener('blur', function() {
+      menuEl.classList.add('d-none');
+      if (!inputEl.value && saved) inputEl.value = saved;
+    });
+    inputEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { menuEl.classList.add('d-none'); inputEl.blur(); }
+    });
+  }
+
+  buildSuppMenu(
+    document.getElementById('hSuppInput'),
+    document.getElementById('hSuppMenu'),
+    elSupplier,
+    function() { loadData(1); }
+  );
+
+  document.getElementById('hBtnSearch').addEventListener('click', function() { loadData(1); });
+
+  function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+
+  function loadData(page) {
+    currentPage = page || 1;
+    elLoading.classList.remove('d-none');
+    elResults.classList.add('d-none');
+    elEmpty.classList.add('d-none');
+
+    var params = new URLSearchParams();
+    params.set('page', currentPage);
+    if (elDateFrom.value) params.set('date_from', elDateFrom.value);
+    if (elDateTo.value) params.set('date_to', elDateTo.value);
+    if (elSupplier.value) params.set('supplier', elSupplier.value);
+
+    fetch('/api/po/list?' + params.toString())
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        elLoading.classList.add('d-none');
+        var items = data.items || [];
+        var total = data.total || 0;
+        if (items.length === 0) { elEmpty.classList.remove('d-none'); return; }
+
+        elResults.classList.remove('d-none');
+        elCount.textContent = total + ' pesanan ditemukan';
+        elBody.innerHTML = '';
+
+        items.forEach(function(o) {
+          var tr = document.createElement('tr');
+          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.po_number + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          if (canEdit) {
+            actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+          }
+          actions += ' <button class="btn btn-sm btn-outline-danger btn-pdf-po" data-po="' + o.po_number + '" title="Export PDF"><i class="bi bi-file-earmark-pdf"></i></button>';
+          if (canDelete) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-po" data-po="' + o.po_number + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
+          tr.innerHTML = '<td><code>' + o.po_number + '</code></td>'
+            + '<td>' + (o.tgl_pesanan || '-') + '</td>'
+            + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+            + '<td class="text-center">' + (o.total_items || 0) + '</td>'
+            + '<td>' + (o.date_from || '') + ' ~ ' + (o.date_to || '') + '</td>'
+            + '<td>' + (o.created_by || '') + '</td>'
+            + '<td class="text-nowrap">' + actions + '</td>';
+          elBody.appendChild(tr);
+        });
+
+        lastItems = items;
+        renderPagination(total);
+        bindListButtons();
+      });
+  }
+
+  // --- Client-side sorting ---
+  var lastItems = [];
+  var sortState = { key: null, asc: true };
+
+  function getSortVal(o, key) {
+    switch(key) {
+      case 'po_number': return o.po_number || '';
+      case 'tgl_pesanan': return o.tgl_pesanan || '';
+      case 'supplier_name': return (o.supplier_name || o.suppid || '').toLowerCase();
+      case 'total_items': return Number(o.total_items) || 0;
+      case 'date_from': return o.date_from || '';
+      case 'created_by': return (o.created_by || '').toLowerCase();
+      default: return '';
+    }
+  }
+
+  function sortAndRender() {
+    if (!lastItems.length) return;
+    var sorted = lastItems.slice();
+    if (sortState.key) {
+      sorted.sort(function(a, b) {
+        var va = getSortVal(a, sortState.key);
+        var vb = getSortVal(b, sortState.key);
+        if (typeof va === 'number') return sortState.asc ? va - vb : vb - va;
+        if (va < vb) return sortState.asc ? -1 : 1;
+        if (va > vb) return sortState.asc ? 1 : -1;
+        return 0;
+      });
+    }
+    elBody.innerHTML = '';
+    sorted.forEach(function(o) {
+      var tr = document.createElement('tr');
+      var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.po_number + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+      if (canEdit) {
+        actions += ' <a href="/pesanan-pembelian/input?edit=' + encodeURIComponent(o.po_number) + '" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>';
+      }
+      actions += ' <button class="btn btn-sm btn-outline-danger btn-pdf-po" data-po="' + o.po_number + '" title="Export PDF"><i class="bi bi-file-earmark-pdf"></i></button>';
+      if (canDelete) {
+        actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-po" data-po="' + o.po_number + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+      }
+      tr.innerHTML = '<td><code>' + o.po_number + '</code></td>'
+        + '<td>' + (o.tgl_pesanan || '-') + '</td>'
+        + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+        + '<td class="text-center">' + (o.total_items || 0) + '</td>'
+        + '<td>' + (o.date_from || '') + ' ~ ' + (o.date_to || '') + '</td>'
+        + '<td>' + (o.created_by || '') + '</td>'
+        + '<td class="text-nowrap">' + actions + '</td>';
+      elBody.appendChild(tr);
+    });
+    bindListButtons();
+    updateSortIcons();
+  }
+
+  function updateSortIcons() {
+    document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+      var icon = th.querySelector('i');
+      if (th.dataset.col === sortState.key) {
+        icon.className = sortState.asc ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      } else {
+        icon.className = 'bi bi-chevron-expand';
+      }
+    });
+  }
+
+  document.querySelectorAll('#hResults th[data-col]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = th.dataset.col;
+      if (sortState.key === key) { sortState.asc = !sortState.asc; }
+      else { sortState.key = key; sortState.asc = true; }
+      sortAndRender();
+    });
+  });
+
+  function renderPagination(total) {
+    var totalPages = Math.ceil(total / 20);
+    elPageList.innerHTML = '';
+    if (totalPages <= 1) return;
+    var startPage = Math.max(1, currentPage - 2);
+    var endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    if (currentPage > 1) addPageBtn('«', currentPage - 1);
+    for (var p = startPage; p <= endPage; p++) addPageBtn(p, p, p === currentPage);
+    if (currentPage < totalPages) addPageBtn('»', currentPage + 1);
+  }
+
+  function addPageBtn(label, page, active) {
+    var li = document.createElement('li');
+    li.className = 'page-item' + (active ? ' active' : '');
+    var a = document.createElement('a');
+    a.className = 'page-link'; a.href = '#'; a.textContent = label;
+    a.addEventListener('click', function(e) { e.preventDefault(); loadData(page); });
+    li.appendChild(a); elPageList.appendChild(li);
+  }
+
+  function bindListButtons() {
+    document.querySelectorAll('#hTableBody .btn-view-po').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var po = btn.dataset.po;
+        var res = await fetch('/api/po/' + encodeURIComponent(po));
+        var data = await res.json();
+        if (data.error) { window.showToast && showToast(data.error, 'danger'); return; }
+        document.getElementById('detailPONumber').textContent = data.po_number;
+        document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
+        document.getElementById('detailDate').textContent = data.tgl_pesanan || '';
+        document.getElementById('detailPeriod').textContent = (data.date_from || '') + ' ~ ' + (data.date_to || '');
+        var tbody = document.getElementById('detailLines');
+        tbody.innerHTML = '';
+        (data.lines || []).forEach(function(line, i) {
+          var tr = document.createElement('tr');
+          var packing = Math.round(line.packing) || 1;
+          var qtyBsr = Math.floor(line.qty_order || 0);
+          var totalKcl = Math.round(line.qty_order_kcl || 0);
+          var remKcl = Math.round(totalKcl - qtyBsr * packing);
+          var qtyParts = [];
+          if (qtyBsr > 0) qtyParts.push(fmtNum(qtyBsr) + ' ' + line.satbesar);
+          if (remKcl > 0) qtyParts.push(fmtNum(remKcl) + ' ' + (line.satkecil || 'Pcs'));
+          var qtyStr = qtyParts.join(' ') || fmtNum(totalKcl) + ' ' + (line.satkecil || 'Pcs');
+          var hbelikcl = packing > 0 ? (line.hbelibsr || 0) / packing : 0;
+          var totalHarga = hbelikcl * totalKcl;
+          tr.innerHTML = '<td>' + (i + 1) + '</td>'
+            + '<td><code>' + line.artno + '</code></td>'
+            + '<td>' + line.artpabrik + '</td>'
+            + '<td>' + line.artname + '</td>'
+            + '<td class="text-end">' + packing + '/' + line.satbesar + '</td>'
+            + '<td class="text-end">' + qtyStr + '</td>'
+            + '<td class="text-end">' + fmtNum(totalHarga) + '</td>';
+          tbody.appendChild(tr);
+        });
+        new bootstrap.Modal(document.getElementById('poDetailModal')).show();
+      });
+    });
+
+    document.querySelectorAll('#hTableBody .btn-pdf-po').forEach(function(btn) {
+      btn.addEventListener('click', function() { exportPDF(btn.dataset.po); });
+    });
+
+    document.querySelectorAll('#hTableBody .btn-delete-po').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var po = btn.dataset.po;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus pesanan ' + po + '?') : Promise.resolve(confirm('Hapus pesanan ' + po + '?')));
+        if (!confirmed) return;
+        var res = await fetch('/api/po/' + encodeURIComponent(po), { method: 'DELETE' });
+        var data = await res.json();
+        if (data.ok) {
+          window.showToast && showToast('Pesanan ' + po + ' berhasil dihapus');
+          loadData(currentPage);
+        } else {
+          window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+        }
+      });
+    });
+  }
+
+  // PDF export from detail modal
+  document.getElementById('detailExportPDF').addEventListener('click', function() {
+    var po = document.getElementById('detailPONumber').textContent;
+    if (po) exportPDF(po);
+  });
+
+  function exportPDF(poNumber) {
+    fetch('/api/po/' + encodeURIComponent(poNumber))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) { window.showToast && showToast(data.error, 'danger'); return; }
+        generatePDF(data);
+      })
+      .catch(function(e) { window.showToast && showToast('Error: ' + e.message, 'danger'); });
+  }
+
+  function generatePDF(data) {
+    var jsPDF = window.jspdf.jsPDF;
+    // A5 landscape: 210 x 148 mm
+    var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a5' });
+    var pageW = 210, pageH = 148;
+    var marginL = 8, marginR = 8, marginT = 8;
+    var contentW = pageW - marginL - marginR;
+
+    var lines = data.lines || [];
+    var rowsPerPage = 18;
+    var totalPages = Math.ceil(lines.length / rowsPerPage) || 1;
+
+    for (var pg = 0; pg < totalPages; pg++) {
+      if (pg > 0) doc.addPage();
+      var y = marginT;
+
+      // ---- HEADER ----
+      // Store name (bold, larger)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(storeName || 'TokoHub', marginL, y + 4);
+
+      // Store location (smaller, below store name)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      if (storeLocation) {
+        doc.text(storeLocation, marginL, y + 8);
+      }
+
+      // Decorative circles (3 grey circles, top center)
+      var circleR = 2;
+      var circleY = y + 5;
+      var circleCenterX = pageW / 2;
+      doc.setFillColor(200, 200, 200);
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.circle(circleCenterX - 40, circleY, circleR, 'FD');
+      doc.circle(circleCenterX + 40, circleY, circleR, 'FD');
+
+      // Right side: "PESANAN PEMBELIAN" title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('PESANAN PEMBELIAN', pageW - marginR, y + 4, { align: 'right' });
+
+      // Page number
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Hal: ' + (pg + 1) + '/' + totalPages, pageW - marginR, y + 8, { align: 'right' });
+
+      y += 12;
+
+      // Horizontal line
+      doc.setLineWidth(0.5);
+      doc.line(marginL, y, pageW - marginR, y);
+      y += 3;
+
+      // ---- INFO FIELDS ----
+      var infoFontSize = 8;
+      doc.setFontSize(infoFontSize);
+      var colLeft = marginL;
+      var colRight = marginL + contentW * 0.5;
+
+      doc.setFont('helvetica', 'normal');
+      doc.text('No. Pesanan', colLeft, y);
+      doc.text(': ' + data.po_number, colLeft + 24, y);
+      doc.text('Tgl Pesanan', colRight, y);
+      doc.text(': ' + (data.tgl_pesanan || ''), colRight + 24, y);
+      y += 4;
+
+      doc.text('Terima Dari', colLeft, y);
+      doc.text(': ' + (data.supplier_name || data.suppid || ''), colLeft + 24, y);
+      y += 5;
+
+      // ---- TABLE ----
+      var pageLines = lines.slice(pg * rowsPerPage, (pg + 1) * rowsPerPage);
+      var tableHead = [['No', 'Barcode', 'Nama Barang', 'QTY Order', 'Bonus', 'Jlh']];
+      var tableBody = [];
+
+      pageLines.forEach(function(line, idx) {
+        var no = pg * rowsPerPage + idx + 1;
+        var packing = line.packing || 1;
+        var qtyBsr = Math.floor(line.qty_order || 0);
+        var totalKcl = Math.round(line.qty_order_kcl || 0);
+        var remKcl = Math.round(totalKcl - qtyBsr * packing);
+        var satBesar = line.satbesar || '';
+        var satKecil = line.satkecil || '';
+
+        // Build QTY Order with space between qty and unit
+        var qtyParts = [];
+        if (qtyBsr > 0) qtyParts.push(fmtNum(qtyBsr) + ' ' + satBesar);
+        if (remKcl > 0) qtyParts.push(fmtNum(remKcl) + ' ' + satKecil);
+        var qtyStr = qtyParts.length ? qtyParts.join('  ') : '0';
+
+        tableBody.push([
+          no,
+          line.artpabrik || '',
+          line.artname || '',
+          qtyStr,
+          '-',
+          fmtNum(totalKcl) + ' ' + satKecil,
+        ]);
+      });
+
+      doc.autoTable({
+        startY: y,
+        head: tableHead,
+        body: tableBody,
+        theme: 'plain',
+        styles: { fontSize: 7, cellPadding: 1 },
+        headStyles: { fillColor: false, textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', lineColor: [0, 0, 0], lineWidth: 0.2 },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 8 },
+          1: { cellWidth: 28 },
+          2: { cellWidth: 'auto' },
+          3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' },
+          4: { halign: 'right', cellWidth: 16 },
+          5: { halign: 'right', cellWidth: 26 },
+        },
+        margin: { left: marginL, right: marginR },
+        tableWidth: contentW,
+        didParseCell: function(data) {
+          // Add top/bottom borders on header row only
+          if (data.section === 'head') {
+            data.cell.styles.lineColor = [0, 0, 0];
+            data.cell.styles.lineWidth = 0.2;
+          }
+        },
+        didDrawCell: function(data) {
+          // Draw horizontal line under each body row
+          if (data.section === 'body' && data.column.index === 0) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.1);
+            doc.line(marginL, data.cell.y + data.cell.height, pageW - marginR, data.cell.y + data.cell.height);
+          }
+        },
+      });
+
+      var afterTableY = doc.lastAutoTable.finalY || y + 40;
+
+      // ---- FOOTER: Notes left, Signatures right ----
+      var footerY = Math.max(afterTableY + 6, pageH - 36);
+
+      // NOTES box (left side)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text('NOTES:', marginL, footerY);
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.2);
+      doc.rect(marginL, footerY + 1, contentW * 0.45, 12);
+
+      // Signature boxes (right side)
+      var sigW = 36;
+      var sigGap = 10;
+      var sigRightEnd = pageW - marginR;
+      var sig2X = sigRightEnd - sigW;
+      var sig1X = sig2X - sigGap - sigW;
+      doc.setFontSize(8);
+
+      doc.text('Penerima Barang', sig1X + sigW / 2, footerY, { align: 'center' });
+      doc.line(sig1X, footerY + 13, sig1X + sigW, footerY + 13);
+
+      doc.text('Pemesan', sig2X + sigW / 2, footerY, { align: 'center' });
+      doc.line(sig2X, footerY + 13, sig2X + sigW, footerY + 13);
+    }
+
+    doc.save('pesanan_' + data.po_number + '.pdf');
+  }
+
+})();
+</script>
+{% endblock %}

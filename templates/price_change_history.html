@@ -42,11 +42,11 @@
       <table class="sh-table">
         <thead>
           <tr>
-            <th>No. PH</th>
-            <th>Tanggal</th>
-            <th>Keterangan</th>
-            <th>User</th>
-            <th class="text-center">Items</th>
+            <th class="sh-sortable" data-col="nobukti">No. PH <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="tglberlaku">Tanggal <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="uraian">Keterangan <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="userid">User <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable text-center" data-col="line_count">Items <i class="bi bi-chevron-expand"></i></th>
             <th></th>
           </tr>
         </thead>
@@ -126,7 +126,7 @@
   var perPage = 20;
 
   // Default date range: today
-  var today = new Date().toISOString().split('T')[0];
+  var _d = new Date(); var today = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
   elDateFrom.value = today;
   elDateTo.value = today;
 
@@ -167,6 +167,7 @@
         elResults.classList.remove('d-none');
         elCount.textContent = total + ' perubahan harga ditemukan';
 
+        lastItems = items;
         elBody.innerHTML = '';
         items.forEach(function(o) {
           var tr = document.createElement('tr');
@@ -331,6 +332,82 @@
       });
     });
   }
+
+  // --- Client-side sorting ---
+  var lastItems = [];
+  var sortState = { key: null, asc: true };
+
+  function getSortVal(o, key) {
+    switch(key) {
+      case 'nobukti': return o.nobukti || '';
+      case 'tglberlaku': return o.tglberlaku || '';
+      case 'uraian': return (o.uraian || '').toLowerCase();
+      case 'userid': return (o.userid || '').toLowerCase();
+      case 'line_count': return Number(o.line_count) || 0;
+      default: return '';
+    }
+  }
+
+  function sortAndRender() {
+    if (!lastItems.length) return;
+    var sorted = lastItems.slice();
+    if (sortState.key) {
+      sorted.sort(function(a, b) {
+        var va = getSortVal(a, sortState.key);
+        var vb = getSortVal(b, sortState.key);
+        if (typeof va === 'number') return sortState.asc ? va - vb : vb - va;
+        if (va < vb) return sortState.asc ? -1 : 1;
+        if (va > vb) return sortState.asc ? 1 : -1;
+        return 0;
+      });
+    }
+    elBody.innerHTML = '';
+    sorted.forEach(function(o) {
+      var tr = document.createElement('tr');
+      var actions = '<button class="btn btn-sm btn-outline-primary btn-view-ph" data-ph="' + esc(o.nobukti) + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+      if (canEdit && !o.islocked) {
+        actions += ' <a href="/perubahan-harga/input?edit=' + encodeURIComponent(o.nobukti) + '" class="btn btn-sm btn-outline-success" title="Edit"><i class="bi bi-pencil"></i></a>';
+      }
+      if (canDelete && !o.islocked) {
+        actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-ph" data-ph="' + esc(o.nobukti) + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+      }
+      if (canLock) {
+        var lockCls = o.islocked ? 'btn-warning' : 'btn-outline-secondary';
+        var lockIcon = o.islocked ? 'lock-fill' : 'unlock';
+        var lockTitle = o.islocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
+        actions += ' <button class="btn btn-sm btn-lock-ph ' + lockCls + '" data-ph="' + esc(o.nobukti) + '" data-locked="' + (o.islocked ? 1 : 0) + '" title="' + lockTitle + '"><i class="bi bi-' + lockIcon + '"></i></button>';
+      }
+      tr.innerHTML = '<td><code>' + esc(o.nobukti) + '</code></td>'
+        + '<td>' + (o.tglberlaku || '-') + '</td>'
+        + '<td>' + esc(o.uraian || '') + '</td>'
+        + '<td>' + esc(o.userid || '') + '</td>'
+        + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+        + '<td class="text-nowrap">' + actions + '</td>';
+      elBody.appendChild(tr);
+    });
+    bindButtons();
+    updateSortIcons();
+  }
+
+  function updateSortIcons() {
+    document.querySelectorAll('#phResults th[data-col]').forEach(function(th) {
+      var icon = th.querySelector('i');
+      if (th.dataset.col === sortState.key) {
+        icon.className = sortState.asc ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      } else {
+        icon.className = 'bi bi-chevron-expand';
+      }
+    });
+  }
+
+  document.querySelectorAll('#phResults th[data-col]').forEach(function(th) {
+    th.addEventListener('click', function() {
+      var key = th.dataset.col;
+      if (sortState.key === key) { sortState.asc = !sortState.asc; }
+      else { sortState.key = key; sortState.asc = true; }
+      sortAndRender();
+    });
+  });
 
   elBtnSearch.addEventListener('click', function() { loadData(1); });
   elDateFrom.addEventListener('change', function() { loadData(1); });

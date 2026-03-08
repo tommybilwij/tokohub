@@ -16,8 +16,19 @@ import config
 from config import save_to_envrc, _ENVRC_PATH
 from models.settings import SettingsUpdate
 from services.llm import get_openai_config, save_openai_config
+from services import app_settings
 
 logger = logging.getLogger(__name__)
+
+_DB_KEYS = ('fuzzy_cache_ttl', 'fuzzy_top_n', 'fuzzy_min_score',
+            'pc_top_n', 'pc_min_score', 'po_top_n', 'po_min_score',
+            'session_max_age')
+
+
+async def _get_db_settings(pool) -> dict:
+    """Read fuzzy settings from DB, return as int dict."""
+    all_s = await app_settings.get_all(pool)
+    return {k: int(all_s.get(k, 0)) for k in _DB_KEYS}
 
 router = APIRouter()
 
@@ -47,16 +58,13 @@ async def api_settings_get(db: aiomysql.Pool = Depends(get_db)):
             'deployment_id': openai_cfg['deployment_id'],
             'api_version': openai_cfg['api_version'],
         },
-        'fuzzy_cache_ttl': config.settings.fuzzy_cache_ttl,
-        'fuzzy_top_n': config.settings.fuzzy_top_n,
-        'fuzzy_min_score': config.settings.fuzzy_min_score,
-        'pc_top_n': config.settings.pc_top_n,
-        'pc_min_score': config.settings.pc_min_score,
+        **(await _get_db_settings(db)),
         'server_port': config.settings.server_port,
         'server_host': config.settings.server_host,
         'lan_mode': config.settings.lan_mode,
         'mdns_hostname': config.settings.mdns_hostname,
         'store_name': config.settings.store_name,
+        'store_location': config.settings.store_location,
     }
 
 
@@ -78,10 +86,17 @@ async def api_settings_post(data: SettingsUpdate, db: aiomysql.Pool = Depends(ge
         # Save OpenAI config to DB
         if 'openai' in raw:
             openai_data = raw.pop('openai')
-            # Merge with existing config (so partial updates work)
             existing = await get_openai_config(db)
             existing.update(openai_data)
             await save_openai_config(db, existing)
+
+        # Save fuzzy matching settings to DB (no restart needed)
+        fuzzy_data = {}
+        for k in _DB_KEYS:
+            if k in raw:
+                fuzzy_data[k] = raw.pop(k)
+        if fuzzy_data:
+            await app_settings.save_many(db, fuzzy_data)
 
         # Save everything else to envrc
         if raw:
@@ -142,11 +157,3 @@ async def api_restart():
     return {'ok': True}
 
 
-@router.post('/api/snapshots/cleanup')
-async def api_cleanup_snapshots(request: Request, db=Depends(get_db)):
-    user = getattr(request.state, 'user', None)
-    if not user or user['role'] != 'admin':
-        return JSONResponse({'error': 'Forbidden'}, status_code=403)
-    from services.snapshot_service import delete_all_snapshots
-    count = await delete_all_snapshots(db)
-    return {'ok': True, 'deleted': count}

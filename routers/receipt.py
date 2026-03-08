@@ -117,6 +117,8 @@ async def preview_fp(data: FPPreviewRequest, db: aiomysql.Pool = Depends(get_db)
     supplier_id = data.supplier_id.strip()
     items = [item.model_dump() for item in data.items]
     order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
+    due_date = date.fromisoformat(data.due_date) if data.due_date else None
+    uraian = (data.uraian or '').strip()[:50] or None
 
     if not supplier_id or not items:
         return JSONResponse({'error': 'supplier_id and items are required'}, status_code=400)
@@ -136,13 +138,15 @@ async def commit_fp(data: FPCommitRequest, db: aiomysql.Pool = Depends(get_db)):
     userid = data.userid.strip()
     items = [item.model_dump() for item in data.items]
     order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
+    due_date = date.fromisoformat(data.due_date) if data.due_date else None
+    uraian = (data.uraian or '').strip()[:50] or None
 
     if not supplier_id or not items or not userid:
         return JSONResponse({'error': 'supplier_id, userid, and items are required'}, status_code=400)
 
     try:
         from services.fp_service import commit_fp as _commit
-        result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price)
+        result = await _commit(db, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price, due_date=due_date, uraian=uraian)
         return result
     except Exception as e:
         logger.exception("FP commit failed")
@@ -182,10 +186,10 @@ async def get_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
 
 @router.get('/api/fp/{fp_number}/snapshot')
 async def get_fp_snapshot(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
-    from services.snapshot_service import get_snapshot
-    result = await get_snapshot(db, fp_number)
+    from services.fp_service import get_fp_comparison
+    result = await get_fp_comparison(db, fp_number)
     if not result:
-        return JSONResponse({'error': 'No snapshot found'}, status_code=404)
+        return JSONResponse({'error': 'No comparison data found'}, status_code=404)
     return result
 
 
@@ -227,13 +231,15 @@ async def update_fp(data: FPUpdateRequest, db: aiomysql.Pool = Depends(get_db)):
     fp_number = data.fp_number.strip()
     items = [item.model_dump() for item in data.items]
     order_date = date.fromisoformat(data.order_date) if data.order_date else date.today()
+    due_date = date.fromisoformat(data.due_date) if data.due_date else None
+    uraian = (data.uraian or '').strip()[:50] or None
 
     if not supplier_id or not items or not userid or not fp_number:
         return JSONResponse({'error': 'fp_number, supplier_id, userid, and items are required'}, status_code=400)
 
     try:
         from services.fp_service import update_fp as _update
-        result = await _update(db, fp_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price)
+        result = await _update(db, fp_number, supplier_id, items, order_date, userid=userid, shipping_cost=data.shipping_cost, update_price=data.update_price, due_date=due_date, uraian=uraian)
         return result
     except Exception as e:
         logger.exception("Faktur update failed")

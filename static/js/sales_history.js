@@ -93,12 +93,12 @@
   // -----------------------------------------------------------------------
   function fmt(n) {
     if (n == null || isNaN(n)) return '0';
-    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return Number(n).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function fmtInt(n) {
     if (n == null || isNaN(n)) return '0';
-    return Number(n).toLocaleString('en-US');
+    return Number(n).toLocaleString('id-ID');
   }
 
   function pad(d) { return String(d).padStart(2, '0'); }

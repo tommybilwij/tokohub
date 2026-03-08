@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     pc_top_n: int = 10
     pc_min_score: int = 30
 
+    # Fuzzy matching (Pesanan Pembelian)
+    po_top_n: int = 50
+    po_min_score: int = 40
+
     # Server
     server_port: int = 5000
     server_host: str = '127.0.0.1'
@@ -111,6 +115,7 @@ class Settings(BaseSettings):
 
     # Branding
     store_name: str = ''
+    store_location: str = ''
 
     # Database
     db: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -179,17 +184,14 @@ _KEY_TO_ENV = {
     'db.password': 'DB_PASSWORD',
     'db.name': 'DB_NAME',
     'db.pool_size': 'DB_POOL_SIZE',
-    'fuzzy_cache_ttl': 'FUZZY_CACHE_TTL',
-    'fuzzy_top_n': 'FUZZY_TOP_N',
-    'fuzzy_min_score': 'FUZZY_MIN_SCORE',
-    'pc_top_n': 'PC_TOP_N',
-    'pc_min_score': 'PC_MIN_SCORE',
+    # fuzzy settings now stored in DB (tokohub.app_settings)
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
     'store_name': 'STORE_NAME',
-    'session_max_age': 'SESSION_MAX_AGE',
+    'store_location': 'STORE_LOCATION',
+    # session_max_age now stored in DB (tokohub.app_settings)
 }
 
 

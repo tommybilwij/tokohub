@@ -4,7 +4,6 @@ Handles reading stock prices, writing price changes to
 myposse.sthist (tipetrans=0) and icphg header.
 """
 
-import json
 import logging
 from datetime import date
 from decimal import Decimal
@@ -62,7 +61,7 @@ async def _generate_ph_number(cursor, order_date):
     return f"{prefix}{seq:05d}"
 
 
-async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict:
+async def commit_price_change(pool, items: list[dict], userid: str = '', uraian: str = '') -> dict:
     """Commit price changes.
 
     Each item: {artno, hjual, hjual2, hjual3, hjual4, hjual5}
@@ -122,16 +121,24 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                 # Bundling 1
                 b1 = item.get('bundling1')
                 if b1:
-                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
-                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                    update_cols.extend(['over1=%s', 'hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('min_qty', 0)),
+                                        float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
                                         float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
 
                 # Bundling 2
                 b2 = item.get('bundling2')
                 if b2:
-                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
-                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                    update_cols.extend(['over2=%s', 'hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('min_qty', 0)),
+                                        float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
                                         float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                # Update ispaketprc flag if any bundling was provided
+                if b1 or b2:
+                    has_bnd = 1 if ((b1 and float(b1.get('min_qty', 0))) or (b2 and float(b2.get('min_qty', 0)))) else 0
+                    update_cols.append('ispaketprc=%s')
+                    update_vals.append(has_bnd)
 
                 update_vals.append(artno)
                 await cursor.execute(
@@ -139,11 +146,14 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                     tuple(update_vals)
                 )
 
-                # Bundling values for sthist — use new if changed, else keep old
+                # Bundling values for sthist — use new if changed, else keep old from stock
                 sthist_o1 = [float(b1.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b1 else [
                     stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
                 sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
                     stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
+                sthist_over1 = float(b1.get('min_qty', 0)) if b1 else stock['over1']
+                sthist_over2 = float(b2.get('min_qty', 0)) if b2 else stock['over2']
+                sthist_ispaketprc = (1 if (sthist_over1 or sthist_over2) else 0) if (b1 or b2) else stock['ispaketprc']
 
                 # 2. Insert into sthist (tipetrans=0)
                 await cursor.execute(
@@ -182,7 +192,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                         new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
                         *sthist_o1,
                         *sthist_o2,
-                        stock['over1'], stock['over2'], stock['ispaketprc'],
+                        sthist_over1, sthist_over2, sthist_ispaketprc,
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
@@ -190,15 +200,16 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                 )
 
             # Insert icphg header
-            uraian = ', '.join(i.get('artno', '') for i in items[:3])
-            if len(items) > 3:
-                uraian += f' +{len(items) - 3}'
-            # Use first item artname if available for more readable uraian
-            first_stock = before_map.get(items[0]['artno'])
-            if first_stock:
-                uraian = first_stock['artname'] or uraian
-                if len(items) > 1:
-                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            if not uraian:
+                uraian = ', '.join(i.get('artno', '') for i in items[:3])
+                if len(items) > 3:
+                    uraian += f' +{len(items) - 3}'
+                # Use first item artname if available for more readable uraian
+                first_stock = before_map.get(items[0]['artno'])
+                if first_stock:
+                    uraian = first_stock['artname'] or uraian
+                    if len(items) > 1:
+                        uraian = uraian[:80] + f' +{len(items) - 1}'
             await cursor.execute(
                 """INSERT INTO icphg (nobukti, becreff, tglberlaku, uraian, userid)
                    VALUES (%s, %s, %s, %s, %s)""",
@@ -220,7 +231,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
     return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
 
 
-async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -> dict:
+async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', uraian: str = '') -> dict:
     """Update an existing Perubahan Harga.
 
     Strategy: delete old sthist lines, restore old stock prices,
@@ -239,17 +250,23 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
 
     becreff = header['becreff']
 
-    # Get old sthist lines to restore prices
+    # Get old sthist lines for restoration
     old_lines = await execute_query(
         pool,
-        """SELECT stockid, oprice, noindex,
-                  hjual, hjual2, hjual3, hjual4, hjual5,
-                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
-                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
-           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
-    noindex_max = max((l['noindex'] for l in old_lines), default=0)
+
+    # Build per-item noindex range
+    item_noindex = {}
+    for line in old_lines:
+        artno = line['stockid']
+        ni = line['noindex']
+        if artno not in item_noindex:
+            item_noindex[artno] = {'min': ni, 'max': ni}
+        else:
+            item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
+            item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
     # Phase 1: Atomic — delete old sthist lines
     async with pool.acquire() as conn:
@@ -263,40 +280,22 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                 await conn.rollback()
                 raise
 
-    # Phase 2: Restore old stock prices where no newer change exists
-    for line in old_lines:
-        artno = line['stockid']
-        newer = await execute_single(
-            pool,
-            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
-            (artno, noindex_max),
-        )
-        if newer:
+    # Phase 2: Restore old stock hjual+bundling from previous sthist entries
+    from services.stock_restore import (
+        get_previous_hjual, has_newer_hjual_update, get_init_hjual,
+        RESTORE_HJUAL_SQL, hjual_params,
+    )
+    for artno, ni in item_noindex.items():
+        if await has_newer_hjual_update(pool, artno, ni['max']):
             continue
-        old_hjual = float(line.get('oprice') or 0)
-        if not old_hjual:
-            continue
-        prev = await execute_single(
-            pool,
-            """SELECT hjual2, hjual3, hjual4, hjual5
-               FROM sthist WHERE stockid = %s AND noindex < %s
-               ORDER BY noindex DESC LIMIT 1""",
-            (artno, min(l['noindex'] for l in old_lines if l['stockid'] == artno)),
-        )
-        try:
-            if prev:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
-                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
-                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
-                )
-            else:
-                await execute_modify(
-                    pool, "UPDATE stock SET hjual=%s WHERE artno=%s", (old_hjual, artno),
-                )
-        except Exception:
-            logger.warning("Failed to restore price for %s during update", artno, exc_info=True)
+        prev = await get_previous_hjual(pool, artno, ni['min'])
+        if not prev:
+            prev = await get_init_hjual(pool, artno)
+        if prev:
+            try:
+                await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+            except Exception:
+                logger.warning("Failed to restore price for %s during update", artno, exc_info=True)
 
     # Phase 3: Re-read current stock prices and apply new changes
     artnos = [i['artno'] for i in items]
@@ -333,14 +332,22 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
 
                 b1 = item.get('bundling1')
                 if b1:
-                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
-                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                    update_cols.extend(['over1=%s', 'hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('min_qty', 0)),
+                                        float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
                                         float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
                 b2 = item.get('bundling2')
                 if b2:
-                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
-                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                    update_cols.extend(['over2=%s', 'hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('min_qty', 0)),
+                                        float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
                                         float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                # Update ispaketprc flag if any bundling was provided
+                if b1 or b2:
+                    has_bnd = 1 if ((b1 and float(b1.get('min_qty', 0))) or (b2 and float(b2.get('min_qty', 0)))) else 0
+                    update_cols.append('ispaketprc=%s')
+                    update_vals.append(has_bnd)
 
                 update_vals.append(artno)
                 await cursor.execute(
@@ -352,6 +359,9 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                     stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
                 sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
                     stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
+                sthist_over1 = float(b1.get('min_qty', 0)) if b1 else stock['over1']
+                sthist_over2 = float(b2.get('min_qty', 0)) if b2 else stock['over2']
+                sthist_ispaketprc = (1 if (sthist_over1 or sthist_over2) else 0) if (b1 or b2) else stock['ispaketprc']
 
                 await cursor.execute(
                     """INSERT INTO sthist (
@@ -389,7 +399,7 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                         new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
                         *sthist_o1,
                         *sthist_o2,
-                        stock['over1'], stock['over2'], stock['ispaketprc'],
+                        sthist_over1, sthist_over2, sthist_ispaketprc,
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
@@ -397,14 +407,15 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                 )
 
             # Update icphg header
-            uraian = ', '.join(i.get('artno', '') for i in items[:3])
-            if len(items) > 3:
-                uraian += f' +{len(items) - 3}'
-            first_stock = before_map.get(items[0]['artno'])
-            if first_stock:
-                uraian = first_stock['artname'] or uraian
-                if len(items) > 1:
-                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            if not uraian:
+                uraian = ', '.join(i.get('artno', '') for i in items[:3])
+                if len(items) > 3:
+                    uraian += f' +{len(items) - 3}'
+                first_stock = before_map.get(items[0]['artno'])
+                if first_stock:
+                    uraian = first_stock['artname'] or uraian
+                    if len(items) > 1:
+                        uraian = uraian[:80] + f' +{len(items) - 1}'
             await cursor.execute(
                 "UPDATE icphg SET uraian = %s, userid = %s WHERE nobukti = %s",
                 (uraian[:200], userid, ph_number)
@@ -422,7 +433,7 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
 
 
 async def delete_ph(pool, ph_number: str) -> dict:
-    """Delete a Perubahan Harga: restore old prices where possible, hard-delete rows."""
+    """Delete a Perubahan Harga: restore old hjual+bundling from sthist history, hard-delete rows."""
     header = await execute_single(
         pool,
         "SELECT nobukti, becreff, islocked FROM icphg WHERE nobukti = %s",
@@ -438,12 +449,20 @@ async def delete_ph(pool, ph_number: str) -> dict:
     # Get sthist lines for price restoration
     lines = await execute_query(
         pool,
-        """SELECT stockid, oprice, noindex,
-                  hjual, hjual2, hjual3, hjual4, hjual5
-           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
-    noindex_max = max((l['noindex'] for l in lines), default=0)
+
+    # Build per-item noindex range
+    item_noindex = {}
+    for line in lines:
+        artno = line['stockid']
+        ni = line['noindex']
+        if artno not in item_noindex:
+            item_noindex[artno] = {'min': ni, 'max': ni}
+        else:
+            item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
+            item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
     # Phase 1 — Atomic: delete sthist + icphg
     async with pool.acquire() as conn:
@@ -461,45 +480,23 @@ async def delete_ph(pool, ph_number: str) -> dict:
                 logger.exception("Price change delete failed")
                 raise
 
-    # Phase 2 — Restore prices where no newer change exists
-    for line in lines:
-        artno = line['stockid']
-        newer = await execute_single(
-            pool,
-            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
-            (artno, noindex_max),
-        )
-        if newer:
-            continue
+    # Phase 2 — Restore hjual + bundling from previous sthist entries
+    from services.stock_restore import (
+        get_previous_hjual, has_newer_hjual_update, get_init_hjual,
+        RESTORE_HJUAL_SQL, hjual_params,
+    )
 
-        old_hjual = float(line.get('oprice') or 0)
-        if not old_hjual:
+    for artno, ni in item_noindex.items():
+        if await has_newer_hjual_update(pool, artno, ni['max']):
             continue
-
-        # oprice only stores old hjual; look for previous sthist to get hjual2-5
-        prev = await execute_single(
-            pool,
-            """SELECT hjual2, hjual3, hjual4, hjual5
-               FROM sthist WHERE stockid = %s AND noindex < %s
-               ORDER BY noindex DESC LIMIT 1""",
-            (artno, min(l['noindex'] for l in lines if l['stockid'] == artno)),
-        )
-        try:
-            if prev:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
-                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
-                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
-                )
-            else:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s WHERE artno=%s",
-                    (old_hjual, artno),
-                )
-        except Exception:
-            logger.warning("Failed to restore price for %s", artno, exc_info=True)
+        prev = await get_previous_hjual(pool, artno, ni['min'])
+        if not prev:
+            prev = await get_init_hjual(pool, artno)
+        if prev:
+            try:
+                await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+            except Exception:
+                logger.warning("Failed to restore hjual for %s", artno, exc_info=True)
 
     try:
         from services.stock_search import invalidate_cache
@@ -558,18 +555,27 @@ async def get_ph_detail(pool, ph_number: str) -> dict | None:
         pool,
         """SELECT stockid, artpabrik, artname, oprice, hjual, hjual2, hjual3, hjual4, hjual5,
                   hbelibsr, hbelikcl, hbelinetto, packing, satuanbsr, satuankcl,
-                  pctdisc1, pctdisc2, pctdisc3, pctppn
+                  pctdisc1, pctdisc2, pctdisc3, pctppn,
+                  over1, over2, ispaketprc,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
            FROM sthist WHERE becreff = %s AND tipetrans = 0 ORDER BY noindex""",
         (header['becreff'],),
     )
     result = dict(header)
     result['tglberlaku'] = result['tglberlaku'].isoformat() if result['tglberlaku'] else ''
     result['lines'] = []
+    _float_keys = (
+        'oprice', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
+        'hbelibsr', 'hbelikcl', 'hbelinetto', 'packing',
+        'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn',
+        'over1', 'over2',
+        'hjualo1', 'hjual2o1', 'hjual3o1', 'hjual4o1', 'hjual5o1',
+        'hjualo2', 'hjual2o2', 'hjual3o2', 'hjual4o2', 'hjual5o2',
+    )
     for l in lines:
         d = dict(l)
-        for k in ('oprice', 'hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5',
-                  'hbelibsr', 'hbelikcl', 'hbelinetto', 'packing',
-                  'pctdisc1', 'pctdisc2', 'pctdisc3', 'pctppn'):
+        for k in _float_keys:
             d[k] = float(d.get(k) or 0)
         result['lines'].append(d)
     return result
@@ -616,38 +622,45 @@ async def get_price_change_report(pool, report_date: date | None = None) -> list
     return result
 
 
-async def get_price_change_from_snapshots(pool, report_date: date | None = None) -> list[dict]:
-    """Get harga jual changes from FP snapshots (faktur) for a date.
-    Returns items where hjual changed, showing old→new hjual1 only."""
+async def get_price_change_from_fp(pool, report_date: date | None = None) -> list[dict]:
+    """Get harga jual changes from FP sthist (tipetrans=1, isupdateprice=1) for a date.
+    Returns items where hjual changed compared to previous sthist entry."""
     report_date = report_date or date.today()
     rows = await execute_query(
         pool,
-        """SELECT po_number, snapshot_json, created_by, created_at
-           FROM tokohub.faktur_pembelian_snapshots
-           WHERE DATE(created_at) = %s
-           ORDER BY id DESC""",
+        """SELECT s.nofaktur, s.stockid AS artno, s.artpabrik, s.artname, s.noindex,
+                  s.hjual, s.posttime, b.userid
+           FROM sthist s
+           LEFT JOIN icbym b ON b.nofaktur = s.nofaktur AND b.tipe = '1'
+           WHERE s.tipetrans = 1 AND s.isupdateprice = 1 AND s.tanggal = %s
+           ORDER BY s.noindex DESC""",
         (report_date,),
     )
-    # Collect all artnos to look up barcode & department
     all_items = []
     for r in rows:
-        data = json.loads(r['snapshot_json'])
-        for item in data.get('items', []):
-            b = item.get('before') or {}
-            a = item.get('after') or {}
-            old_hjual = float(b.get('hjual') or 0)
-            new_hjual = float(a.get('hjual') or 0)
-            if old_hjual != new_hjual and new_hjual > 0:
-                all_items.append({
-                    'source': 'faktur',
-                    'ref_number': r['po_number'],
-                    'artno': item['artno'],
-                    'artname': a.get('artname') or b.get('artname') or '',
-                    'old_hjual': old_hjual,
-                    'new_hjual': new_hjual,
-                    'created_by': r['created_by'],
-                    'created_at': r['created_at'].isoformat() if r['created_at'] else '',
-                })
+        artno = r['artno']
+        new_hjual = float(r['hjual'] or 0)
+        # Find previous hjual from sthist
+        prev = await execute_single(
+            pool,
+            """SELECT hjual FROM sthist
+               WHERE stockid = %s AND noindex < %s
+                 AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
+               ORDER BY noindex DESC LIMIT 1""",
+            (artno, r['noindex']),
+        )
+        old_hjual = float(prev['hjual'] or 0) if prev else 0
+        if old_hjual != new_hjual and new_hjual > 0:
+            all_items.append({
+                'source': 'faktur',
+                'ref_number': r['nofaktur'],
+                'artno': artno,
+                'artname': r['artname'] or '',
+                'old_hjual': old_hjual,
+                'new_hjual': new_hjual,
+                'created_by': r['userid'] or '',
+                'created_at': r['posttime'].isoformat() if r['posttime'] else '',
+            })
     # Look up barcode & department from stock
     artnos = list({it['artno'] for it in all_items})
     stock_map = {}

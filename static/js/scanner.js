@@ -93,15 +93,15 @@
   // -----------------------------------------------------------------------
   function fmt(n) {
     if (n == null || isNaN(n)) return '-';
-    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return Number(n).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function fmtQty(n) {
     if (n == null || isNaN(n)) return '-';
     var v = Number(n);
     return v % 1 === 0
-      ? v.toLocaleString('en-US')
-      : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+      ? v.toLocaleString('id-ID')
+      : v.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
 
   function fmtPct(n) {

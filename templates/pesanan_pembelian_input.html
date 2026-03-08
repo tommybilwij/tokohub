@@ -1,0 +1,1243 @@
+{% extends "base.html" %}
+{% block title %}Pesanan Pembelian{% endblock %}
+
+{% block content %}
+<!-- Normal (create) header -->
+<div class="page-header d-flex align-items-center justify-content-between mb-2" id="poHeaderCreate">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/pesanan-pembelian" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <div>
+      <h4 class="page-title mb-0">Buat Pesanan Pembelian</h4>
+      <small class="text-muted">Pilih supplier, analisa penjualan, lalu simpan pesanan</small>
+    </div>
+  </div>
+</div>
+<!-- Edit header (hidden by default) -->
+<div class="page-header d-flex align-items-center justify-content-between mb-2 d-none" id="poHeaderEdit">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/pesanan-pembelian" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+    <h4 class="page-title mb-0">Edit Pesanan: <span id="poEditNumber"></span></h4>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Left: Input Panel -->
+  <div class="col-xl-3">
+    <div class="card">
+      <div class="card-header card-header-primary">
+        <h5 class="mb-0"><i class="bi bi-cart-check"></i> Parameter Pesanan</h5>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Supplier</label>
+          <div class="h-supp-dropdown">
+            <input type="text" id="poSuppInput" class="form-control" placeholder="-- Pilih Supplier --" autocomplete="off">
+            <input type="hidden" id="poSupplier" value="">
+            <div class="h-supp-menu d-none" id="poSuppMenu"></div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Tanggal Pesanan</label>
+          <input type="date" id="poOrderDate" class="form-control" value="{{ today }}">
+        </div>
+
+        <hr>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Periode Penjualan</label>
+          <small class="text-muted d-block mb-2">Analisa penjualan per bulan</small>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Dari</label>
+            <select id="poSalesFrom" class="form-select"></select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Sampai</label>
+            <select id="poSalesTo" class="form-select"></select>
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Target Order (hari)</label>
+          <small class="text-muted d-block mb-2">Order untuk berapa hari ke depan</small>
+          <input type="number" id="poTargetDays" class="form-control" value="30" min="1" step="1">
+        </div>
+
+        <button class="btn btn-primary-app w-100" id="poLoadItems">
+          <i class="bi bi-arrow-repeat"></i> Muat Data
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Item List -->
+  <div class="col-xl-9">
+    <div class="text-center py-5 d-none" id="poItemsLoading">
+      <div class="spinner-border spinner-border-sm text-primary"></div>
+      <span class="ms-2 text-muted">Memuat item & data penjualan...</span>
+    </div>
+
+    <div class="text-center py-5" id="poEmptyState">
+      <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+      <p class="text-muted mt-2 mb-0">Pilih supplier dan periode, lalu klik "Muat Data"</p>
+    </div>
+
+    <div class="d-none" id="poItemsContainer">
+      <div class="card">
+        <div class="card-header card-header-primary d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
+          <span class="badge badge-counter" id="poItemCount">0 item</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="d-flex gap-2 align-items-center p-2 border-bottom">
+            <div class="position-relative" style="max-width:280px">
+              <input type="text" class="form-control form-control-sm" id="poFilterInput"
+                     placeholder="Cari nama / artno..." autocomplete="off">
+              <div class="progress d-none" id="poFilterLoading" style="height:2px;position:absolute;bottom:0;left:0;right:0;border-radius:0 0 4px 4px;z-index:1060"><div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width:100%"></div></div>
+              <div class="dropdown-menu w-100 shadow-sm" id="poFilterMenu" style="max-height:300px;overflow:auto;z-index:1050"></div>
+            </div>
+            <div class="position-relative" style="max-width:280px;flex:1">
+              <input type="text" class="form-control form-control-sm" id="poAddItemInput"
+                     placeholder="+ Tambah item lain..." autocomplete="off">
+              <div class="progress d-none" id="poAddItemLoading" style="height:2px;position:absolute;bottom:0;left:0;right:0;border-radius:0 0 4px 4px;z-index:1060"><div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width:100%"></div></div>
+              <div class="dropdown-menu w-100 shadow-sm" id="poAddItemMenu" style="max-height:250px;overflow:auto;z-index:1050"></div>
+            </div>
+            <div class="form-check form-switch mb-0 ms-auto">
+              <input type="checkbox" class="form-check-input" id="poHideZero">
+              <label class="form-check-label small" for="poHideZero">Sembunyikan qty 0</label>
+            </div>
+          </div>
+          <div class="table-responsive" style="max-height:calc(100vh - 300px);overflow:auto">
+            <table class="table table-hover table-sm mb-0" id="poItemTable" style="white-space:nowrap">
+              <thead class="sticky-top bg-white" id="poTableHead"></thead>
+              <tbody id="poItemBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card-footer">
+          <div class="d-flex gap-3 align-items-center flex-wrap">
+            <button class="btn btn-sm btn-cta" id="poCreateSave" disabled>
+              <i class="bi bi-eye"></i> Preview
+            </button>
+            <button class="btn btn-sm btn-outline-danger d-none" id="poClearAll">
+              <i class="bi bi-trash"></i> Hapus Semua
+            </button>
+            <small class="text-muted" id="poOrderSummary"></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fuzzy Search Results Modal -->
+<div class="modal fade" id="poFuzzyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white py-2">
+        <h6 class="modal-title mb-0"><i class="bi bi-search me-1"></i> Hasil Pencarian</h6>
+        <small class="ms-2 opacity-75" id="poFuzzyCount"></small>
+        <button type="button" class="btn-close btn-close-white btn-close-sm ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" style="max-height:70vh;overflow:auto">
+        <div id="poFuzzyBody" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  'use strict';
+
+  var currentUser = '{{ user.username if user else "" }}';
+  var _d = new Date(); var today = _d.getFullYear() + '-' + String(_d.getMonth()+1).padStart(2,'0') + '-' + String(_d.getDate()).padStart(2,'0');
+  var STORAGE_KEY = 'po_input_draft';
+
+  // Edit mode detection
+  var editPO = new URLSearchParams(window.location.search).get('edit') || '';
+  if (editPO) {
+    document.getElementById('poHeaderCreate').classList.add('d-none');
+    document.getElementById('poHeaderEdit').classList.remove('d-none');
+    document.getElementById('poEditNumber').textContent = editPO;
+    document.getElementById('poCreateSave').innerHTML = '<i class="bi bi-eye"></i> Preview';
+  }
+
+  // Populate month select dropdowns (last 24 months up to current month)
+  var monthNames = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  var dNow = new Date();
+  var currentMonth = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0');
+  var dFrom3 = new Date(); dFrom3.setMonth(dFrom3.getMonth() - 3);
+  var defaultFrom = dFrom3.getFullYear() + '-' + String(dFrom3.getMonth() + 1).padStart(2, '0');
+  var fromSel = document.getElementById('poSalesFrom');
+  var toSel = document.getElementById('poSalesTo');
+  for (var mi = 0; mi < 24; mi++) {
+    var md = new Date(dNow.getFullYear(), dNow.getMonth() - mi, 1);
+    var val = md.getFullYear() + '-' + String(md.getMonth() + 1).padStart(2, '0');
+    var label = monthNames[md.getMonth()] + ' ' + md.getFullYear();
+    var optFrom = new Option(label, val);
+    var optTo = new Option(label, val);
+    if (val === defaultFrom) optFrom.selected = true;
+    if (val === currentMonth) optTo.selected = true;
+    fromSel.appendChild(optFrom);
+    toSel.appendChild(optTo);
+  }
+
+  // --- Draft persistence ---
+  function saveDraft() {
+    if (editPO) return; // Don't save drafts in edit mode
+    var orders = {};
+    poItems.forEach(function(item) {
+      if ((item._orderBsr || 0) > 0 || (item._orderRemKcl || 0) > 0 || item._checked === false) {
+        orders[item.artno] = { bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0, chk: item._checked !== false };
+      }
+    });
+    var extraItems = [];
+    poItems.forEach(function(item) {
+      if (item._isExtra) {
+        extraItems.push({
+          artno: item.artno, artpabrik: item.artpabrik, artname: item.artname,
+          packing: item.packing, satbesar: item.satbesar, satkecil: item.satkecil,
+          hbelibsr: item.hbelibsr, bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0,
+        });
+      }
+    });
+    var draft = {
+      suppid: suppHidden.value,
+      suppLabel: suppInput.value,
+      orderDate: document.getElementById('poOrderDate').value,
+      salesFrom: document.getElementById('poSalesFrom').value,
+      salesTo: document.getElementById('poSalesTo').value,
+      targetDays: document.getElementById('poTargetDays').value,
+      orders: orders,
+      extraItems: extraItems,
+      hasData: poItems.length > 0,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)); } catch(e) {}
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  }
+
+  function loadDraft() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  }
+
+  var _pendingDraftOrders = null;
+  var _pendingExtraItems = [];
+
+  function restoreDraft() {
+    var draft = loadDraft();
+    if (!draft || !draft.suppid) return;
+
+    // Restore form fields
+    suppHidden.value = draft.suppid;
+    suppInput.value = draft.suppLabel || draft.suppid;
+    if (draft.orderDate) document.getElementById('poOrderDate').value = draft.orderDate;
+    if (draft.salesFrom) document.getElementById('poSalesFrom').value = draft.salesFrom.substring(0, 7);
+    if (draft.salesTo) document.getElementById('poSalesTo').value = draft.salesTo.substring(0, 7);
+    if (draft.targetDays) document.getElementById('poTargetDays').value = draft.targetDays;
+
+    // If there was data loaded, auto-reload and apply saved orders
+    if (draft.hasData) {
+      _pendingDraftOrders = draft.orders || {};
+      _pendingExtraItems = draft.extraItems || [];
+      loadItems();
+    }
+  }
+
+  function applyDraftOrders() {
+    if (!_pendingDraftOrders) return;
+    var orders = _pendingDraftOrders;
+    var extras = _pendingExtraItems || [];
+    _pendingDraftOrders = null;
+    _pendingExtraItems = [];
+
+    poItems.forEach(function(item) {
+      var saved = orders[item.artno];
+      if (saved) {
+        item._orderBsr = saved.bsr || 0;
+        item._orderRemKcl = saved.kcl || 0;
+        if (saved.chk === false) item._checked = false;
+      }
+    });
+
+    // Restore extra items (items added from other suppliers)
+    var existingArtnos = {};
+    poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+    extras.forEach(function(ex) {
+      if (existingArtnos[ex.artno]) return;
+      poItems.push({
+        artno: ex.artno, artpabrik: ex.artpabrik || '', artname: ex.artname || '',
+        packing: ex.packing || 1, satbesar: ex.satbesar || 'Pcs', satkecil: ex.satkecil || 'Pcs',
+        hbelibsr: ex.hbelibsr || 0,
+        _monthData: {}, _maxMonthKcl: 0, _stockQty: 0,
+        _suggKcl: 0, _suggBsr: 0, _suggRemKcl: 0,
+        _orderBsr: ex.bsr || 0, _orderRemKcl: ex.kcl || 0,
+        _checked: true, _isExtra: true,
+      });
+    });
+
+    renderItems();
+    updateSummary();
+  }
+
+  // Vendor dropdown
+  var allVendors = [];
+  fetch('/api/vendors')
+    .then(function(r) { return r.json(); })
+    .then(function(vendors) {
+      allVendors = vendors.map(function(v) {
+        return { id: v.id, label: v.id + ' - ' + (v.name || v.id) };
+      });
+      if (editPO) {
+        loadEditPO(editPO);
+      } else {
+        restoreDraft();
+      }
+    });
+
+  var suppInput = document.getElementById('poSuppInput');
+  var suppMenu = document.getElementById('poSuppMenu');
+  var suppHidden = document.getElementById('poSupplier');
+
+  function renderSuppMenu(filter) {
+    var q = (filter || '').toLowerCase();
+    var items = q ? allVendors.filter(function(v) { return v.label.toLowerCase().indexOf(q) >= 0; }) : allVendors;
+    suppMenu.innerHTML = '';
+    items.slice(0, 50).forEach(function(v) {
+      var div = document.createElement('div');
+      div.className = 'h-supp-item';
+      div.textContent = v.label;
+      div.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        suppHidden.value = v.id;
+        suppInput.value = v.label;
+        suppMenu.classList.add('d-none');
+        if (poItems.length) saveDraft();
+      });
+      suppMenu.appendChild(div);
+    });
+    suppMenu.classList.remove('d-none');
+  }
+
+  var suppSaved = '';
+  suppInput.addEventListener('focus', function() { suppSaved = suppInput.value; suppInput.value = ''; renderSuppMenu(''); });
+  suppInput.addEventListener('input', function() { renderSuppMenu(suppInput.value); });
+  suppInput.addEventListener('blur', function() {
+    suppMenu.classList.add('d-none');
+    if (!suppInput.value && suppSaved) suppInput.value = suppSaved;
+  });
+  suppInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { suppMenu.classList.add('d-none'); suppInput.blur(); }
+  });
+
+  // Data
+  var poItems = [];
+  var poMonthly = {}; // {artno: {"2026-01": qty_kcl, ...}}
+  var poMonths = [];  // ["2025-12", "2026-01", ...]
+  var poStock = {};
+  var poSortDir = 0; // 0=none, 1=asc, -1=desc
+
+  var MONTH_NAMES = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  function fmtMonth(ym) {
+    var parts = ym.split('-');
+    return MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
+  }
+
+  function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+  function fmtDec(n) { return n % 1 === 0 ? n.toString() : n.toFixed(1); }
+
+  document.getElementById('poLoadItems').addEventListener('click', loadItems);
+
+  // Convert month input (YYYY-MM) to first and last day of month
+  // If toMonth is current month, use today's date instead of last day
+  function monthToDateRange(fromMonth, toMonth) {
+    var fromDate = fromMonth + '-01';
+    var now = new Date();
+    var nowMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var toDate;
+    if (toMonth === nowMonth) {
+      toDate = toMonth + '-' + String(now.getDate()).padStart(2, '0');
+    } else {
+      var toParts = toMonth.split('-');
+      var toY = parseInt(toParts[0]), toM = parseInt(toParts[1]);
+      var lastDay = new Date(toY, toM, 0).getDate();
+      toDate = toMonth + '-' + String(lastDay).padStart(2, '0');
+    }
+    return { from: fromDate, to: toDate };
+  }
+
+  async function loadItems() {
+    var suppid = suppHidden.value;
+    var salesFromMonth = document.getElementById('poSalesFrom').value;
+    var salesToMonth = document.getElementById('poSalesTo').value;
+
+    if (!suppid) { window.showToast && showToast('Pilih supplier dulu', 'warning'); return; }
+    if (!salesFromMonth || !salesToMonth) { window.showToast && showToast('Pilih periode sales', 'warning'); return; }
+
+    var range = monthToDateRange(salesFromMonth, salesToMonth);
+    var salesFrom = range.from;
+    var salesTo = range.to;
+
+    document.getElementById('poEmptyState').classList.add('d-none');
+    document.getElementById('poItemsLoading').classList.remove('d-none');
+    document.getElementById('poItemsContainer').classList.add('d-none');
+
+    try {
+      var [itemsRes, monthlyRes, stockRes] = await Promise.all([
+        fetch('/api/po/vendor-items?suppid=' + encodeURIComponent(suppid)).then(function(r) { return r.json(); }),
+        fetch('/api/po/sales-monthly?suppid=' + encodeURIComponent(suppid) + '&date_from=' + salesFrom + '&date_to=' + salesTo).then(function(r) { return r.json(); }),
+        fetch('/api/po/stock-balance?suppid=' + encodeURIComponent(suppid)).then(function(r) { return r.json(); }),
+      ]);
+
+      poItems = itemsRes;
+      poMonthly = monthlyRes.items || {};
+      poMonths = monthlyRes.months || [];
+      poStock = stockRes;
+
+      poItems.forEach(function(item) { computeSaran(item); });
+
+      // Apply draft orders if restoring from localStorage
+      applyDraftOrders();
+
+      renderItems();
+      document.getElementById('poCreateSave').disabled = false;
+      document.getElementById('poClearAll').classList.remove('d-none');
+      updateSummary();
+      saveDraft();
+
+    } catch (err) {
+      window.showToast && showToast('Gagal memuat data: ' + err.message, 'danger');
+    } finally {
+      document.getElementById('poItemsLoading').classList.add('d-none');
+    }
+  }
+
+  function renderItems() {
+    var container = document.getElementById('poItemsContainer');
+    var thead = document.getElementById('poTableHead');
+    var tbody = document.getElementById('poItemBody');
+    var filterText = (document.getElementById('poFilterInput').value || '').toLowerCase();
+    var hideZero = document.getElementById('poHideZero').checked;
+
+    container.classList.remove('d-none');
+
+    // --- Two-row header with column groups ---
+    var skcl0 = 'Kcl';
+
+    // Row 1: group headers — first 4 cols, Stok, Saran, Order all use rowspan=2
+    var gRow = '<tr class="po-group-header">'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="text-center align-middle"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-middle">#</th>'
+      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6;cursor:pointer;user-select:none" class="align-middle" id="poSortName">'
+      + 'Nama Barang <span style="display:inline-flex;flex-direction:column;line-height:0;vertical-align:middle;margin-left:4px;font-size:0.6rem;gap:1px">'
+      + '<span style="color:' + (poSortDir === 1 ? '#0d6efd' : '#bbb') + '">&#9671;</span>'
+      + '<span style="color:' + (poSortDir === -1 ? '#0d6efd' : '#bbb') + '">&#9671;</span>'
+      + '</span></th>'
+      + '<th rowspan="2" style="width:40px;background:#e0f2f1 !important;border-bottom:1px solid #dee2e6;border-left:2px solid #dee2e6" class="text-center align-middle">Isi</th>'
+      + '<th colspan="' + poMonths.length + '" class="po-gh-sales po-col-sep">Penjualan (' + skcl0 + ')</th>'
+      + '<th rowspan="2" class="po-col-sep text-end align-middle" style="width:70px">Stok (' + skcl0 + ')</th>'
+      + '<th rowspan="2" class="po-gh-saran po-col-sep text-center align-middle" style="width:90px">Saran</th>'
+      + '<th rowspan="2" colspan="2" class="po-gh-order po-col-sep text-center align-middle" style="width:125px">Order</th>'
+      + '<th colspan="2" class="po-gh-harga po-col-sep">Harga Beli</th>'
+      + '</tr>';
+
+    // Row 2: only month sub-headers and harga sub-headers
+    var hRow = '<tr>';
+
+    poMonths.forEach(function(m, i) {
+      hRow += '<th class="text-end po-month-header' + (i === 0 ? ' po-col-sep' : '') + '">' + fmtMonth(m) + '</th>';
+    });
+
+    hRow += '<th class="text-end po-gh-harga po-col-sep" style="width:70px">Per Kcl</th>'
+      + '<th class="text-end po-gh-harga" style="width:80px">Total</th>'
+      + '</tr>';
+
+    thead.innerHTML = gRow + hRow;
+
+    // Sort click handler
+    var sortBtn = document.getElementById('poSortName');
+    if (sortBtn) {
+      sortBtn.addEventListener('click', function() {
+        poSortDir = poSortDir === 1 ? -1 : poSortDir === -1 ? 0 : 1;
+        renderItems();
+      });
+    }
+
+    // --- Build sorted index ---
+    var indices = poItems.map(function(_, i) { return i; });
+    if (poSortDir !== 0) {
+      indices.sort(function(a, b) {
+        var na = (poItems[a].artname || '').toLowerCase();
+        var nb = (poItems[b].artname || '').toLowerCase();
+        return na < nb ? -poSortDir : na > nb ? poSortDir : 0;
+      });
+    }
+
+    // --- Build body ---
+    tbody.innerHTML = '';
+    var shown = 0;
+    var grandTotal = 0;
+
+    indices.forEach(function(idx) {
+      var item = poItems[idx];
+      if (filterText) {
+        var match = (item.artno + ' ' + item.artpabrik + ' ' + item.artname).toLowerCase().indexOf(filterText) >= 0;
+        if (!match) return;
+      }
+      if (hideZero && getOrderKcl(item) <= 0) return;
+
+      shown++;
+      var tr = document.createElement('tr');
+      var packing = item.packing || 1;
+      var hasOrder = getOrderKcl(item) > 0;
+      if (hasOrder) tr.className = 'po-has-order';
+      var z = '<span class="text-muted">-</span>';
+
+      var isChecked = hasOrder && item._checked !== false;
+      var isDisabled = !hasOrder;
+      var cells = '<td class="text-center"><input type="checkbox" class="po-row-check" data-idx="' + idx + '"' + (isChecked ? ' checked' : '') + (isDisabled ? ' disabled' : '') + '></td>'
+        + '<td class="text-muted">' + shown + '</td>'
+        + '<td class="text-nowrap"><span title="' + item.artno + (item.artpabrik ? ' | ' + item.artpabrik : '') + '">'
+        + item.artname + '</span>' + (item._isExtra ? ' <span class="badge bg-info" style="font-size:.6rem">tambahan</span>' : '') + '</td>'
+        + '<td class="text-center text-nowrap" style="border-left:2px solid #dee2e6">' + Math.round(packing) + '/' + item.satbesar + '</td>';
+
+      // Month sales with unit
+      var skcl = item.satkecil || 'Pcs';
+      poMonths.forEach(function(m, i) {
+        var qkcl = (item._monthData && item._monthData[m]) || 0;
+        cells += '<td class="text-end po-cell-month' + (i === 0 ? ' po-col-sep' : '') + '">'
+          + (qkcl ? fmtNum(qkcl) + ' <small class="po-unit">' + skcl + '</small>' : z) + '</td>';
+      });
+
+      // Stock with unit
+      var stockCell;
+      if (item._stockQty < 0) {
+        stockCell = '<span class="text-danger fw-bold" title="Stok minus!"><i class="bi bi-exclamation-octagon-fill"></i> ' + fmtNum(item._stockQty) + ' <small class="po-unit">' + skcl + '</small></span>';
+      } else if (item._stockQty > 0) {
+        stockCell = fmtNum(item._stockQty) + ' <small class="po-unit">' + skcl + '</small>';
+      } else {
+        stockCell = z;
+      }
+
+      // Saran - compact
+      var suggDisplay = z;
+      if (item._suggKcl > 0) {
+        var parts = [];
+        if (item._suggBsr > 0) parts.push('<b>' + fmtNum(item._suggBsr) + '</b><small>' + item.satbesar + '</small>');
+        if (item._suggRemKcl > 0) parts.push('<b>' + fmtNum(item._suggRemKcl) + '</b><small>' + (item.satkecil || 'Pcs') + '</small>');
+        suggDisplay = parts.join(' ');
+      }
+
+      // Order inputs
+      var orderBsr = '<input type="number" min="0" step="1" class="form-control form-control-sm text-end po-order-bsr po-order-input" '
+        + 'data-idx="' + idx + '" value="' + (item._orderBsr || 0) + '">'
+        + '<small class="po-order-unit">' + item.satbesar + '</small>';
+      var orderKcl = '<input type="number" min="0" step="1" class="form-control form-control-sm text-end po-order-kcl po-order-input" '
+        + 'data-idx="' + idx + '" value="' + (item._orderRemKcl || 0) + '">'
+        + '<small class="po-order-unit">' + (item.satkecil || 'Pcs') + '</small>';
+
+      // Harga
+      var hbelikcl = packing > 0 ? (item.hbelibsr || 0) / packing : 0;
+      var orderTotalKcl = (item._orderBsr || 0) * packing + (item._orderRemKcl || 0);
+      var totalHbeli = hbelikcl * orderTotalKcl;
+      grandTotal += totalHbeli;
+
+      cells += '<td class="text-end po-cell-stok po-col-sep">' + stockCell + '</td>'
+        + '<td class="text-center po-cell-saran po-col-sep text-nowrap">' + suggDisplay + '</td>'
+        + '<td class="po-cell-order po-col-sep text-center">' + orderBsr + '</td>'
+        + '<td class="po-cell-order text-center">' + orderKcl + '</td>'
+        + '<td class="text-end po-cell-harga po-col-sep">' + (hbelikcl ? fmtNum(hbelikcl) : z) + '</td>'
+        + '<td class="text-end po-cell-harga po-total-hbeli" data-idx="' + idx + '">'
+        + (totalHbeli ? '<b>' + fmtNum(totalHbeli) + '</b>' : z) + '</td>';
+
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('poItemCount').textContent = shown + ' / ' + poItems.length + ' item';
+    document.getElementById('poOrderSummary').innerHTML =
+      poItems.filter(function(it) { return getOrderKcl(it) > 0; }).length + ' item dipesan'
+      + (grandTotal > 0 ? ' &middot; Total: <b>Rp ' + fmtNum(grandTotal) + '</b>' : '');
+
+    function updateRowTotal(idx) {
+      var item = poItems[idx];
+      var packing = item.packing || 1;
+      var hbelikcl = packing > 0 ? (item.hbelibsr || 0) / packing : 0;
+      var totalKcl = (item._orderBsr || 0) * packing + (item._orderRemKcl || 0);
+      var total = hbelikcl * totalKcl;
+      var el = tbody.querySelector('.po-total-hbeli[data-idx="' + idx + '"]');
+      if (el) el.innerHTML = total ? '<b>' + fmtNum(total) + '</b>' : '<span class="text-muted">-</span>';
+      // Update row highlight + checkbox
+      var row = el && el.closest('tr');
+      if (row) {
+        if (totalKcl > 0) row.classList.add('po-has-order');
+        else row.classList.remove('po-has-order');
+        var cb = row.querySelector('.po-row-check');
+        if (cb) {
+          cb.disabled = totalKcl <= 0;
+          if (totalKcl > 0) { cb.checked = true; item._checked = true; }
+          else { cb.checked = false; item._checked = false; }
+        }
+      }
+    }
+
+    function parseOrderVal(str) {
+      return parseInt(String(str).replace(/[^0-9\-]/g, ''), 10) || 0;
+    }
+
+    tbody.querySelectorAll('.po-order-bsr').forEach(function(input) {
+      input.addEventListener('change', function() {
+        var idx = parseInt(input.dataset.idx);
+        var val = parseInt(input.value) || 0;
+        if (val < 0) val = 0;
+        poItems[idx]._orderBsr = val;
+        input.value = val;
+        updateRowTotal(idx);
+        updateSummary();
+        saveDraft();
+      });
+    });
+    tbody.querySelectorAll('.po-order-kcl').forEach(function(input) {
+      input.addEventListener('change', function() {
+        var idx = parseInt(input.dataset.idx);
+        var val = parseInt(input.value) || 0;
+        if (val < 0) val = 0;
+        var packing = poItems[idx].packing || 1;
+        // Auto-carry: if kcl >= packing, add to bsr
+        if (packing > 1 && val >= packing) {
+          var carry = Math.floor(val / packing);
+          val = val % packing;
+          poItems[idx]._orderBsr = (poItems[idx]._orderBsr || 0) + carry;
+          var bsrInput = tbody.querySelector('.po-order-bsr[data-idx="' + idx + '"]');
+          if (bsrInput) bsrInput.value = poItems[idx]._orderBsr;
+        }
+        poItems[idx]._orderRemKcl = val;
+        input.value = val;
+        updateRowTotal(idx);
+        updateSummary();
+        saveDraft();
+      });
+    });
+
+    // Up/Down arrow navigation between order inputs
+    tbody.addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      var input = e.target;
+      if (!input.classList.contains('po-order-input')) return;
+      e.preventDefault();
+      var isBsr = input.classList.contains('po-order-bsr');
+      var cls = isBsr ? '.po-order-bsr' : '.po-order-kcl';
+      var all = Array.from(tbody.querySelectorAll(cls));
+      var curIdx = all.indexOf(input);
+      if (curIdx < 0) return;
+      var nextIdx = e.key === 'ArrowUp' ? curIdx - 1 : curIdx + 1;
+      if (nextIdx >= 0 && nextIdx < all.length) {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        all[nextIdx].focus();
+      }
+    });
+
+    // Row checkboxes
+    tbody.querySelectorAll('.po-row-check').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        poItems[parseInt(cb.dataset.idx)]._checked = cb.checked;
+        saveDraft();
+      });
+    });
+
+    // Check-all header checkbox
+    var checkAll = document.getElementById('poCheckAll');
+    if (checkAll) {
+      checkAll.addEventListener('change', function() {
+        var val = checkAll.checked;
+        tbody.querySelectorAll('.po-row-check').forEach(function(cb) {
+          cb.checked = val;
+          poItems[parseInt(cb.dataset.idx)]._checked = val;
+        });
+        saveDraft();
+      });
+    }
+  }
+
+  function getOrderKcl(item) {
+    var packing = item.packing || 1;
+    return (item._orderBsr || 0) * packing + (item._orderRemKcl || 0);
+  }
+
+  function updateSummary() {
+    var count = 0;
+    var grandTotal = 0;
+    poItems.forEach(function(it) {
+      var okcl = getOrderKcl(it);
+      if (okcl > 0) {
+        count++;
+        var packing = it.packing || 1;
+        var hbelikcl = packing > 0 ? (it.hbelibsr || 0) / packing : 0;
+        grandTotal += hbelikcl * okcl;
+      }
+    });
+    document.getElementById('poOrderSummary').innerHTML =
+      count + ' item dipesan'
+      + (grandTotal > 0 ? ' &middot; Total: <b>Rp ' + fmtNum(grandTotal) + '</b>' : '');
+  }
+
+  // --- Fuzzy search for filter input ---
+  (function() {
+    var filterInput = document.getElementById('poFilterInput');
+    var filterMenu = document.getElementById('poFilterMenu');
+    var filterLoading = document.getElementById('poFilterLoading');
+    var fuzzyTimer = null;
+    var lastFuzzyResults = [];
+
+    // Local filter still works on input
+    filterInput.addEventListener('input', function() {
+      renderItems();
+      clearTimeout(fuzzyTimer);
+      var q = filterInput.value.trim();
+      if (q.length < 2) { filterMenu.classList.remove('show'); filterLoading.classList.add('d-none'); return; }
+      filterLoading.classList.remove('d-none');
+      fuzzyTimer = setTimeout(function() {
+        fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=po')
+          .then(function(r) { return r.json(); })
+          .then(function(results) {
+            filterLoading.classList.add('d-none');
+            lastFuzzyResults = results || [];
+            filterMenu.innerHTML = '';
+            if (!results.length) {
+              filterMenu.innerHTML = '<div class="px-3 py-2 text-muted small">Tidak ditemukan</div>';
+              filterMenu.classList.add('show');
+              return;
+            }
+            var existingArtnos = {};
+            poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+            var shown = results.slice(0, 8);
+            shown.forEach(function(r) {
+              var inList = existingArtnos[r.artno];
+              var score = Math.round(r.score || 0);
+              var div = document.createElement('div');
+              div.className = 'dropdown-item small d-flex align-items-center' + (inList ? ' text-muted' : '');
+              div.style.cursor = 'pointer';
+              div.style.whiteSpace = 'normal';
+              div.innerHTML = '<span class="badge ' + (score >= 80 ? 'bg-success' : score >= 50 ? 'bg-warning text-dark' : 'bg-secondary') + ' me-2" style="min-width:38px">' + score + '%</span>'
+                + '<span><strong>' + (r.artno || '') + '</strong> ' + (r.artname || '')
+                + ' <span class="text-muted">(' + Math.round(r.packing || 1) + '/' + (r.satbesar || 'Pcs') + ')</span>'
+                + (inList ? ' <span class="badge bg-info">sudah ada</span>' : '') + '</span>';
+              if (!inList) {
+                div.addEventListener('mousedown', function(e) {
+                  e.preventDefault();
+                  addItemToList(r);
+                  filterInput.value = '';
+                  filterMenu.classList.remove('show');
+                  renderItems();
+                });
+              }
+              filterMenu.appendChild(div);
+            });
+            if (results.length > 8) {
+              var more = document.createElement('div');
+              more.className = 'dropdown-item small text-center text-primary fw-bold';
+              more.style.cursor = 'pointer';
+              more.textContent = 'Lihat semua ' + results.length + ' hasil...';
+              more.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                filterMenu.classList.remove('show');
+                openFuzzyModal(lastFuzzyResults);
+              });
+              filterMenu.appendChild(more);
+            }
+            filterMenu.classList.add('show');
+          });
+      }, 300);
+    });
+
+    filterInput.addEventListener('blur', function() {
+      setTimeout(function() { filterMenu.classList.remove('show'); }, 200);
+    });
+
+    filterInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && lastFuzzyResults.length) {
+        e.preventDefault();
+        filterMenu.classList.remove('show');
+        openFuzzyModal(lastFuzzyResults);
+      }
+    });
+  })();
+
+  function openFuzzyModal(results) {
+    var body = document.getElementById('poFuzzyBody');
+    var countEl = document.getElementById('poFuzzyCount');
+    body.innerHTML = '';
+    var existingArtnos = {};
+    poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+    results.forEach(function(r, i) {
+      var inList = existingArtnos[r.artno];
+      var score = Math.round(r.score || 0);
+      var scoreColor = score >= 80 ? '#198754' : score >= 60 ? '#fd7e14' : score >= 40 ? '#ffc107' : '#adb5bd';
+      var el = document.createElement('div');
+      el.className = 'list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3' + (inList ? ' bg-light text-muted' : '');
+      el.innerHTML =
+        '<div style="min-width:48px;text-align:center">'
+        + '<div class="rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" style="width:40px;height:40px;font-size:0.75rem;background:' + scoreColor + '">' + score + '%</div>'
+        + '</div>'
+        + '<div class="flex-grow-1" style="min-width:0">'
+        + '<div class="fw-semibold text-truncate">' + (r.artname || '') + '</div>'
+        + '<small class="text-muted"><code>' + (r.artno || '') + '</code> &middot; ' + Math.round(r.packing || 1) + '/' + (r.satbesar || 'Pcs') + '</small>'
+        + '</div>'
+        + '<div style="min-width:90px;text-align:right">'
+        + (inList
+          ? '<span class="badge bg-secondary">sudah ada</span>'
+          : '<button class="btn btn-sm btn-success btn-po-fuzzy-add" data-idx="' + i + '"><i class="bi bi-plus-lg me-1"></i>Tambah</button>')
+        + '</div>';
+      body.appendChild(el);
+    });
+    countEl.textContent = results.length + ' hasil';
+
+    // Bind add buttons
+    body.querySelectorAll('.btn-po-fuzzy-add').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var idx = parseInt(btn.dataset.idx);
+        var r = results[idx];
+        if (r) {
+          addItemToList(r);
+          var row = btn.closest('.list-group-item');
+          row.classList.add('bg-light', 'text-muted');
+          btn.outerHTML = '<span class="badge bg-info text-white"><i class="bi bi-check-lg me-1"></i>Ditambahkan</span>';
+        }
+      });
+    });
+
+    var modal = new bootstrap.Modal(document.getElementById('poFuzzyModal'));
+    modal.show();
+  }
+
+  document.getElementById('poHideZero').addEventListener('change', renderItems);
+
+  // --- Add Item search ---
+  (function() {
+    var addInput = document.getElementById('poAddItemInput');
+    var addMenu = document.getElementById('poAddItemMenu');
+    var addLoading = document.getElementById('poAddItemLoading');
+    var addTimer = null;
+    var addLastResults = [];
+
+    addInput.addEventListener('input', function() {
+      clearTimeout(addTimer);
+      var q = addInput.value.trim();
+      if (q.length < 2) { addMenu.classList.remove('show'); addLoading.classList.add('d-none'); return; }
+      addLoading.classList.remove('d-none');
+      addTimer = setTimeout(function() {
+        fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=po')
+          .then(function(r) { return r.json(); })
+          .then(function(results) {
+            addLoading.classList.add('d-none');
+            addLastResults = results || [];
+            addMenu.innerHTML = '';
+            if (!results.length) {
+              addMenu.innerHTML = '<div class="px-3 py-2 text-muted small">Tidak ditemukan</div>';
+              addMenu.classList.add('show');
+              return;
+            }
+            var existingArtnos = {};
+            poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+            var shown = results.slice(0, 8);
+            shown.forEach(function(r) {
+              var inList = existingArtnos[r.artno];
+              var score = Math.round(r.score || 0);
+              var div = document.createElement('div');
+              div.className = 'dropdown-item small d-flex align-items-center' + (inList ? ' text-muted' : '');
+              div.style.cursor = 'pointer';
+              div.style.whiteSpace = 'normal';
+              div.innerHTML = '<span class="badge ' + (score >= 80 ? 'bg-success' : score >= 50 ? 'bg-warning text-dark' : 'bg-secondary') + ' me-2" style="min-width:38px">' + score + '%</span>'
+                + '<span><strong>' + (r.artno || '') + '</strong> ' + (r.artname || '')
+                + ' <span class="text-muted">(' + Math.round(r.packing || 1) + '/' + (r.satbesar || 'Pcs') + ')</span>'
+                + (inList ? ' <span class="badge bg-info">sudah ada</span>' : '') + '</span>';
+              if (!inList) {
+                div.addEventListener('mousedown', function(e) {
+                  e.preventDefault();
+                  addItemToList(r);
+                  addInput.value = '';
+                  addMenu.classList.remove('show');
+                });
+              }
+              addMenu.appendChild(div);
+            });
+            if (results.length > 8) {
+              var more = document.createElement('div');
+              more.className = 'dropdown-item small text-center text-primary fw-bold';
+              more.style.cursor = 'pointer';
+              more.textContent = 'Lihat semua ' + results.length + ' hasil...';
+              more.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                addMenu.classList.remove('show');
+                openFuzzyModal(addLastResults);
+              });
+              addMenu.appendChild(more);
+            }
+            addMenu.classList.add('show');
+          });
+      }, 300);
+    });
+
+    addInput.addEventListener('blur', function() {
+      setTimeout(function() { addMenu.classList.remove('show'); }, 200);
+    });
+
+    addInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && addLastResults.length) {
+        e.preventDefault();
+        addMenu.classList.remove('show');
+        openFuzzyModal(addLastResults);
+      }
+    });
+
+    addInput.addEventListener('focus', function() {
+      if (addMenu.children.length && addInput.value.trim().length >= 2) addMenu.classList.add('show');
+    });
+  })();
+
+  function computeSaran(item) {
+    var packing = item.packing || 1;
+    var stockQty = poStock[item.artno] || 0;
+    var monthData = poMonthly[item.artno] || {};
+    var maxMonthKcl = 0;
+    poMonths.forEach(function(m) {
+      var q = monthData[m] || 0;
+      if (q > maxMonthKcl) maxMonthKcl = q;
+    });
+    var suggKcl = 0, suggBsr = 0, suggRemKcl = 0;
+    if (stockQty >= 0) {
+      var targetDays = parseInt(document.getElementById('poTargetDays').value) || 30;
+      var projected = (maxMonthKcl / 30) * targetDays;
+      suggKcl = Math.max(0, Math.ceil(projected - stockQty));
+      suggBsr = packing > 1 ? Math.floor(suggKcl / packing) : 0;
+      suggRemKcl = packing > 1 ? Math.round(suggKcl - suggBsr * packing) : suggKcl;
+    }
+    item._monthData = monthData;
+    item._maxMonthKcl = maxMonthKcl;
+    item._stockQty = stockQty;
+    item._suggKcl = suggKcl;
+    item._suggBsr = suggBsr;
+    item._suggRemKcl = suggRemKcl;
+    item._orderBsr = suggBsr;
+    item._orderRemKcl = suggRemKcl;
+  }
+
+  function addItemToList(stockItem) {
+    var newItem = {
+      artno: stockItem.artno,
+      artpabrik: stockItem.artpabrik || '',
+      artname: stockItem.artname || '',
+      packing: parseFloat(stockItem.packing) || 1,
+      satbesar: stockItem.satbesar || 'Pcs',
+      satkecil: stockItem.satkecil || 'Pcs',
+      hbelibsr: parseFloat(stockItem.hbelibsr) || 0,
+      _monthData: {},
+      _maxMonthKcl: 0,
+      _stockQty: 0,
+      _suggKcl: 0,
+      _suggBsr: 0,
+      _suggRemKcl: 0,
+      _orderBsr: 0,
+      _orderRemKcl: 0,
+      _checked: true,
+      _isExtra: true,
+    };
+
+    // Try local data first, then fetch from API for any-supplier data
+    computeSaran(newItem);
+    poItems.push(newItem);
+    renderItems();
+    updateSummary();
+    saveDraft();
+
+    // Fetch sales+stock regardless of supplier
+    var salesFromMonth = document.getElementById('poSalesFrom').value;
+    var salesToMonth = document.getElementById('poSalesTo').value;
+    if (salesFromMonth && salesToMonth) {
+      var range = monthToDateRange(salesFromMonth, salesToMonth);
+      fetch('/api/po/item-data?artno=' + encodeURIComponent(stockItem.artno)
+        + '&date_from=' + encodeURIComponent(range.from)
+        + '&date_to=' + encodeURIComponent(range.to))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          // Merge into global data
+          if (data.monthly && Object.keys(data.monthly).length) {
+            poMonthly[stockItem.artno] = data.monthly;
+          }
+          if (data.stock !== undefined) {
+            poStock[stockItem.artno] = data.stock;
+          }
+          // Re-compute saran with real data
+          computeSaran(newItem);
+          renderItems();
+          updateSummary();
+          saveDraft();
+        })
+        .catch(function() {});
+    }
+
+    // Scroll to the new item
+    var tbody = document.getElementById('poItemBody');
+    if (tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Save draft on form field changes
+  ['poOrderDate', 'poSalesFrom', 'poSalesTo', 'poTargetDays'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function() { if (poItems.length) saveDraft(); });
+  });
+
+  // Clear all order quantities
+  document.getElementById('poClearAll').addEventListener('click', async function() {
+    var confirmed = await (window.showConfirm
+      ? showConfirm('Hapus semua data dan kembali ke awal?')
+      : Promise.resolve(confirm('Hapus semua data dan kembali ke awal?')));
+    if (!confirmed) return;
+    poItems = [];
+    poMonths = [];
+    document.getElementById('poItemsContainer').classList.add('d-none');
+    document.getElementById('poEmptyState').classList.remove('d-none');
+    document.getElementById('poClearAll').classList.add('d-none');
+    document.getElementById('poCreateSave').disabled = true;
+    updateSummary();
+    localStorage.removeItem('po_draft');
+  });
+
+  // --- Edit mode: load existing PO data ---
+  async function loadEditPO(poNumber) {
+    try {
+      var res = await fetch('/api/po/' + encodeURIComponent(poNumber));
+      var data = await res.json();
+      if (data.error) { window.showToast && showToast(data.error, 'danger'); return; }
+
+      // Set supplier
+      suppHidden.value = data.suppid;
+      var vendor = allVendors.find(function(v) { return v.id === data.suppid; });
+      suppInput.value = vendor ? vendor.label : data.supplier_name || data.suppid;
+
+      // Set dates
+      if (data.tgl_pesanan) document.getElementById('poOrderDate').value = data.tgl_pesanan;
+      if (data.date_from) document.getElementById('poSalesFrom').value = data.date_from.substring(0, 7);
+      if (data.date_to) document.getElementById('poSalesTo').value = data.date_to.substring(0, 7);
+
+      // Build order map from existing PO lines: {artno: {bsr, kcl}}
+      var orderMap = {};
+      var editExtraLines = [];
+      (data.lines || []).forEach(function(line) {
+        var packing = line.packing || 1;
+        var totalKcl = Math.round(line.qty_order_kcl || 0);
+        var bsr = Math.floor(line.qty_order || 0);
+        var remKcl = Math.round(totalKcl - bsr * packing);
+        orderMap[line.artno] = { bsr: bsr, kcl: remKcl };
+        editExtraLines.push({
+          artno: line.artno, artpabrik: line.artpabrik || '', artname: line.artname || '',
+          packing: packing, satbesar: line.satbesar || 'Pcs', satkecil: line.satkecil || 'Pcs',
+          hbelibsr: parseFloat(line.hbelibsr) || 0, bsr: bsr, kcl: remKcl,
+        });
+      });
+
+      // Set pending orders and extra items (for items not in vendor list)
+      _pendingDraftOrders = orderMap;
+      _pendingExtraItems = editExtraLines;
+      await loadItems();
+    } catch (err) {
+      window.showToast && showToast('Gagal memuat pesanan: ' + err.message, 'danger');
+    }
+  }
+
+  // Save
+  document.getElementById('poCreateSave').addEventListener('click', async function() {
+    var suppid = suppHidden.value;
+    var orderDate = document.getElementById('poOrderDate').value;
+    var salesFromMonth = document.getElementById('poSalesFrom').value;
+    var salesToMonth = document.getElementById('poSalesTo').value;
+
+    if (!suppid || !orderDate) {
+      window.showToast && showToast('Lengkapi supplier dan tanggal', 'warning');
+      return;
+    }
+
+    var itemsToSave = poItems
+      .filter(function(it) { return getOrderKcl(it) > 0 && it._checked !== false; })
+      .map(function(it) {
+        return {
+          artno: it.artno,
+          artpabrik: it.artpabrik,
+          artname: it.artname,
+          packing: it.packing,
+          satbesar: it.satbesar,
+          satkecil: it.satkecil,
+          qty_order: it._orderBsr || 0,
+          qty_order_kcl_remainder: it._orderRemKcl || 0,
+          hbelibsr: it.hbelibsr,
+        };
+      });
+
+    if (itemsToSave.length === 0) {
+      window.showToast && showToast('Tidak ada item dengan qty > 0', 'warning');
+      return;
+    }
+
+    if (!salesFromMonth || !salesToMonth) {
+      window.showToast && showToast('Lengkapi periode sales', 'warning');
+      return;
+    }
+    var salesRange = monthToDateRange(salesFromMonth, salesToMonth);
+
+    var isEdit = !!editPO;
+
+    // Show preview modal
+    var confirmed = await showPreviewModal({
+      isEdit: isEdit,
+      poNumber: editPO,
+      supplier: suppInput.value,
+      orderDate: orderDate,
+      items: itemsToSave,
+    });
+    if (!confirmed) return;
+
+    try {
+      var url = isEdit
+        ? '/api/po/' + encodeURIComponent(editPO) + '/update'
+        : '/api/po/save';
+      var payload = {
+        suppid: suppid,
+        items: itemsToSave,
+        order_date: orderDate,
+        date_from: salesRange.from,
+        date_to: salesRange.to,
+      };
+      if (!isEdit) payload.created_by = currentUser;
+
+      var res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+      if (data.ok) {
+        clearDraft();
+        var msg = isEdit
+          ? 'Pesanan ' + data.po_number + ' berhasil diupdate (' + data.total_items + ' item)'
+          : 'Pesanan ' + data.po_number + ' berhasil disimpan (' + data.total_items + ' item)';
+        window.showToast && showToast(msg);
+        window.location.href = '/pesanan-pembelian';
+      } else {
+        window.showToast && showToast(data.error || 'Gagal menyimpan', 'danger');
+      }
+    } catch (err) {
+      window.showToast && showToast('Error: ' + err.message, 'danger');
+    }
+  });
+
+  // Preview modal before save/update
+  function showPreviewModal(opts) {
+    return new Promise(function(resolve) {
+      var modal = document.getElementById('poPreviewModal');
+      if (!modal) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="modal fade" id="poPreviewModal" tabindex="-1">'
+          + '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">'
+          + '<div class="modal-content">'
+          + '<div class="modal-header">'
+          + '<h5 class="modal-title" id="poPreviewTitle"></h5>'
+          + '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>'
+          + '</div>'
+          + '<div class="modal-body" id="poPreviewBody"></div>'
+          + '<div class="modal-footer">'
+          + '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>'
+          + '<button type="button" class="btn btn-cta" id="poPreviewConfirm"></button>'
+          + '</div>'
+          + '</div></div></div>'
+        );
+        modal = document.getElementById('poPreviewModal');
+      }
+
+      var title = opts.isEdit ? 'Preview Update: ' + opts.poNumber : 'Preview Pesanan Baru';
+      var btnText = opts.isEdit ? '<i class="bi bi-check-circle"></i> Update Pesanan' : '<i class="bi bi-check-circle"></i> Simpan Pesanan';
+      document.getElementById('poPreviewTitle').textContent = title;
+      document.getElementById('poPreviewConfirm').innerHTML = btnText;
+
+      // Build info + table
+      var html = '<div class="mb-3">'
+        + '<div class="row g-2 small">'
+        + '<div class="col-6"><strong>Supplier:</strong> ' + opts.supplier + '</div>'
+        + '<div class="col-6"><strong>Tgl Pesanan:</strong> ' + opts.orderDate + '</div>'
+        + '</div></div>';
+
+      var grandTotal = 0;
+      html += '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0">'
+        + '<thead class="table-light"><tr>'
+        + '<th class="text-center" style="width:40px">No</th>'
+        + '<th style="max-width:200px">Nama Barang</th>'
+        + '<th class="text-center" style="width:60px">Isi</th>'
+        + '<th class="text-end" style="width:120px">QTY Order</th>'
+        + '<th class="text-end" style="width:100px">Harga/Kcl</th>'
+        + '<th class="text-end" style="width:110px">Total</th>'
+        + '</tr></thead><tbody>';
+
+      opts.items.forEach(function(it, i) {
+        var packing = it.packing || 1;
+        var totalKcl = (it.qty_order || 0) * packing + (it.qty_order_kcl_remainder || 0);
+        var hbelikcl = packing > 0 ? (it.hbelibsr || 0) / packing : 0;
+        var total = hbelikcl * totalKcl;
+        grandTotal += total;
+
+        var qtyParts = [];
+        if (it.qty_order > 0) qtyParts.push(fmtNum(it.qty_order) + ' ' + it.satbesar);
+        if (it.qty_order_kcl_remainder > 0) qtyParts.push(fmtNum(it.qty_order_kcl_remainder) + ' ' + (it.satkecil || 'Pcs'));
+        var qtyStr = qtyParts.join(' ') || '0';
+
+        html += '<tr>'
+          + '<td class="text-center">' + (i + 1) + '</td>'
+          + '<td>' + it.artname + '</td>'
+          + '<td class="text-center">' + Math.round(packing) + '/' + it.satbesar + '</td>'
+          + '<td class="text-end">' + qtyStr + '</td>'
+          + '<td class="text-end">' + (hbelikcl ? fmtNum(hbelikcl) : '-') + '</td>'
+          + '<td class="text-end">' + (total ? fmtNum(total) : '-') + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody><tfoot><tr class="fw-bold">'
+        + '<td colspan="3" class="text-end">Total ' + opts.items.length + ' item</td>'
+        + '<td></td><td></td>'
+        + '<td class="text-end">Rp ' + fmtNum(grandTotal) + '</td>'
+        + '</tr></tfoot></table></div>';
+
+      document.getElementById('poPreviewBody').innerHTML = html;
+
+      var bsModal = new bootstrap.Modal(modal);
+      var confirmBtn = document.getElementById('poPreviewConfirm');
+
+      function cleanup() {
+        confirmBtn.removeEventListener('click', onConfirm);
+        modal.removeEventListener('hidden.bs.modal', onHidden);
+      }
+      var resolved = false;
+      function onConfirm() { resolved = true; bsModal.hide(); cleanup(); resolve(true); }
+      function onHidden() { if (!resolved) { cleanup(); resolve(false); } }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      modal.addEventListener('hidden.bs.modal', onHidden);
+      bsModal.show();
+    });
+  }
+
+})();
+</script>
+{% endblock %}

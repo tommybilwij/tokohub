@@ -1,6 +1,7 @@
 """HTML page routes."""
 
 import aiomysql
+from datetime import date
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -26,7 +27,7 @@ async def _user_ctx(request: Request, user: dict | None) -> dict:
         pool = request.app.state.db_pool
         perms = await get_role_permissions(pool, user['role'])
         nav = [p for p in perms.split(',') if p in PAGES]
-    return {'user': user, 'nav_pages': nav}
+    return {'user': user, 'nav_pages': nav, 'today': date.today().isoformat()}
 
 
 async def _check_page(request: Request, user: dict | None, page: str):
@@ -112,6 +113,38 @@ async def history_page(
         'can_entry': has_entry, 'can_edit': can_edit, 'can_delete': can_delete, 'can_lock': can_lock,
         **await _user_ctx(request, user),
     })
+
+
+@router.get('/pesanan-pembelian')
+async def pesanan_pembelian_page(
+    request: Request,
+    db: aiomysql.Pool = Depends(get_db),
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    pool = request.app.state.db_pool
+    has_entry = await has_page_access(pool, user['role'], 'pesanan:input')
+    has_list = await has_page_access(pool, user['role'], 'pesanan:daftar')
+    if not has_entry and not has_list:
+        denied = await _check_page(request, user, 'pesanan')
+        if denied: return denied
+    can_edit = await has_page_access(pool, user['role'], 'pesanan:daftar:edit')
+    can_delete = await has_page_access(pool, user['role'], 'pesanan:daftar:delete')
+    return templates.TemplateResponse(request, 'pesanan_pembelian.html', {
+        'can_entry': has_entry, 'can_edit': can_edit, 'can_delete': can_delete,
+        **await _user_ctx(request, user),
+    })
+
+
+@router.get('/pesanan-pembelian/input')
+async def pesanan_pembelian_input_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    denied = await _check_page(request, user, 'pesanan:input')
+    if denied: return denied
+    return templates.TemplateResponse(request, 'pesanan_pembelian_input.html', await _user_ctx(request, user))
 
 
 @router.get('/scanner')

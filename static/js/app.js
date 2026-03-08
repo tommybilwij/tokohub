@@ -27,6 +27,8 @@
     userSelect:      $('#userSelect'),
     vendorSelect:    $('#vendorSelect'),
     orderDate:       $('#orderDate'),
+    dueDateInput:    $('#dueDateInput'),
+    keteranganInput: $('#keteranganInput'),
     itemNameInput:   $('#itemNameInput'),
     btnAddItem:      $('#btnAddItem'),
     shippingCostInput: null, // removed — now per-item
@@ -64,11 +66,11 @@
   function formatNumber(n) {
     const num = Number(n);
     if (isNaN(num)) return '0';
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   function parsePrice(str) {
-    return parseFloat(String(str).replace(/,/g, '').replace(/[^0-9.\-]/g, '')) || 0;
+    return parseFloat(String(str).replace(/\./g, '').replace(',', '.').replace(/[^0-9.\-]/g, '')) || 0;
   }
 
   /** Truncate (floor) a number to 2 decimal places — no rounding up. */
@@ -118,6 +120,8 @@
           user: dom.userSelect ? dom.userSelect.value : '',
           vendor: dom.vendorSelect ? dom.vendorSelect.value : '',
           orderDate: dom.orderDate ? dom.orderDate.value : '',
+          dueDate: dom.dueDateInput ? dom.dueDateInput.value : '',
+          keterangan: dom.keteranganInput ? dom.keteranganInput.value : '',
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -199,6 +203,8 @@
           if (window._setVendorInput) window._setVendorInput(draft.header.vendor);
         }
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
+        if (draft.header.dueDate && dom.dueDateInput) dom.dueDateInput.value = draft.header.dueDate;
+        if (draft.header.keterangan && dom.keteranganInput) dom.keteranganInput.value = draft.header.keterangan;
       }
 
       return true;
@@ -320,7 +326,7 @@
 
     // Set today's date as default
     if (dom.orderDate) {
-      dom.orderDate.value = new Date().toISOString().slice(0, 10);
+      var d = new Date(); dom.orderDate.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
 
     // Load dropdowns first, then restore saved state
@@ -425,6 +431,8 @@
     dom.userSelect.addEventListener('change', _saveStateDebounced);
     dom.vendorSelect.addEventListener('change', _saveStateDebounced);
     dom.orderDate.addEventListener('change', _saveStateDebounced);
+    if (dom.dueDateInput) dom.dueDateInput.addEventListener('change', _saveStateDebounced);
+    if (dom.keteranganInput) dom.keteranganInput.addEventListener('input', _saveStateDebounced);
 
     // Per-item shipping cost: delegate change events
     document.addEventListener('change', (e) => {
@@ -457,6 +465,16 @@
     dom.btnNewReceipt.addEventListener('click', () => {
       bootstrap.Modal.getInstance(dom.fpSuccessModal).hide();
       clearAllItems();
+    });
+
+    // Expand / Collapse all
+    document.getElementById('expandAll').addEventListener('click', function() {
+      document.querySelectorAll('#itemTable .item-detail').forEach(function(d) { d.classList.add('open'); });
+      document.querySelectorAll('#itemTable .item-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+    });
+    document.getElementById('collapseAll').addEventListener('click', function() {
+      document.querySelectorAll('#itemTable .item-detail').forEach(function(d) { d.classList.remove('open'); });
+      document.querySelectorAll('#itemTable .item-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
     });
 
     // --- Keyboard shortcuts ---
@@ -895,6 +913,12 @@
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
       const totalEl = document.querySelector(`.edit-disc-total[data-idx="${idx}"][data-field="${f}"]`);
       if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
+      const pcsEl = document.querySelector(`.disc-pcs[data-idx="${idx}"][data-field="${f}"]`);
+      if (pcsEl) {
+        const amtPcs = (qtyKcl > 0 && amtMap[f]) ? amtMap[f] / qtyKcl : 0;
+        const pcsInput = pcsEl.querySelector('input');
+        if (pcsInput) pcsInput.value = amtPcs ? formatNumber(amtPcs) : '0';
+      }
     });
 
     // Per-item shipping cost
@@ -1195,6 +1219,7 @@
                     <th></th>
                     <th class="dp-th-total"><span class="dp-unit-bsr">/${satuanBsr}</span> &times; <span class="dp-qty-bsr">${item.qtyBesar || 1}</span> =</th>
                     <th class="dp-unit-bsr">/${satuanBsr}</th>
+                    <th>/Pcs</th>
                     <th>%</th>
                   </tr>
                 </thead>
@@ -1205,6 +1230,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc1"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1214,6 +1240,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc2"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1223,6 +1250,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="ppn"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1232,6 +1260,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="disc-pcs" data-idx="${idx}" data-field="disc3"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
                                value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -2023,6 +2052,8 @@
           supplier_id: supplierId,
           items,
           order_date: dom.orderDate.value,
+          due_date: dom.dueDateInput ? dom.dueDateInput.value : '',
+          uraian: dom.keteranganInput ? dom.keteranganInput.value : '',
         },
       });
 
@@ -2045,7 +2076,7 @@
       if (!v) return '<span class="fp-disc-zero">-</span>';
       const n = parseFloat(v);
       if (n === 0) return '<span class="fp-disc-zero">-</span>';
-      return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+      return (Number.isInteger(n) ? n.toString() : n.toFixed(2)) + '%';
     };
 
     dom.fpPreviewBody.innerHTML = '';
@@ -2094,10 +2125,14 @@
     const supplierId = dom.vendorSelect.value;
     const matched = state.items.filter((i) => i.selectedArtno);
 
-    // Block if any item has QTY KCL = 0
+    // Block if any item has QTY KCL = 0 or Total Harga Beli = 0
     for (const it of matched) {
       if (!it.qtyKecil || it.qtyKecil <= 0) {
         showToast(`QTY KCL untuk "${it.name || it.selectedArtno}" adalah 0. Isi QTY KCL sebelum kirim Faktur.`, 'danger');
+        return;
+      }
+      if (!it.priceBsr || it.priceBsr <= 0) {
+        showToast(`Total Harga Beli untuk "${it.name || it.selectedArtno}" adalah 0. Isi harga beli sebelum kirim Faktur.`, 'warning');
         return;
       }
     }
@@ -2114,6 +2149,8 @@
           userid: userId,
           items,
           order_date: dom.orderDate.value,
+          due_date: dom.dueDateInput ? dom.dueDateInput.value : '',
+          uraian: dom.keteranganInput ? dom.keteranganInput.value : '',
           update_price: updatePriceEl ? updatePriceEl.checked : true,
         },
       });

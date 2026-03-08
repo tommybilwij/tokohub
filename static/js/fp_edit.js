@@ -1115,6 +1115,17 @@
     }
   });
 
+  // ------- Expand / Collapse all -------
+  var table = document.getElementById('editItemTable');
+  document.getElementById('editExpandAll').addEventListener('click', function() {
+    table.querySelectorAll('.item-detail').forEach(function(d) { d.classList.add('open'); });
+    table.querySelectorAll('.item-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+  });
+  document.getElementById('editCollapseAll').addEventListener('click', function() {
+    table.querySelectorAll('.item-detail').forEach(function(d) { d.classList.remove('open'); });
+    table.querySelectorAll('.item-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
+  });
+
   // ------- Back / Escape -------
   elBtnBack.addEventListener('click', closeEdit);
   document.addEventListener('keydown', function (e) {

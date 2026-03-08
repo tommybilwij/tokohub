@@ -459,6 +459,16 @@
       clearAllItems();
     });
 
+    // Expand / Collapse all
+    document.getElementById('expandAll').addEventListener('click', function() {
+      document.querySelectorAll('#itemTable .item-detail').forEach(function(d) { d.classList.add('open'); });
+      document.querySelectorAll('#itemTable .item-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+    });
+    document.getElementById('collapseAll').addEventListener('click', function() {
+      document.querySelectorAll('#itemTable .item-detail').forEach(function(d) { d.classList.remove('open'); });
+      document.querySelectorAll('#itemTable .item-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
+    });
+
     // --- Keyboard shortcuts ---
     document.addEventListener('keydown', (e) => {
       // Escape → collapse any open detail panel

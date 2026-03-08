@@ -121,6 +121,16 @@
       </div>`;
   }
 
+  // Expand / Collapse all
+  document.getElementById('pcExpandAll').addEventListener('click', function() {
+    document.querySelectorAll('#pcTable .pc-detail').forEach(function(d) { d.classList.add('open'); });
+    document.querySelectorAll('#pcTable .pc-main').forEach(function(m) { m.classList.add('has-detail-open'); });
+  });
+  document.getElementById('pcCollapseAll').addEventListener('click', function() {
+    document.querySelectorAll('#pcTable .pc-detail').forEach(function(d) { d.classList.remove('open'); });
+    document.querySelectorAll('#pcTable .pc-main').forEach(function(m) { m.classList.remove('has-detail-open'); });
+  });
+
   // --- Search ---
   let searchTimer;
   let lastResults = [];

@@ -159,13 +159,20 @@ def main():
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
 
             https_port = 443
-            try:
-                import socket
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.bind(('0.0.0.0', https_port))
-                s.close()
-            except (PermissionError, OSError) as e:
-                raise RuntimeError(f"Cannot bind HTTPS port 443: {e}. Run with sudo for port 443.") from e
+            import socket, time as _time
+            max_retries = 10
+            for attempt in range(1, max_retries + 1):
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.bind(('0.0.0.0', https_port))
+                    s.close()
+                    break
+                except (PermissionError, OSError) as e:
+                    if attempt == max_retries:
+                        raise RuntimeError(f"Cannot bind HTTPS port 443 after {max_retries} attempts: {e}. Run with sudo for port 443.") from e
+                    logger.warning("Port 443 unavailable (attempt %d/%d): %s — retrying in 2s", attempt, max_retries, e)
+                    _time.sleep(2)
+                    _time.sleep(attempt * 2)
 
             if https_port:
                 app.state.https_port = https_port

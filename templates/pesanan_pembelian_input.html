@@ -63,23 +63,6 @@
           <i class="bi bi-arrow-repeat"></i> Muat Data
         </button>
 
-        <hr>
-
-        <div class="mb-2">
-          <label class="form-label fw-semibold mb-1">Kolom Export PDF</label>
-          <small class="text-muted d-block mb-2">Pilih kolom yang tampil di PDF</small>
-        </div>
-        <div class="d-flex flex-column gap-1" id="poPdfCols">
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="isi" checked><span class="form-check-label small">Isi (Packing)</span></label>
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="sales" checked><span class="form-check-label small">Penjualan / Bulan</span></label>
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="stok" checked><span class="form-check-label small">Stok</span></label>
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="saran" checked><span class="form-check-label small">Saran</span></label>
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="order" checked><span class="form-check-label small">Order Qty</span></label>
-          <label class="form-check form-check-sm mb-0"><input type="checkbox" class="form-check-input" value="harga"><span class="form-check-label small">Harga Beli</span></label>
-        </div>
-        <button class="btn btn-outline-secondary w-100 mt-2 d-none" id="poExportPdf" disabled>
-          <i class="bi bi-file-earmark-pdf"></i> Export PDF
-        </button>
       </div>
     </div>
   </div>
@@ -279,7 +262,7 @@
     return MONTH_NAMES[parseInt(parts[1]) - 1] + ' ' + parts[0].slice(2);
   }
 
-  function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+  function fmtNum(n) { return new Intl.NumberFormat('en-US').format(Math.round(n)); }
   function fmtDec(n) { return n % 1 === 0 ? n.toString() : n.toFixed(1); }
 
   document.getElementById('poLoadItems').addEventListener('click', loadItems);
@@ -347,7 +330,6 @@
       document.getElementById('poCreateSave').disabled = false;
       document.getElementById('poClearAll').classList.remove('d-none');
       updateSummary();
-      showPdfBtn();
       saveDraft();
 
     } catch (err) {
@@ -367,29 +349,37 @@
     container.classList.remove('d-none');
 
     // --- Two-row header with column groups ---
-    var skcl0 = poItems.length ? (poItems[0].satkecil || 'Pcs') : 'Kcl';
+    var skcl0 = 'Kcl';
 
-    // Row 1: group headers
+    // Row 1: group headers (no rowspan - full columns in both rows)
     var gRow = '<tr class="po-group-header">'
-      + '<th rowspan="2" style="width:28px;vertical-align:middle" class="text-center"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
-      + '<th rowspan="2" style="width:28px;vertical-align:middle">#</th>'
-      + '<th rowspan="2" style="min-width:180px;vertical-align:middle;text-align:left">Nama Barang</th>'
-      + '<th rowspan="2" style="width:40px;vertical-align:middle" class="text-center">Isi</th>'
+      + '<th style="background:#fff !important;border:none"></th>'
+      + '<th style="background:#fff !important;border:none"></th>'
+      + '<th style="background:#fff !important;border:none"></th>'
+      + '<th style="background:#fff !important;border:none"></th>'
       + '<th colspan="' + poMonths.length + '" class="po-gh-sales po-col-sep">Penjualan (' + skcl0 + ')</th>'
-      + '<th rowspan="2" class="po-col-sep" style="vertical-align:middle">Stok (' + skcl0 + ')</th>'
-      + '<th rowspan="2" class="po-gh-saran po-col-sep" style="vertical-align:middle">Saran</th>'
-      + '<th colspan="2" rowspan="2" class="po-gh-order po-col-sep" style="vertical-align:middle">Order</th>'
+      + '<th class="po-col-sep">Stok (' + skcl0 + ')</th>'
+      + '<th class="po-gh-saran po-col-sep">Saran</th>'
+      + '<th colspan="2" class="po-gh-order po-col-sep">Order</th>'
       + '<th colspan="2" class="po-gh-harga po-col-sep">Harga Beli</th>'
       + '</tr>';
 
-    // Row 2: month sub-headers + harga sub-headers only
-    var hRow = '<tr>';
+    // Row 2: all individual column headers
+    var hRow = '<tr>'
+      + '<th style="width:28px" class="text-center"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
+      + '<th style="width:28px">#</th>'
+      + '<th style="min-width:180px">Nama Barang</th>'
+      + '<th class="text-center" style="width:40px">Isi</th>';
 
     poMonths.forEach(function(m, i) {
       hRow += '<th class="text-end po-month-header' + (i === 0 ? ' po-col-sep' : '') + '">' + fmtMonth(m) + '</th>';
     });
 
-    hRow += '<th class="text-end po-gh-harga po-col-sep" style="width:70px">Per Kcl</th>'
+    hRow += '<th class="text-end po-col-sep" style="width:70px">Kcl</th>'
+      + '<th class="text-center po-gh-saran po-col-sep" style="width:90px">Qty</th>'
+      + '<th class="text-center po-gh-order po-col-sep" style="width:70px">Bsr</th>'
+      + '<th class="text-center po-gh-order" style="width:55px">Kcl</th>'
+      + '<th class="text-end po-gh-harga po-col-sep" style="width:70px">Per Kcl</th>'
       + '<th class="text-end po-gh-harga" style="width:80px">Total</th>'
       + '</tr>';
 
@@ -422,19 +412,20 @@
         + item.artname + '</span></td>'
         + '<td class="text-center text-nowrap">' + Math.round(packing) + '/' + item.satbesar + '</td>';
 
-      // Month sales - just numbers, no unit
+      // Month sales with unit
+      var skcl = item.satkecil || 'Pcs';
       poMonths.forEach(function(m, i) {
         var qkcl = (item._monthData && item._monthData[m]) || 0;
         cells += '<td class="text-end po-cell-month' + (i === 0 ? ' po-col-sep' : '') + '">'
-          + (qkcl ? fmtNum(qkcl) : z) + '</td>';
+          + (qkcl ? fmtNum(qkcl) + ' <small class="po-unit">' + skcl + '</small>' : z) + '</td>';
       });
 
-      // Stock - just number
+      // Stock with unit
       var stockCell;
       if (item._stockQty < 0) {
-        stockCell = '<span class="text-danger fw-bold" title="Stok minus!"><i class="bi bi-exclamation-octagon-fill"></i> ' + fmtNum(item._stockQty) + '</span>';
+        stockCell = '<span class="text-danger fw-bold" title="Stok minus!"><i class="bi bi-exclamation-octagon-fill"></i> ' + fmtNum(item._stockQty) + ' <small class="po-unit">' + skcl + '</small></span>';
       } else if (item._stockQty > 0) {
-        stockCell = fmtNum(item._stockQty);
+        stockCell = fmtNum(item._stockQty) + ' <small class="po-unit">' + skcl + '</small>';
       } else {
         stockCell = z;
       }
@@ -443,17 +434,17 @@
       var suggDisplay = z;
       if (item._suggKcl > 0) {
         var parts = [];
-        if (item._suggBsr > 0) parts.push('<b>' + item._suggBsr + '</b><small>' + item.satbesar + '</small>');
-        if (item._suggRemKcl > 0) parts.push('<b>' + item._suggRemKcl + '</b><small>' + (item.satkecil || 'Pcs') + '</small>');
+        if (item._suggBsr > 0) parts.push('<b>' + fmtNum(item._suggBsr) + '</b><small>' + item.satbesar + '</small>');
+        if (item._suggRemKcl > 0) parts.push('<b>' + fmtNum(item._suggRemKcl) + '</b><small>' + (item.satkecil || 'Pcs') + '</small>');
         suggDisplay = parts.join(' ');
       }
 
       // Order inputs
-      var orderBsr = '<input type="number" class="form-control form-control-sm text-end po-order-bsr" '
-        + 'data-idx="' + idx + '" value="' + (item._orderBsr || 0) + '" min="0" step="1">'
+      var orderBsr = '<input type="text" inputmode="numeric" class="form-control form-control-sm text-end po-order-bsr po-order-input" '
+        + 'data-idx="' + idx + '" value="' + fmtNum(item._orderBsr || 0) + '">'
         + '<small class="po-order-unit">' + item.satbesar + '</small>';
-      var orderKcl = '<input type="number" class="form-control form-control-sm text-end po-order-kcl" '
-        + 'data-idx="' + idx + '" value="' + (item._orderRemKcl || 0) + '" min="0" step="1">'
+      var orderKcl = '<input type="text" inputmode="numeric" class="form-control form-control-sm text-end po-order-kcl po-order-input" '
+        + 'data-idx="' + idx + '" value="' + fmtNum(item._orderRemKcl || 0) + '">'
         + '<small class="po-order-unit">' + (item.satkecil || 'Pcs') + '</small>';
 
       // Harga
@@ -501,23 +492,35 @@
       }
     }
 
+    function parseOrderVal(str) {
+      return parseInt(String(str).replace(/[^0-9\-]/g, ''), 10) || 0;
+    }
+
     tbody.querySelectorAll('.po-order-bsr').forEach(function(input) {
       input.addEventListener('change', function() {
         var idx = parseInt(input.dataset.idx);
-        poItems[idx]._orderBsr = parseFloat(input.value) || 0;
+        var val = parseOrderVal(input.value);
+        poItems[idx]._orderBsr = val;
+        input.value = fmtNum(val);
         updateRowTotal(idx);
         updateSummary();
         saveDraft();
       });
+      input.addEventListener('focus', function() { input.value = poItems[parseInt(input.dataset.idx)]._orderBsr || 0; input.select(); });
+      input.addEventListener('blur', function() { input.value = fmtNum(poItems[parseInt(input.dataset.idx)]._orderBsr || 0); });
     });
     tbody.querySelectorAll('.po-order-kcl').forEach(function(input) {
       input.addEventListener('change', function() {
         var idx = parseInt(input.dataset.idx);
-        poItems[idx]._orderRemKcl = parseFloat(input.value) || 0;
+        var val = parseOrderVal(input.value);
+        poItems[idx]._orderRemKcl = val;
+        input.value = fmtNum(val);
         updateRowTotal(idx);
         updateSummary();
         saveDraft();
       });
+      input.addEventListener('focus', function() { input.value = poItems[parseInt(input.dataset.idx)]._orderRemKcl || 0; input.select(); });
+      input.addEventListener('blur', function() { input.value = fmtNum(poItems[parseInt(input.dataset.idx)]._orderRemKcl || 0); });
     });
 
     // Row checkboxes
@@ -564,141 +567,6 @@
 
   document.getElementById('poFilterInput').addEventListener('input', renderItems);
   document.getElementById('poHideZero').addEventListener('change', renderItems);
-
-  // --- Export PDF ---
-  var pdfBtn = document.getElementById('poExportPdf');
-
-  function getSelectedPdfCols() {
-    var cols = {};
-    document.querySelectorAll('#poPdfCols input[type=checkbox]').forEach(function(cb) {
-      cols[cb.value] = cb.checked;
-    });
-    return cols;
-  }
-
-  function showPdfBtn() {
-    if (poItems.length > 0) {
-      pdfBtn.classList.remove('d-none');
-      pdfBtn.disabled = false;
-    }
-  }
-
-  pdfBtn.addEventListener('click', function() {
-    if (!poItems.length) return;
-    var cols = getSelectedPdfCols();
-    var suppLabel = suppInput.value || '-';
-    var orderDate = document.getElementById('poOrderDate').value;
-    var salesFrom = document.getElementById('poSalesFrom').value;
-    var salesTo = document.getElementById('poSalesTo').value;
-
-    // Only checked items
-    var items = poItems.filter(function(it) { return it._checked !== false; });
-    if (items.length === 0) {
-      window.showToast && showToast('Centang item yang ingin di-export', 'warning');
-      return;
-    }
-
-    // Build header
-    var thRow = '<th style="width:30px">#</th><th style="text-align:left">Nama Barang</th>';
-    if (cols.isi) thRow += '<th>Isi</th>';
-    if (cols.sales) {
-      poMonths.forEach(function(m) { thRow += '<th>' + fmtMonth(m) + '</th>'; });
-    }
-    if (cols.stok) thRow += '<th>Stok</th>';
-    if (cols.saran) thRow += '<th>Saran</th>';
-    if (cols.order) thRow += '<th>Order</th>';
-    if (cols.harga) thRow += '<th>H.Beli/Kcl</th><th>Total</th>';
-
-    // Build body rows
-    var rows = '';
-    var grandTotal = 0;
-    items.forEach(function(item, i) {
-      var packing = item.packing || 1;
-      var skcl = item.satkecil || 'Pcs';
-      var sbsr = item.satbesar || '';
-      rows += '<tr><td style="text-align:center">' + (i + 1) + '</td>';
-      rows += '<td style="text-align:left">' + item.artname + '<br><small style="color:#888">' + item.artno + '</small></td>';
-
-      if (cols.isi) rows += '<td>' + Math.round(packing) + '/' + sbsr + '</td>';
-
-      if (cols.sales) {
-        poMonths.forEach(function(m) {
-          var q = (item._monthData && item._monthData[m]) || 0;
-          rows += '<td>' + (q ? fmtNum(q) : '-') + '</td>';
-        });
-      }
-
-      if (cols.stok) {
-        var sq = item._stockQty || 0;
-        rows += '<td' + (sq < 0 ? ' style="color:red;font-weight:bold"' : '') + '>'
-          + (sq ? fmtNum(sq) + ' ' + skcl : '-') + '</td>';
-      }
-
-      if (cols.saran) {
-        var saran = '';
-        if (item._suggKcl > 0) {
-          if (item._suggBsr > 0) saran += item._suggBsr + ' ' + sbsr + ' ';
-          if (item._suggRemKcl > 0) saran += item._suggRemKcl + ' ' + skcl;
-        }
-        rows += '<td>' + (saran || '-') + '</td>';
-      }
-
-      if (cols.order) {
-        var orderStr = '';
-        if (item._orderBsr > 0) orderStr += item._orderBsr + ' ' + sbsr + ' ';
-        if (item._orderRemKcl > 0) orderStr += item._orderRemKcl + ' ' + skcl;
-        rows += '<td style="font-weight:bold">' + (orderStr || '-') + '</td>';
-      }
-
-      if (cols.harga) {
-        var hbelikcl = packing > 0 ? (item.hbelibsr || 0) / packing : 0;
-        var totalKcl = (item._orderBsr || 0) * packing + (item._orderRemKcl || 0);
-        var total = hbelikcl * totalKcl;
-        grandTotal += total;
-        rows += '<td>' + (hbelikcl ? fmtNum(hbelikcl) : '-') + '</td>';
-        rows += '<td style="font-weight:bold">' + (total ? fmtNum(total) : '-') + '</td>';
-      }
-
-      rows += '</tr>';
-    });
-
-    // Grand total row
-    if (cols.harga) {
-      var colCount = 2 + (cols.isi ? 1 : 0) + (cols.sales ? poMonths.length : 0)
-        + (cols.stok ? 1 : 0) + (cols.saran ? 1 : 0) + (cols.order ? 1 : 0) + 1;
-      rows += '<tr style="border-top:2px solid #000;font-weight:bold">'
-        + '<td colspan="' + colCount + '" style="text-align:right">TOTAL</td>'
-        + '<td>' + fmtNum(grandTotal) + '</td></tr>';
-    }
-
-    var html = '<!DOCTYPE html><html><head><title>PO - ' + suppLabel + '</title>'
-      + '<style>'
-      + 'body{font-family:Arial,sans-serif;font-size:11px;margin:20px;color:#222}'
-      + 'h2{margin:0 0 4px;font-size:16px}'
-      + '.meta{color:#555;font-size:10px;margin-bottom:12px}'
-      + '.meta span{margin-right:16px}'
-      + 'table{width:100%;border-collapse:collapse;font-size:10px}'
-      + 'th{background:#f0f0f0;font-weight:bold;text-transform:uppercase;font-size:9px;letter-spacing:0.5px}'
-      + 'th,td{border:1px solid #ccc;padding:4px 6px;text-align:right;white-space:nowrap}'
-      + 'td:nth-child(2){text-align:left;white-space:normal;max-width:200px}'
-      + 'tr:nth-child(even){background:#fafafa}'
-      + '@media print{body{margin:10px}}'
-      + '</style></head><body>'
-      + '<h2>Pesanan Pembelian</h2>'
-      + '<div class="meta">'
-      + '<span><b>Supplier:</b> ' + suppLabel + '</span>'
-      + '<span><b>Tgl Pesanan:</b> ' + orderDate + '</span>'
-      + '<span><b>Periode:</b> ' + salesFrom + ' s/d ' + salesTo + '</span>'
-      + '<span><b>Items:</b> ' + items.length + '</span>'
-      + '</div>'
-      + '<table><thead><tr>' + thRow + '</tr></thead><tbody>' + rows + '</tbody></table>'
-      + '<script>window.onload=function(){window.print()}<\/script>'
-      + '</body></html>';
-
-    var w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-  });
 
   // Save draft on form field changes
   ['poOrderDate', 'poSalesFrom', 'poSalesTo', 'poTargetDays'].forEach(function(id) {

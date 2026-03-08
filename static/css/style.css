@@ -2165,6 +2165,8 @@ body {
   left: 0;
   z-index: 2;
   background: #fff;
+  min-width: 28px;
+  max-width: 28px;
 }
 #poItemTable th:nth-child(2),
 #poItemTable td:nth-child(2) {
@@ -2172,14 +2174,16 @@ body {
   left: 28px;
   z-index: 2;
   background: #fff;
+  min-width: 32px;
+  max-width: 32px;
 }
 #poItemTable th:nth-child(3),
 #poItemTable td:nth-child(3) {
   position: sticky;
-  left: 56px;
+  left: 60px;
   z-index: 2;
   background: #fff;
-  border-right: 2px solid var(--clr-neutral-300);
+  box-shadow: 2px 0 4px rgba(0,0,0,.08);
 }
 #poItemTable thead th:nth-child(1),
 #poItemTable thead th:nth-child(2),
@@ -2226,6 +2230,17 @@ body {
 }
 .po-cell-order input.form-control:focus {
   box-shadow: 0 0 0 2px rgba(67,160,71,.25);
+}
+.po-unit {
+  display: inline-block;
+  width: 28px;
+  margin-left: 2px;
+  text-align: left;
+  color: var(--clr-neutral-500);
+  font-size: var(--fs-2xs);
+  vertical-align: baseline;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .po-order-unit {
   display: inline-block;

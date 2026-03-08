@@ -53,11 +53,11 @@
           <small class="text-muted d-block mb-2">Analisa penjualan per bulan</small>
           <div class="mb-2">
             <label class="form-label small mb-1">Dari</label>
-            <input type="month" id="poSalesFrom" class="form-control">
+            <select id="poSalesFrom" class="form-select"></select>
           </div>
           <div class="mb-2">
             <label class="form-label small mb-1">Sampai</label>
-            <input type="month" id="poSalesTo" class="form-control">
+            <select id="poSalesTo" class="form-select"></select>
           </div>
         </div>
 
@@ -114,7 +114,7 @@
         <div class="card-footer">
           <div class="d-flex gap-3 align-items-center flex-wrap">
             <button class="btn btn-sm btn-cta" id="poCreateSave" disabled>
-              <i class="bi bi-check-circle"></i> Simpan Pesanan
+              <i class="bi bi-eye"></i> Preview
             </button>
             <button class="btn btn-sm btn-outline-danger d-none" id="poClearAll">
               <i class="bi bi-trash"></i> Hapus Semua
@@ -143,14 +143,28 @@
     document.getElementById('poHeaderCreate').classList.add('d-none');
     document.getElementById('poHeaderEdit').classList.remove('d-none');
     document.getElementById('poEditNumber').textContent = editPO;
-    document.getElementById('poCreateSave').innerHTML = '<i class="bi bi-check-circle"></i> Update Pesanan';
+    document.getElementById('poCreateSave').innerHTML = '<i class="bi bi-eye"></i> Preview';
   }
 
-  // Default sales period: last 6 months
-  var dFrom = new Date(); dFrom.setMonth(dFrom.getMonth() - 6);
-  document.getElementById('poSalesFrom').value = dFrom.getFullYear() + '-' + String(dFrom.getMonth() + 1).padStart(2, '0');
+  // Populate month select dropdowns (last 24 months up to current month)
+  var monthNames = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   var dNow = new Date();
-  document.getElementById('poSalesTo').value = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0');
+  var currentMonth = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0');
+  var dFrom3 = new Date(); dFrom3.setMonth(dFrom3.getMonth() - 3);
+  var defaultFrom = dFrom3.getFullYear() + '-' + String(dFrom3.getMonth() + 1).padStart(2, '0');
+  var fromSel = document.getElementById('poSalesFrom');
+  var toSel = document.getElementById('poSalesTo');
+  for (var mi = 0; mi < 24; mi++) {
+    var md = new Date(dNow.getFullYear(), dNow.getMonth() - mi, 1);
+    var val = md.getFullYear() + '-' + String(md.getMonth() + 1).padStart(2, '0');
+    var label = monthNames[md.getMonth()] + ' ' + md.getFullYear();
+    var optFrom = new Option(label, val);
+    var optTo = new Option(label, val);
+    if (val === defaultFrom) optFrom.selected = true;
+    if (val === currentMonth) optTo.selected = true;
+    fromSel.appendChild(optFrom);
+    toSel.appendChild(optTo);
+  }
 
   // --- Draft persistence ---
   function saveDraft() {
@@ -195,8 +209,8 @@
     suppHidden.value = draft.suppid;
     suppInput.value = draft.suppLabel || draft.suppid;
     if (draft.orderDate) document.getElementById('poOrderDate').value = draft.orderDate;
-    if (draft.salesFrom) document.getElementById('poSalesFrom').value = draft.salesFrom;
-    if (draft.salesTo) document.getElementById('poSalesTo').value = draft.salesTo;
+    if (draft.salesFrom) document.getElementById('poSalesFrom').value = draft.salesFrom.substring(0, 7);
+    if (draft.salesTo) document.getElementById('poSalesTo').value = draft.salesTo.substring(0, 7);
     if (draft.targetDays) document.getElementById('poTargetDays').value = draft.targetDays;
 
     // If there was data loaded, auto-reload and apply saved orders
@@ -292,12 +306,20 @@
   document.getElementById('poLoadItems').addEventListener('click', loadItems);
 
   // Convert month input (YYYY-MM) to first and last day of month
+  // If toMonth is current month, use today's date instead of last day
   function monthToDateRange(fromMonth, toMonth) {
     var fromDate = fromMonth + '-01';
-    var toParts = toMonth.split('-');
-    var toY = parseInt(toParts[0]), toM = parseInt(toParts[1]);
-    var lastDay = new Date(toY, toM, 0).getDate();
-    var toDate = toMonth + '-' + String(lastDay).padStart(2, '0');
+    var now = new Date();
+    var nowMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var toDate;
+    if (toMonth === nowMonth) {
+      toDate = toMonth + '-' + String(now.getDate()).padStart(2, '0');
+    } else {
+      var toParts = toMonth.split('-');
+      var toY = parseInt(toParts[0]), toM = parseInt(toParts[1]);
+      var lastDay = new Date(toY, toM, 0).getDate();
+      toDate = toMonth + '-' + String(lastDay).padStart(2, '0');
+    }
     return { from: fromDate, to: toDate };
   }
 
@@ -391,10 +413,10 @@
 
     // Row 1: group headers — first 4 cols, Stok, Saran, Order all use rowspan=2
     var gRow = '<tr class="po-group-header">'
-      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="text-center align-bottom"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
-      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-bottom">#</th>'
-      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-bottom">Nama Barang</th>'
-      + '<th rowspan="2" style="width:40px;background:#e0f2f1 !important;border-bottom:1px solid #dee2e6;border-left:2px solid #dee2e6" class="text-center align-bottom">Isi</th>'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="text-center align-middle"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-middle">#</th>'
+      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-middle">Nama Barang</th>'
+      + '<th rowspan="2" style="width:40px;background:#e0f2f1 !important;border-bottom:1px solid #dee2e6;border-left:2px solid #dee2e6" class="text-center align-middle">Isi</th>'
       + '<th colspan="' + poMonths.length + '" class="po-gh-sales po-col-sep">Penjualan (' + skcl0 + ')</th>'
       + '<th rowspan="2" class="po-col-sep text-end align-middle" style="width:70px">Stok (' + skcl0 + ')</th>'
       + '<th rowspan="2" class="po-gh-saran po-col-sep text-center align-middle" style="width:90px">Saran</th>'
@@ -692,7 +714,7 @@
     }
 
     var itemsToSave = poItems
-      .filter(function(it) { return getOrderKcl(it) > 0; })
+      .filter(function(it) { return getOrderKcl(it) > 0 && it._checked !== false; })
       .map(function(it) {
         return {
           artno: it.artno,
@@ -719,12 +741,15 @@
     var salesRange = monthToDateRange(salesFromMonth, salesToMonth);
 
     var isEdit = !!editPO;
-    var confirmMsg = isEdit
-      ? 'Update pesanan ' + editPO + ' dengan ' + itemsToSave.length + ' item?'
-      : 'Simpan pesanan dengan ' + itemsToSave.length + ' item?';
-    var confirmed = await (window.showConfirm
-      ? showConfirm(confirmMsg)
-      : Promise.resolve(confirm(confirmMsg)));
+
+    // Show preview modal
+    var confirmed = await showPreviewModal({
+      isEdit: isEdit,
+      poNumber: editPO,
+      supplier: suppInput.value,
+      orderDate: orderDate,
+      items: itemsToSave,
+    });
     if (!confirmed) return;
 
     try {
@@ -760,6 +785,99 @@
       window.showToast && showToast('Error: ' + err.message, 'danger');
     }
   });
+
+  // Preview modal before save/update
+  function showPreviewModal(opts) {
+    return new Promise(function(resolve) {
+      var modal = document.getElementById('poPreviewModal');
+      if (!modal) {
+        document.body.insertAdjacentHTML('beforeend',
+          '<div class="modal fade" id="poPreviewModal" tabindex="-1">'
+          + '<div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">'
+          + '<div class="modal-content">'
+          + '<div class="modal-header">'
+          + '<h5 class="modal-title" id="poPreviewTitle"></h5>'
+          + '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>'
+          + '</div>'
+          + '<div class="modal-body" id="poPreviewBody"></div>'
+          + '<div class="modal-footer">'
+          + '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>'
+          + '<button type="button" class="btn btn-cta" id="poPreviewConfirm"></button>'
+          + '</div>'
+          + '</div></div></div>'
+        );
+        modal = document.getElementById('poPreviewModal');
+      }
+
+      var title = opts.isEdit ? 'Preview Update: ' + opts.poNumber : 'Preview Pesanan Baru';
+      var btnText = opts.isEdit ? '<i class="bi bi-check-circle"></i> Update Pesanan' : '<i class="bi bi-check-circle"></i> Simpan Pesanan';
+      document.getElementById('poPreviewTitle').textContent = title;
+      document.getElementById('poPreviewConfirm').innerHTML = btnText;
+
+      // Build info + table
+      var html = '<div class="mb-3">'
+        + '<div class="row g-2 small">'
+        + '<div class="col-6"><strong>Supplier:</strong> ' + opts.supplier + '</div>'
+        + '<div class="col-6"><strong>Tgl Pesanan:</strong> ' + opts.orderDate + '</div>'
+        + '</div></div>';
+
+      var grandTotal = 0;
+      html += '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0">'
+        + '<thead class="table-light"><tr>'
+        + '<th class="text-center" style="width:40px">No</th>'
+        + '<th>Nama Barang</th>'
+        + '<th class="text-center" style="width:60px">Isi</th>'
+        + '<th class="text-end" style="width:120px">QTY Order</th>'
+        + '<th class="text-end" style="width:100px">Harga/Kcl</th>'
+        + '<th class="text-end" style="width:110px">Total</th>'
+        + '</tr></thead><tbody>';
+
+      opts.items.forEach(function(it, i) {
+        var packing = it.packing || 1;
+        var totalKcl = (it.qty_order || 0) * packing + (it.qty_order_kcl_remainder || 0);
+        var hbelikcl = packing > 0 ? (it.hbelibsr || 0) / packing : 0;
+        var total = hbelikcl * totalKcl;
+        grandTotal += total;
+
+        var qtyParts = [];
+        if (it.qty_order > 0) qtyParts.push(fmtNum(it.qty_order) + ' ' + it.satbesar);
+        if (it.qty_order_kcl_remainder > 0) qtyParts.push(fmtNum(it.qty_order_kcl_remainder) + ' ' + (it.satkecil || 'Pcs'));
+        var qtyStr = qtyParts.join(' + ') || '0';
+
+        html += '<tr>'
+          + '<td class="text-center">' + (i + 1) + '</td>'
+          + '<td>' + it.artname + '</td>'
+          + '<td class="text-center">' + Math.round(packing) + '/' + it.satbesar + '</td>'
+          + '<td class="text-end">' + qtyStr + '</td>'
+          + '<td class="text-end">' + (hbelikcl ? fmtNum(hbelikcl) : '-') + '</td>'
+          + '<td class="text-end">' + (total ? fmtNum(total) : '-') + '</td>'
+          + '</tr>';
+      });
+
+      html += '</tbody><tfoot><tr class="fw-bold">'
+        + '<td colspan="3" class="text-end">Total ' + opts.items.length + ' item</td>'
+        + '<td></td><td></td>'
+        + '<td class="text-end">Rp ' + fmtNum(grandTotal) + '</td>'
+        + '</tr></tfoot></table></div>';
+
+      document.getElementById('poPreviewBody').innerHTML = html;
+
+      var bsModal = new bootstrap.Modal(modal);
+      var confirmBtn = document.getElementById('poPreviewConfirm');
+
+      function cleanup() {
+        confirmBtn.removeEventListener('click', onConfirm);
+        modal.removeEventListener('hidden.bs.modal', onHidden);
+      }
+      var resolved = false;
+      function onConfirm() { resolved = true; bsModal.hide(); cleanup(); resolve(true); }
+      function onHidden() { if (!resolved) { cleanup(); resolve(false); } }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      modal.addEventListener('hidden.bs.modal', onHidden);
+      bsModal.show();
+    });
+  }
 
 })();
 </script>

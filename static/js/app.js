@@ -648,7 +648,12 @@
       const detail = document.querySelector(`.item-detail[data-idx="${newIdx}"]`);
       if (row) row.classList.add('has-detail-open');
       if (detail) detail.classList.add('open');
-      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Focus on Sat. Besar qty input
+        const qtyInput = detail && detail.querySelector('.edit-qty-besar');
+        if (qtyInput) { qtyInput.focus(); qtyInput.select(); }
+      }
     });
     showToast(`"${name}" ditambahkan`, 'success');
   }

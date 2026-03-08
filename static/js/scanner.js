@@ -1,10 +1,7 @@
 /**
  * Scanner Page - Barcode scanner + stock lookup
  *
- * Detection strategy:
- *   1. BarcodeDetector API (native, hardware-accelerated, handles shake/blur)
- *   2. Quagga2 fallback (JS-based, for browsers without BarcodeDetector)
- *
+ * Detection: Quagga2 (JS-based) with multi-pass config cycling.
  * Anti-shake: requires CONFIRM_COUNT consecutive identical reads before accepting.
  * Center-crop: only scans the middle portion of the frame for faster, more accurate reads.
  */
@@ -50,17 +47,25 @@
   if (!dom.viewport) return;
 
   // -----------------------------------------------------------------------
+  // Permissions (from server-rendered data attributes)
+  // -----------------------------------------------------------------------
+  var scannerPage = document.querySelector('.scanner-page');
+  var SHOW_BELI = scannerPage.dataset.showBeli === 'true';
+  var SHOW_JUAL = scannerPage.dataset.showJual === 'true';
+  var SHOW_MARGIN = scannerPage.dataset.showMargin === 'true';
+
+  // -----------------------------------------------------------------------
   // Config
   // -----------------------------------------------------------------------
   var COOLDOWN_MS = 2000;
   var CONFIRM_COUNT = 2;
-  var CROP_RATIO = 0.6;       // scan center 60% of frame width
-  var CROP_HEIGHT_RATIO = 0.3; // scan center 30% of frame height
-  var SCAN_INTERVAL_MS = 150;  // min ms between decode attempts
+  var CROP_RATIO = 0.8;        // scan center 80% of frame width
+  var CROP_HEIGHT_RATIO = 0.5;  // scan center 50% of frame height
+  var SCAN_INTERVAL_MS = 80;    // min ms between decode attempts
 
-  // Processing canvas for Quagga fallback
-  var PROC_W = 1280;
-  var PROC_H = 720;
+  // Quagga processing canvas — 800x600 gives enough detail for reliable decode
+  var PROC_W = 800;
+  var PROC_H = 600;
   var procCanvas = document.createElement('canvas');
   procCanvas.width = PROC_W;
   procCanvas.height = PROC_H;
@@ -80,23 +85,7 @@
   var isDecoding = false;
   var torchOn = false;
   var torchTrack = null;
-  var useNativeDetector = false;
-  var nativeDetector = null;
-
-  // -----------------------------------------------------------------------
-  // Feature detection: BarcodeDetector API
-  // -----------------------------------------------------------------------
-  if (typeof BarcodeDetector !== 'undefined') {
-    try {
-      nativeDetector = new BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'codabar']
-      });
-      useNativeDetector = true;
-    } catch (e) {
-      // BarcodeDetector exists but failed (e.g. unsupported formats)
-    }
-  }
-
+  // Quagga readers
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader', 'i2of5_reader', 'codabar_reader'];
 
   // -----------------------------------------------------------------------
@@ -243,66 +232,89 @@
     lastScanTime = timestamp;
     isDecoding = true;
 
-    if (useNativeDetector) {
-      detectNative();
-    } else {
-      detectQuagga();
-    }
+    detectQuagga();
   }
 
   // -----------------------------------------------------------------------
-  // Native BarcodeDetector (best for mobile + shaky hands)
+  // Center-crop frame to processing canvas + auto-contrast
   // -----------------------------------------------------------------------
-  function detectNative() {
-    // Detect directly from the video element — the browser handles
-    // frame capture, focus, and motion blur internally.
-    nativeDetector.detect(videoEl).then(function(barcodes) {
-      isDecoding = false;
-      if (barcodes.length > 0) {
-        // Pick the barcode closest to the center of the frame
-        var vw = videoEl.videoWidth;
-        var vh = videoEl.videoHeight;
-        var cx = vw / 2;
-        var cy = vh / 2;
-        var best = null;
-        var bestDist = Infinity;
-        for (var i = 0; i < barcodes.length; i++) {
-          var b = barcodes[i].boundingBox;
-          if (!b) { best = barcodes[i]; break; }
-          var bx = b.x + b.width / 2;
-          var by = b.y + b.height / 2;
-          var dist = Math.abs(bx - cx) + Math.abs(by - cy);
-          if (dist < bestDist) { bestDist = dist; best = barcodes[i]; }
-        }
-        if (best && best.rawValue) {
-          onBarcodeDetected(best.rawValue);
-        }
-      }
-    }).catch(function() {
-      isDecoding = false;
-    });
-  }
-
-  // -----------------------------------------------------------------------
-  // Quagga2 fallback (center-cropped for accuracy)
-  // -----------------------------------------------------------------------
-  function detectQuagga() {
+  function cropFrameToCanvas() {
     var vw = videoEl.videoWidth;
     var vh = videoEl.videoHeight;
-
-    // Center-crop: extract the middle portion of the frame
     var cropW = Math.round(vw * CROP_RATIO);
     var cropH = Math.round(vh * CROP_HEIGHT_RATIO);
     var cropX = Math.round((vw - cropW) / 2);
     var cropY = Math.round((vh - cropH) / 2);
-
     procCtx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, PROC_W, PROC_H);
+  }
 
-    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.9);
+  /**
+   * Enhance contrast of the processing canvas in-place.
+   * Converts to grayscale and stretches histogram — helps in poor lighting
+   * or washed-out images common on mobile cameras.
+   */
+  function enhanceContrast() {
+    var imgData = procCtx.getImageData(0, 0, PROC_W, PROC_H);
+    var d = imgData.data;
+    var len = d.length;
+    // Find min/max luminance (sample every 4th pixel for speed)
+    var lo = 255, hi = 0;
+    for (var i = 0; i < len; i += 16) {
+      var gray = (d[i] * 77 + d[i+1] * 150 + d[i+2] * 29) >> 8;
+      if (gray < lo) lo = gray;
+      if (gray > hi) hi = gray;
+    }
+    var range = hi - lo;
+    if (range < 30) return imgData; // already very low contrast, skip (probably blank)
+    if (range > 220) return imgData; // already good contrast
+    // Stretch histogram
+    var scale = 255 / range;
+    for (var j = 0; j < len; j += 4) {
+      d[j]   = Math.min(255, Math.max(0, ((d[j]   - lo) * scale) | 0));
+      d[j+1] = Math.min(255, Math.max(0, ((d[j+1] - lo) * scale) | 0));
+      d[j+2] = Math.min(255, Math.max(0, ((d[j+2] - lo) * scale) | 0));
+    }
+    procCtx.putImageData(imgData, 0, 0);
+    return imgData;
+  }
+
+  // -----------------------------------------------------------------------
+  // -----------------------------------------------------------------------
+  // Quagga2 detection (center-cropped, contrast-enhanced)
+  //
+  // Multi-pass: tries locate first, falls back to no-locate with
+  // multiple patch sizes for difficult/blurry barcodes.
+  // -----------------------------------------------------------------------
+  var quaggaPass = 0; // cycles through configs each frame
+
+  var QUAGGA_CONFIGS = [
+    // Pass 0: standard locate with medium patch
+    { locate: true, locator: { patchSize: 'medium', halfSample: true } },
+    // Pass 1: large patch — better for far/small barcodes
+    { locate: true, locator: { patchSize: 'large', halfSample: true } },
+    // Pass 2: small patch — better for close-up/large barcodes
+    { locate: true, locator: { patchSize: 'small', halfSample: false } },
+    // Pass 3: no locate, scan entire frame — catches barcodes locator misses
+    { locate: false, locator: { patchSize: 'medium', halfSample: true } },
+  ];
+
+  function detectQuagga() {
+    cropFrameToCanvas();
+    enhanceContrast();
+    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.85);
+
+    var cfg = QUAGGA_CONFIGS[quaggaPass % QUAGGA_CONFIGS.length];
+    quaggaPass++;
+
     Quagga.decodeSingle({
       src: dataUrl,
-      decoder: { readers: QUAGGA_READERS, multiple: false },
-      locate: true,
+      numOfWorkers: 0,
+      decoder: {
+        readers: QUAGGA_READERS,
+        multiple: false
+      },
+      locate: cfg.locate,
+      locator: cfg.locator
     }, function(result) {
       isDecoding = false;
       if (result && result.codeResult && result.codeResult.code) {
@@ -468,42 +480,57 @@
     dom.sdPacking.textContent = item.packing ? (Math.round(item.packing) + ' ' + (item.satkecil || '')) : '-';
     dom.sdSatuan.textContent = (item.satbesar || '-') + ' / ' + (item.satkecil || '-');
 
-    dom.sdHbeliBsr.textContent = fmt(item.hbelibsr);
-    dom.sdHbeliKcl.textContent = fmt(item.hbelikcl);
-    dom.sdDisc1.textContent = fmtPct(item.pctdisc1);
-    dom.sdDisc2.textContent = fmtPct(item.pctdisc2);
-    dom.sdDisc3.textContent = fmtPct(item.pctdisc3);
-    dom.sdPPN.textContent = fmtPct(item.pctppn);
+    // Harga Beli (permission-gated)
+    if (SHOW_BELI) {
+      dom.sdHbeliBsr.textContent = fmt(item.hbelibsr);
+      dom.sdHbeliKcl.textContent = fmt(item.hbelikcl);
+      dom.sdDisc1.textContent = fmtPct(item.pctdisc1);
+      dom.sdDisc2.textContent = fmtPct(item.pctdisc2);
+      dom.sdDisc3.textContent = fmtPct(item.pctdisc3);
+      dom.sdPPN.textContent = fmtPct(item.pctppn);
 
-    var netto = item.hbelikcl || 0;
-    if (item.pctdisc1) netto *= (1 - item.pctdisc1 / 100);
-    if (item.pctdisc2) netto *= (1 - item.pctdisc2 / 100);
-    if (item.pctdisc3) netto *= (1 - item.pctdisc3 / 100);
-    if (item.pctppn) netto *= (1 + item.pctppn / 100);
-    dom.sdNetto.textContent = fmt(Math.round(netto));
+      var netto = item.hbelikcl || 0;
+      if (item.pctdisc1) netto *= (1 - item.pctdisc1 / 100);
+      if (item.pctdisc2) netto *= (1 - item.pctdisc2 / 100);
+      if (item.pctdisc3) netto *= (1 - item.pctdisc3 / 100);
+      if (item.pctppn) netto *= (1 + item.pctppn / 100);
+      dom.sdNetto.textContent = fmt(Math.round(netto));
+    }
 
-    var tiers = [
-      { label: 'H.Jual 1', val: item.hjual },
-      { label: 'Member', val: item.hjual2 },
-      { label: 'H.Jual 3', val: item.hjual3 },
-      { label: 'H.Jual 4', val: item.hjual4 },
-      { label: 'H.Jual 5', val: item.hjual5 },
-    ];
-    dom.sdJualBody.innerHTML = tiers.map(function(t) {
-      var hasMargin = t.val > 0 && netto > 0;
-      var margin = hasMargin ? (((t.val - netto) / netto) * 100).toFixed(2) + '%' : '-';
-      var marginClass = (hasMargin && t.val < netto) ? 'text-danger' : '';
-      return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
-    }).join('');
+    // Harga Jual (permission-gated)
+    if (SHOW_JUAL) {
+      var netto2 = item.hbelikcl || 0;
+      if (item.pctdisc1) netto2 *= (1 - item.pctdisc1 / 100);
+      if (item.pctdisc2) netto2 *= (1 - item.pctdisc2 / 100);
+      if (item.pctdisc3) netto2 *= (1 - item.pctdisc3 / 100);
+      if (item.pctppn) netto2 *= (1 + item.pctppn / 100);
 
-    var bundlings = item._bundlings || [];
-    if (bundlings.length > 0) {
-      dom.sdBundlingSection.classList.remove('d-none');
-      dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
-        return '<tr><td>' + b.qty + '</td><td class="text-end">' + fmt(b.hjual1) + '</td><td class="text-end">' + fmt(b.hjual2) + '</td><td class="text-end">' + fmt(b.hjual3) + '</td><td class="text-end">' + fmt(b.hjual4) + '</td><td class="text-end">' + fmt(b.hjual5) + '</td></tr>';
+      var tiers = [
+        { label: 'H.Jual 1', val: item.hjual },
+        { label: 'Member', val: item.hjual2 },
+        { label: 'H.Jual 3', val: item.hjual3 },
+        { label: 'H.Jual 4', val: item.hjual4 },
+        { label: 'H.Jual 5', val: item.hjual5 },
+      ];
+      dom.sdJualBody.innerHTML = tiers.map(function(t) {
+        if (SHOW_MARGIN) {
+          var hasMargin = t.val > 0 && netto2 > 0;
+          var margin = hasMargin ? (((t.val - netto2) / netto2) * 100).toFixed(2) + '%' : '-';
+          var marginClass = (hasMargin && t.val < netto2) ? 'text-danger' : '';
+          return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
+        }
+        return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td></tr>';
       }).join('');
-    } else {
-      dom.sdBundlingSection.classList.add('d-none');
+
+      var bundlings = item._bundlings || [];
+      if (bundlings.length > 0) {
+        dom.sdBundlingSection.classList.remove('d-none');
+        dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
+          return '<tr><td>' + b.qty + '</td><td class="text-end">' + fmt(b.hjual1) + '</td><td class="text-end">' + fmt(b.hjual2) + '</td><td class="text-end">' + fmt(b.hjual3) + '</td><td class="text-end">' + fmt(b.hjual4) + '</td><td class="text-end">' + fmt(b.hjual5) + '</td></tr>';
+        }).join('');
+      } else {
+        dom.sdBundlingSection.classList.add('d-none');
+      }
     }
 
     dom.stockDetail.classList.remove('d-none');
@@ -550,7 +577,7 @@
   function hideResults() {
     dom.stockDetail.classList.add('d-none');
     dom.noResultCard.classList.add('d-none');
-    dom.sdBundlingSection.classList.add('d-none');
+    if (dom.sdBundlingSection) dom.sdBundlingSection.classList.add('d-none');
   }
 
   function showNoResult() {

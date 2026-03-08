@@ -1738,8 +1738,8 @@ body {
 
 .scanner-cam-select {
   width: auto;
-  min-width: 100px;
-  font-size: var(--fs-sm);
+  min-width: 80px;
+  font-size: var(--fs-xs);
 }
 
 /* Info grid: barcode / packing / satuan */

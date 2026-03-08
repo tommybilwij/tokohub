@@ -122,7 +122,12 @@ async def scanner_page(
 ):
     denied = await _check_page(request, user, 'scanner')
     if denied: return denied
-    return templates.TemplateResponse(request, 'scanner.html', await _user_ctx(request, user))
+    pool = request.app.state.db_pool
+    ctx = await _user_ctx(request, user)
+    ctx['show_harga_beli'] = await has_page_access(pool, user['role'], 'scanner:harga_beli')
+    ctx['show_harga_jual'] = await has_page_access(pool, user['role'], 'scanner:harga_jual')
+    ctx['show_margin'] = await has_page_access(pool, user['role'], 'scanner:harga_jual:margin')
+    return templates.TemplateResponse(request, 'scanner.html', ctx)
 
 
 @router.get('/laporan')

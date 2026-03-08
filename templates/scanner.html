@@ -2,19 +2,24 @@
 {% block title %}Scanner{% endblock %}
 
 {% block content %}
-<div class="scanner-page mx-auto">
+<div class="scanner-page mx-auto"
+     data-show-beli="{{ show_harga_beli | lower }}"
+     data-show-jual="{{ show_harga_jual | lower }}"
+     data-show-margin="{{ show_margin | lower }}">
 
   <!-- Camera Card -->
   <div class="card mb-3">
-    <div class="card-header card-header-primary d-flex align-items-center justify-content-between py-2">
-      <h6 class="mb-0"><i class="bi bi-camera-video"></i> Camera</h6>
-      <div class="d-flex align-items-center gap-2">
-        <select id="cameraSelect" class="form-select form-select-sm scanner-cam-select d-none">
-          <option value="">Pilih kamera...</option>
-        </select>
-        <button id="btnToggleCamera" class="btn btn-sm btn-light">
-          <i class="bi bi-play-fill"></i> Start
-        </button>
+    <div class="card-header card-header-primary py-2">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+        <h6 class="mb-0"><i class="bi bi-camera-video"></i> Camera</h6>
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+          <select id="cameraSelect" class="form-select form-select-sm scanner-cam-select d-none">
+            <option value="">Pilih kamera...</option>
+          </select>
+          <button id="btnToggleCamera" class="btn btn-sm btn-light">
+            <i class="bi bi-play-fill"></i> Start
+          </button>
+        </div>
       </div>
     </div>
     <div class="card-body p-0 position-relative">
@@ -78,6 +83,7 @@
         <div id="sdStockBalances"></div>
       </div>
 
+      {% if show_harga_beli %}
       <!-- Harga Beli Section -->
       <div class="sd-section mb-3">
         <div class="sd-section-header"><i class="bi bi-tag"></i> Harga Beli</div>
@@ -113,7 +119,9 @@
           <span class="sd-netto-value" id="sdNetto">-</span>
         </div>
       </div>
+      {% endif %}
 
+      {% if show_harga_jual %}
       <!-- Harga Jual Table -->
       <div class="sd-section mb-3">
         <div class="sd-section-header"><i class="bi bi-cash-stack"></i> Harga Jual</div>
@@ -122,7 +130,7 @@
             <tr>
               <th>Tier</th>
               <th>Harga</th>
-              <th>Margin</th>
+              {% if show_margin %}<th>Margin</th>{% endif %}
             </tr>
           </thead>
           <tbody id="sdJualBody"></tbody>
@@ -146,6 +154,7 @@
           <tbody id="sdBundlingBody"></tbody>
         </table>
       </div>
+      {% endif %}
 
     </div>
   </div>

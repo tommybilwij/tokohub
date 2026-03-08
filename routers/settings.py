@@ -111,22 +111,26 @@ async def api_settings_post(data: SettingsUpdate, db: aiomysql.Pool = Depends(ge
 async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
     raw = _strip_masked(data.model_dump(exclude_none=True))
     try:
-        if 'openai' in raw:
-            openai_data = raw.pop('openai')
-            existing = await get_openai_config(db)
-            existing.update(openai_data)
-            await save_openai_config(db, existing)
-
-        # Save DB-stored settings (fuzzy matching, session)
+        # Extract DB-stored settings before saving envrc
+        openai_data = raw.pop('openai', None)
         fuzzy_data = {}
         for k in _DB_KEYS:
             if k in raw:
                 fuzzy_data[k] = raw.pop(k)
-        if fuzzy_data and db:
-            await app_settings.save_many(db, fuzzy_data)
 
+        # Save envrc first (creates DB connection config for restart)
         if raw:
             save_to_envrc(raw)
+
+        # Save DB-stored settings only if pool is available
+        if db:
+            if openai_data:
+                existing = await get_openai_config(db)
+                existing.update(openai_data)
+                await save_openai_config(db, existing)
+            if fuzzy_data:
+                await app_settings.save_many(db, fuzzy_data)
+
         return {'ok': True}
     except Exception as e:
         logger.exception("Failed to save setup")

@@ -377,6 +377,17 @@
         doc.text(storeLocation, marginL, y + 8);
       }
 
+      // Decorative circles (3 grey circles, top center)
+      var circleR = 3.5;
+      var circleY = y + 5;
+      var circleCenterX = pageW / 2;
+      doc.setFillColor(200, 200, 200);
+      doc.setDrawColor(200, 200, 200);
+      doc.circle(circleCenterX - 10, circleY, circleR, 'F');
+      doc.circle(circleCenterX, circleY, circleR, 'F');
+      doc.circle(circleCenterX + 10, circleY, circleR, 'F');
+      doc.setDrawColor(0);
+
       // Right side: "PESANAN PEMBELIAN" title
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);

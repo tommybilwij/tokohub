@@ -205,7 +205,9 @@
                 <th>Artno</th>
                 <th>Nama</th>
                 <th class="text-end">Qty</th>
-                <th>Satuan</th>
+                <th>Satuan Besar</th>
+                <th class="text-end">Qty Kcl</th>
+                <th>Sat.Kcl</th>
                 <th class="text-end">H.Beli</th>
                 <th class="text-end">H.Kcl</th>
                 <th class="text-end">Disc1</th>
@@ -221,9 +223,15 @@
           </table>
         </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer d-flex align-items-center">
+        <div class="form-check form-switch me-auto d-flex align-items-center gap-2 mb-0">
+          <input type="checkbox" class="form-check-input mt-0" role="switch" id="fpUpdatePrice" checked style="width:2.5em;height:1.25em">
+          <label class="form-check-label fw-semibold" for="fpUpdatePrice">
+            <i class="bi bi-arrow-repeat"></i> Update Harga Jual
+          </label>
+        </div>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button type="button" class="btn btn-primary-app" id="btnCommitFP">
+        <button type="button" class="btn btn-primary-app ms-2" id="btnCommitFP">
           <i class="bi bi-check-circle"></i> Buat Faktur & Update Stok
         </button>
       </div>

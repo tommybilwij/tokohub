@@ -2,7 +2,7 @@
 {% block title %}Perubahan Harga{% endblock %}
 
 {% block content %}
-<div class="sh-page" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
+<div class="sh-page" data-can-edit="{{ can_edit | default(false) | tojson }}" data-can-delete="{{ can_delete | default(false) | tojson }}" data-can-lock="{{ can_lock | default(false) | tojson }}">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0"><i class="bi bi-tag"></i> Perubahan Harga</h5>
     {% if can_entry | default(false) %}
@@ -108,6 +108,7 @@
   'use strict';
 
   var pageEl = document.querySelector('.sh-page');
+  var canEdit = pageEl.dataset.canEdit === 'true';
   var canDelete = pageEl.dataset.canDelete === 'true';
   var canLock = pageEl.dataset.canLock === 'true';
 
@@ -170,6 +171,9 @@
         items.forEach(function(o) {
           var tr = document.createElement('tr');
           var actions = '<button class="btn btn-sm btn-outline-primary btn-view-ph" data-ph="' + esc(o.nobukti) + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          if (canEdit && !o.islocked) {
+            actions += ' <a href="/perubahan-harga/input?edit=' + encodeURIComponent(o.nobukti) + '" class="btn btn-sm btn-outline-success" title="Edit"><i class="bi bi-pencil"></i></a>';
+          }
           if (canDelete && !o.islocked) {
             actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-ph" data-ph="' + esc(o.nobukti) + '" title="Hapus"><i class="bi bi-trash"></i></button>';
           }
@@ -274,7 +278,7 @@
       btn.addEventListener('click', async function() {
         var ph = btn.dataset.ph;
         var locked = btn.dataset.locked === '1';
-        var msg = locked ? 'Buka kunci ' + ph + '?' : 'Kunci ' + ph + ' agar tidak bisa diubah?';
+        var msg = locked ? 'Buka kunci ' + ph + '?' : 'Kunci ' + ph + ' agar tidak bisa dihapus?';
         var confirmed = await (window.showConfirm ? showConfirm(msg) : Promise.resolve(confirm(msg)));
         if (!confirmed) return;
         try {
@@ -286,8 +290,25 @@
             btn.className = 'btn btn-sm btn-lock-ph ' + (newLocked ? 'btn-warning' : 'btn-outline-secondary');
             btn.title = newLocked ? 'Terkunci — klik untuk buka' : 'Klik untuk kunci';
             btn.querySelector('i').className = 'bi bi-' + (newLocked ? 'lock-fill' : 'unlock');
+            var td = btn.closest('td');
+            if (canEdit) {
+              var editBtn = td.querySelector('.btn-outline-success');
+              if (newLocked && editBtn) {
+                editBtn.remove();
+              } else if (!newLocked && !editBtn) {
+                var newEdit = document.createElement('a');
+                newEdit.href = '/perubahan-harga/input?edit=' + encodeURIComponent(ph);
+                newEdit.className = 'btn btn-sm btn-outline-success';
+                newEdit.title = 'Edit';
+                newEdit.innerHTML = '<i class="bi bi-pencil"></i>';
+                var viewBtn = td.querySelector('.btn-view-ph');
+                if (viewBtn && viewBtn.nextSibling) {
+                  td.insertBefore(newEdit, viewBtn.nextSibling);
+                  newEdit.insertAdjacentText('afterend', ' ');
+                }
+              }
+            }
             if (canDelete) {
-              var td = btn.closest('td');
               var delBtn = td.querySelector('.btn-delete-ph');
               if (newLocked && delBtn) {
                 delBtn.remove();
@@ -302,7 +323,7 @@
                 bindButtons();
               }
             }
-            window.showToast && showToast(newLocked ? 'Perubahan harga dikunci' : 'Perubahan harga dibuka kuncinya');
+            window.showToast && showToast(newLocked ? 'Perubahan harga dikunci' : 'Kunci dibuka');
           }
         } catch(e) {
           window.showToast && showToast('Error: ' + e.message, 'danger');

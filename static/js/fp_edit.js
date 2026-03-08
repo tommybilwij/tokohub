@@ -22,6 +22,7 @@
   var elSearchInput = document.getElementById('editSearchInput');
   var elSearchResults = document.getElementById('editSearchResults');
   var elItemCount = document.getElementById('editItemCount');
+  var elUpdatePrice = document.getElementById('editUpdatePrice');
 
   var currentFP = null;
   var editLines = [];
@@ -174,6 +175,7 @@
     elTitle.textContent = 'Edit Faktur: ' + data.nofaktur;
     setEditSupplier(data.suppid || '');
     elDate.value = data.tglfaktur || '';
+    if (elUpdatePrice) elUpdatePrice.checked = !!data.isupdateprice;
 
     editLines = (data.lines || []).map(function (l) {
       var b1 = l.bundling1 || {};
@@ -362,7 +364,7 @@
 
       // Main row
       var tr = document.createElement('tr');
-      tr.className = 'item-main has-detail-open';
+      tr.className = 'item-main';
       tr.dataset.idx = idx;
       tr.innerHTML =
         '<td class="row-num"><span class="expand-toggle"><i class="bi bi-chevron-right"></i></span> ' + (idx + 1) + '</td>' +
@@ -379,7 +381,7 @@
       var mainJual = { hjual1: line.hjual, hjual2: line.hjual2, hjual3: line.hjual3, hjual4: line.hjual4, hjual5: line.hjual5, _enabled: true };
 
       var detailTr = document.createElement('tr');
-      detailTr.className = 'item-detail open';
+      detailTr.className = 'item-detail';
       detailTr.dataset.idx = idx;
       detailTr.innerHTML =
         '<td colspan="4"><div class="dp-grid">' +
@@ -1084,6 +1086,7 @@
           userid: elUser.value,
           items: items,
           order_date: elDate.value,
+          update_price: elUpdatePrice ? elUpdatePrice.checked : true,
         }),
       });
       var data = await res.json();

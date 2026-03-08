@@ -59,6 +59,7 @@ class FPCommitRequest(BaseModel):
     items: list[FPItem]
     order_date: str | None = None
     shipping_cost: float = 0  # legacy total fallback
+    update_price: bool = True
 
 
 class FPUpdateRequest(BaseModel):
@@ -68,3 +69,4 @@ class FPUpdateRequest(BaseModel):
     items: list[FPItem]
     order_date: str | None = None
     shipping_cost: float = 0
+    update_price: bool = True

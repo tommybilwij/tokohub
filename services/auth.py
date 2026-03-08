@@ -37,6 +37,7 @@ PAGES = {
     'faktur:daftar:lock':       'Kunci Faktur',
     'price_change':                     'Perubahan Harga',
     'price_change:daftar':              'Daftar Perubahan Harga',
+    'price_change:daftar:edit':         'Edit Perubahan Harga',
     'price_change:daftar:delete':       'Hapus Perubahan Harga',
     'price_change:daftar:lock':         'Kunci Riwayat',
     'price_change:input':               'Input Perubahan Harga',

@@ -2040,6 +2040,8 @@
         <td>${line.artname}</td>
         <td class="fp-num">${line.qty_besar || line.qty}</td>
         <td>${line.satuanbsr}</td>
+        <td class="fp-num">${Math.round(line.packing || 1)}</td>
+        <td>${line.satuankcl || ''}</td>
         <td class="fp-num">${formatNumber(line.hbelibsr)}</td>
         <td class="fp-num">${formatNumber(line.hbelikcl)}</td>
         <td class="fp-num">${fmtDisc(line.pctdisc1)}</td>
@@ -2057,7 +2059,7 @@
     const trTotal = document.createElement('tr');
     trTotal.className = 'fp-row-grand-total';
     trTotal.innerHTML = `
-      <td colspan="13" class="text-end">Grand Total</td>
+      <td colspan="15" class="text-end">Grand Total</td>
       <td class="fp-num fp-grand-total-value">${formatNumber(data.grand_total)}</td>
     `;
     dom.fpPreviewBody.appendChild(trTotal);
@@ -2085,6 +2087,7 @@
 
     showSpinner();
     try {
+      const updatePriceEl = document.getElementById('fpUpdatePrice');
       const data = await api('/receipt/commit', {
         method: 'POST',
         body: {
@@ -2092,6 +2095,7 @@
           userid: userId,
           items,
           order_date: dom.orderDate.value,
+          update_price: updatePriceEl ? updatePriceEl.checked : true,
         },
       });
 

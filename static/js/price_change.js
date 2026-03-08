@@ -8,6 +8,8 @@
   //   hjual, hjual2, hjual3, hjual4, hjual5,
   //   newHjual, newHjual2, newHjual3, newHjual4, newHjual5}
 
+  const editPH = typeof _pcEditPH !== 'undefined' ? _pcEditPH : '';
+
   const searchInput = document.getElementById('pcSearchInput');
   const searchResults = document.getElementById('pcSearchResults');
   const tableBody = document.getElementById('pcTableBody');
@@ -15,20 +17,16 @@
   const btnCommit = document.getElementById('pcBtnCommit');
   const btnClear = document.getElementById('pcBtnClear');
 
-  // When "Update Harga Beli" is checked, auto-check and lock "Kunci Riwayat"
-  const purchEl = document.getElementById('pcUpdatePurchPrice');
-  const lockEl = document.getElementById('pcLockHistory');
-  if (purchEl && lockEl) {
-    function syncLockFromPurch() {
-      if (purchEl.checked) {
-        lockEl.checked = true;
-        lockEl.disabled = true;
-      } else {
-        lockEl.disabled = false;
-      }
-    }
-    purchEl.addEventListener('change', syncLockFromPurch);
-    syncLockFromPurch(); // apply on load
+  // Edit mode UI setup
+  var pcBtnBack = document.getElementById('pcBtnBack');
+  var pcPageTitle = document.getElementById('pcPageTitle');
+  var pcPageSubtitle = document.getElementById('pcPageSubtitle');
+  if (editPH) {
+    if (pcPageTitle) pcPageTitle.textContent = 'Edit Perubahan Harga: ' + editPH;
+    if (pcPageSubtitle) pcPageSubtitle.textContent = '';
+    if (btnCommit) btnCommit.innerHTML = '<i class="bi bi-check-lg"></i> Simpan Perubahan';
+  } else {
+    if (pcBtnBack) pcBtnBack.classList.add('d-none');
   }
 
   function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }
@@ -520,14 +518,13 @@
         }
         return p;
       });
-      const purchEl = document.getElementById('pcUpdatePurchPrice');
-      const lockEl = document.getElementById('pcLockHistory');
-      const updatePurchPrice = purchEl ? purchEl.checked : true;
-      const lockHistory = lockEl ? lockEl.checked : true;
-      const res = await fetch('/api/price-change/commit', {
+      const apiUrl = editPH
+        ? '/api/ph/' + encodeURIComponent(editPH) + '/update'
+        : '/api/price-change/commit';
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({items: payload, update_purch_price: updatePurchPrice, lock_history: lockHistory}),
+        body: JSON.stringify({items: payload}),
       });
       const data = await res.json();
       if (data.ok) {
@@ -545,6 +542,11 @@
 
   // New entry after success
   document.getElementById('pcBtnNew').addEventListener('click', () => {
+    if (editPH) {
+      // After editing, go back to history
+      window.location.href = '/perubahan-harga';
+      return;
+    }
     items.length = 0;
     render();
     bootstrap.Modal.getInstance(document.getElementById('pcSuccessModal'))?.hide();
@@ -561,4 +563,97 @@
     render();
     searchInput.focus();
   });
+
+  // -----------------------------------------------------------------------
+  // Edit mode: load existing PH data
+  // -----------------------------------------------------------------------
+  if (editPH) {
+    var newLabel = document.getElementById('pcBtnNewLabel');
+    if (newLabel) newLabel.textContent = 'Kembali ke Riwayat';
+
+    fetch('/api/ph/' + encodeURIComponent(editPH))
+      .then(r => r.json())
+      .then(async data => {
+        if (data.error) {
+          window.showToast && showToast('Error: ' + data.error, 'danger');
+          return;
+        }
+        // Fetch current stock prices for all items to get bundling info
+        const artnos = (data.lines || []).map(l => l.stockid);
+        let stockMap = {};
+        if (artnos.length) {
+          const stockRes = await fetch('/api/price-change/stock-prices', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({artnos: artnos}),
+          });
+          const stockData = await stockRes.json();
+          stockMap = stockData.items || {};
+        }
+
+        // Also fetch search results to get bundling data
+        for (const line of (data.lines || [])) {
+          const artno = line.stockid;
+          const stock = stockMap[artno] || {};
+          // Fetch full item data including bundlings
+          let bundlings = [];
+          try {
+            const searchRes = await fetch('/api/stock/search?q=' + encodeURIComponent(artno) + '&limit=1');
+            const searchData = await searchRes.json();
+            if (searchData.length && searchData[0].artno === artno) {
+              bundlings = searchData[0]._bundlings || [];
+            }
+          } catch(e) {}
+
+          const b1 = bundlings[0] || {};
+          const b2 = bundlings[1] || {};
+
+          const item = {
+            artno: artno,
+            artname: line.artname || stock.artname || '',
+            artpabrik: line.artpabrik || stock.artpabrik || '',
+            hbelibsr: line.hbelibsr || stock.hbelibsr || 0,
+            hbelikcl: line.hbelikcl || stock.hbelikcl || 0,
+            hbelinetto: line.hbelinetto || stock.hbelinetto || 0,
+            packing: line.packing || stock.packing || 1,
+            satbesar: line.satuanbsr || stock.satbesar || '',
+            pctdisc1: line.pctdisc1 || stock.pctdisc1 || 0,
+            pctdisc2: line.pctdisc2 || stock.pctdisc2 || 0,
+            pctdisc3: line.pctdisc3 || stock.pctdisc3 || 0,
+            pctppn: line.pctppn || stock.pctppn || 0,
+            hjual: line.hjual || 0,
+            hjual2: line.hjual2 || 0,
+            hjual3: line.hjual3 || 0,
+            hjual4: line.hjual4 || 0,
+            hjual5: line.hjual5 || 0,
+            newHjual: line.hjual || 0,
+            newHjual2: line.hjual2 || 0,
+            newHjual3: line.hjual3 || 0,
+            newHjual4: line.hjual4 || 0,
+            newHjual5: line.hjual5 || 0,
+            bundling1: {
+              enabled: !!(b1.qty),
+              minQty: b1.qty || 0,
+              hjual1: b1.hjual1 || 0, hjual2: b1.hjual2 || 0, hjual3: b1.hjual3 || 0,
+              hjual4: b1.hjual4 || 0, hjual5: b1.hjual5 || 0,
+              newHjual1: b1.hjual1 || 0, newHjual2: b1.hjual2 || 0, newHjual3: b1.hjual3 || 0,
+              newHjual4: b1.hjual4 || 0, newHjual5: b1.hjual5 || 0,
+            },
+            bundling2: {
+              enabled: !!(b2.qty),
+              minQty: b2.qty || 0,
+              hjual1: b2.hjual1 || 0, hjual2: b2.hjual2 || 0, hjual3: b2.hjual3 || 0,
+              hjual4: b2.hjual4 || 0, hjual5: b2.hjual5 || 0,
+              newHjual1: b2.hjual1 || 0, newHjual2: b2.hjual2 || 0, newHjual3: b2.hjual3 || 0,
+              newHjual4: b2.hjual4 || 0, newHjual5: b2.hjual5 || 0,
+            },
+          };
+          items.push(item);
+        }
+        render();
+      })
+      .catch(e => {
+        window.showToast && showToast('Error loading PH: ' + e.message, 'danger');
+      });
+  }
 })();

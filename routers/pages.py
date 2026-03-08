@@ -188,6 +188,7 @@ async def price_change_page(
     pool = request.app.state.db_pool
     ctx = await _user_ctx(request, user)
     ctx['can_entry'] = await has_page_access(pool, user['role'], 'price_change:input')
+    ctx['can_edit'] = await has_page_access(pool, user['role'], 'price_change:daftar:edit')
     ctx['can_delete'] = await has_page_access(pool, user['role'], 'price_change:daftar:delete')
     ctx['can_lock'] = await has_page_access(pool, user['role'], 'price_change:daftar:lock')
     return templates.TemplateResponse(request, 'price_change_history.html', ctx)

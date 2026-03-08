@@ -350,6 +350,7 @@
   var poMonthly = {}; // {artno: {"2026-01": qty_kcl, ...}}
   var poMonths = [];  // ["2025-12", "2026-01", ...]
   var poStock = {};
+  var poSortDir = 0; // 0=none, 1=asc, -1=desc
 
   var MONTH_NAMES = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 
@@ -443,7 +444,11 @@
     var gRow = '<tr class="po-group-header">'
       + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="text-center align-middle"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
       + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-middle">#</th>'
-      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-middle">Nama Barang</th>'
+      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6;cursor:pointer;user-select:none" class="align-middle" id="poSortName">'
+      + 'Nama Barang <span style="display:inline-flex;flex-direction:column;line-height:0;vertical-align:middle;margin-left:4px;font-size:0.6rem;gap:1px">'
+      + '<span style="color:' + (poSortDir === 1 ? '#0d6efd' : '#bbb') + '">&#9671;</span>'
+      + '<span style="color:' + (poSortDir === -1 ? '#0d6efd' : '#bbb') + '">&#9671;</span>'
+      + '</span></th>'
       + '<th rowspan="2" style="width:40px;background:#e0f2f1 !important;border-bottom:1px solid #dee2e6;border-left:2px solid #dee2e6" class="text-center align-middle">Isi</th>'
       + '<th colspan="' + poMonths.length + '" class="po-gh-sales po-col-sep">Penjualan (' + skcl0 + ')</th>'
       + '<th rowspan="2" class="po-col-sep text-end align-middle" style="width:70px">Stok (' + skcl0 + ')</th>'
@@ -465,12 +470,32 @@
 
     thead.innerHTML = gRow + hRow;
 
+    // Sort click handler
+    var sortBtn = document.getElementById('poSortName');
+    if (sortBtn) {
+      sortBtn.addEventListener('click', function() {
+        poSortDir = poSortDir === 1 ? -1 : poSortDir === -1 ? 0 : 1;
+        renderItems();
+      });
+    }
+
+    // --- Build sorted index ---
+    var indices = poItems.map(function(_, i) { return i; });
+    if (poSortDir !== 0) {
+      indices.sort(function(a, b) {
+        var na = (poItems[a].artname || '').toLowerCase();
+        var nb = (poItems[b].artname || '').toLowerCase();
+        return na < nb ? -poSortDir : na > nb ? poSortDir : 0;
+      });
+    }
+
     // --- Build body ---
     tbody.innerHTML = '';
     var shown = 0;
     var grandTotal = 0;
 
-    poItems.forEach(function(item, idx) {
+    indices.forEach(function(idx) {
+      var item = poItems[idx];
       if (filterText) {
         var match = (item.artno + ' ' + item.artpabrik + ' ' + item.artname).toLowerCase().indexOf(filterText) >= 0;
         if (!match) return;

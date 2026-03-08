@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS pesanan_pembelian (
+CREATE TABLE IF NOT EXISTS tokohub.pesanan_pembelian (
   id INT(11) NOT NULL AUTO_INCREMENT,
   po_number VARCHAR(30) NOT NULL,
   suppid VARCHAR(30) NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS pesanan_pembelian (
   KEY suppid_idx (suppid)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-CREATE TABLE IF NOT EXISTS pesanan_pembelian_detail (
+CREATE TABLE IF NOT EXISTS tokohub.pesanan_pembelian_detail (
   id INT(11) NOT NULL AUTO_INCREMENT,
   po_number VARCHAR(30) NOT NULL,
   artno VARCHAR(30) NOT NULL,

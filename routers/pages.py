@@ -62,7 +62,10 @@ async def login_page(request: Request, templates: Jinja2Templates = Depends(get_
 
 @router.get('/setup')
 async def setup_page(request: Request, templates: Jinja2Templates = Depends(get_templates)):
-    return templates.TemplateResponse(request, 'setup.html')
+    db_pool = getattr(request.app.state, 'db_pool', None)
+    return templates.TemplateResponse(request, 'setup.html', {
+        'db_connected': db_pool is not None,
+    })
 
 
 @router.get('/faktur-pembelian/input')

@@ -81,7 +81,7 @@
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detail Faktur: <span id="detailFPNumber"></span></h5>
+        <h5 class="modal-title">Detail Faktur Pembelian: <span id="detailFPNumber"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -97,10 +97,8 @@
                 <th>#</th>
                 <th>Artno</th>
                 <th>Nama</th>
-                <th class="text-end">Qty</th>
-                <th>Satuan Besar</th>
-                <th class="text-end">Qty Kcl</th>
-                <th>Sat.Kcl</th>
+                <th class="text-center">Isi</th>
+                <th class="text-end">Qty Order</th>
                 <th class="text-end">H.Beli</th>
                 <th class="text-end">H.Kcl</th>
                 <th class="text-end">Disc1</th>
@@ -447,10 +445,8 @@
           tr.innerHTML = '<td class="fp-rownum">' + (i + 1) + '</td>'
             + '<td class="fp-artno"><code>' + (line.stockid || '') + '</code></td>'
             + '<td>' + (line.artname || '') + '</td>'
-            + '<td class="fp-num">' + line.qty + '</td>'
-            + '<td>' + (line.satuanbsr || '') + '</td>'
-            + '<td class="fp-num">' + qtyKcl + '</td>'
-            + '<td>' + (line.satuankcl || '') + '</td>'
+            + '<td class="text-center">' + qtyKcl + '/' + (line.satuanbsr || 'Pcs') + '</td>'
+            + '<td class="fp-num">' + line.qty + ' ' + (line.satuanbsr || 'Pcs') + '</td>'
             + '<td class="fp-num">' + fmtNum(line.hbelibsr || 0) + '</td>'
             + '<td class="fp-num">' + fmtNum(line.hbelikcl || 0) + '</td>'
             + '<td class="fp-num">' + fmtDisc(line.pctdisc1) + '</td>'

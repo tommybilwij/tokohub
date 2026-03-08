@@ -121,16 +121,24 @@ async def commit_price_change(pool, items: list[dict], userid: str = '', uraian:
                 # Bundling 1
                 b1 = item.get('bundling1')
                 if b1:
-                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
-                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                    update_cols.extend(['over1=%s', 'hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('min_qty', 0)),
+                                        float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
                                         float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
 
                 # Bundling 2
                 b2 = item.get('bundling2')
                 if b2:
-                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
-                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                    update_cols.extend(['over2=%s', 'hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('min_qty', 0)),
+                                        float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
                                         float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                # Update ispaketprc flag if any bundling was provided
+                if b1 or b2:
+                    has_bnd = 1 if ((b1 and float(b1.get('min_qty', 0))) or (b2 and float(b2.get('min_qty', 0)))) else 0
+                    update_cols.append('ispaketprc=%s')
+                    update_vals.append(has_bnd)
 
                 update_vals.append(artno)
                 await cursor.execute(
@@ -138,11 +146,14 @@ async def commit_price_change(pool, items: list[dict], userid: str = '', uraian:
                     tuple(update_vals)
                 )
 
-                # Bundling values for sthist — use new if changed, else keep old
+                # Bundling values for sthist — use new if changed, else keep old from stock
                 sthist_o1 = [float(b1.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b1 else [
                     stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
                 sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
                     stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
+                sthist_over1 = float(b1.get('min_qty', 0)) if b1 else stock['over1']
+                sthist_over2 = float(b2.get('min_qty', 0)) if b2 else stock['over2']
+                sthist_ispaketprc = (1 if (sthist_over1 or sthist_over2) else 0) if (b1 or b2) else stock['ispaketprc']
 
                 # 2. Insert into sthist (tipetrans=0)
                 await cursor.execute(
@@ -181,7 +192,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '', uraian:
                         new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
                         *sthist_o1,
                         *sthist_o2,
-                        stock['over1'], stock['over2'], stock['ispaketprc'],
+                        sthist_over1, sthist_over2, sthist_ispaketprc,
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,
@@ -321,14 +332,22 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
 
                 b1 = item.get('bundling1')
                 if b1:
-                    update_cols.extend(['hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
-                    update_vals.extend([float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
+                    update_cols.extend(['over1=%s', 'hjualo1=%s', 'hjual2o1=%s', 'hjual3o1=%s', 'hjual4o1=%s', 'hjual5o1=%s'])
+                    update_vals.extend([float(b1.get('min_qty', 0)),
+                                        float(b1.get('hjual1', 0)), float(b1.get('hjual2', 0)),
                                         float(b1.get('hjual3', 0)), float(b1.get('hjual4', 0)), float(b1.get('hjual5', 0))])
                 b2 = item.get('bundling2')
                 if b2:
-                    update_cols.extend(['hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
-                    update_vals.extend([float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
+                    update_cols.extend(['over2=%s', 'hjualo2=%s', 'hjual2o2=%s', 'hjual3o2=%s', 'hjual4o2=%s', 'hjual5o2=%s'])
+                    update_vals.extend([float(b2.get('min_qty', 0)),
+                                        float(b2.get('hjual1', 0)), float(b2.get('hjual2', 0)),
                                         float(b2.get('hjual3', 0)), float(b2.get('hjual4', 0)), float(b2.get('hjual5', 0))])
+
+                # Update ispaketprc flag if any bundling was provided
+                if b1 or b2:
+                    has_bnd = 1 if ((b1 and float(b1.get('min_qty', 0))) or (b2 and float(b2.get('min_qty', 0)))) else 0
+                    update_cols.append('ispaketprc=%s')
+                    update_vals.append(has_bnd)
 
                 update_vals.append(artno)
                 await cursor.execute(
@@ -340,6 +359,9 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
                     stock['hjualo1'], stock['hjual2o1'], stock['hjual3o1'], stock['hjual4o1'], stock['hjual5o1']]
                 sthist_o2 = [float(b2.get(f'hjual{n}', 0)) for n in ['1','2','3','4','5']] if b2 else [
                     stock['hjualo2'], stock['hjual2o2'], stock['hjual3o2'], stock['hjual4o2'], stock['hjual5o2']]
+                sthist_over1 = float(b1.get('min_qty', 0)) if b1 else stock['over1']
+                sthist_over2 = float(b2.get('min_qty', 0)) if b2 else stock['over2']
+                sthist_ispaketprc = (1 if (sthist_over1 or sthist_over2) else 0) if (b1 or b2) else stock['ispaketprc']
 
                 await cursor.execute(
                     """INSERT INTO sthist (
@@ -377,7 +399,7 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
                         new_hjual, new_hjual2, new_hjual3, new_hjual4, new_hjual5,
                         *sthist_o1,
                         *sthist_o2,
-                        stock['over1'], stock['over2'], stock['ispaketprc'],
+                        sthist_over1, sthist_over2, sthist_ispaketprc,
                         stock['packing'], stock['satbesar'], stock['satkecil'],
                         ph_number, becreff,
                         old_hjual, pctprofit, pctprofit2, pctprofit3, pctprofit4, pctprofit5,

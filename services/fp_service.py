@@ -29,6 +29,19 @@ class POCreationError(Exception):
     """Raised when faktur pembelian creation fails."""
 
 
+def _bundling_flag(line: dict) -> int:
+    """Return ispaketprc flag from preview line bundling data."""
+    b1 = line.get('bundling1') or {}
+    b2 = line.get('bundling2') or {}
+    return 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
+
+
+def _bundling_val(line: dict, key: str, field: str) -> float:
+    """Extract a bundling field value from preview line, default 0."""
+    b = line.get(key) or {}
+    return float(b.get(field) or 0)
+
+
 async def _generate_fp_number(cursor, order_date):
     """Generate Faktur Pembelian number: FP{YYMMDD}{5-digit-seq}."""
     prefix = f"FP{order_date.strftime('%y%m%d')}"
@@ -286,6 +299,9 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                             jlhdisc1, jlhdisc2, jlhdisc3,
                             pctppn, jlhppn,
                             hjual, hjual2, hjual3, hjual4, hjual5,
+                            ispaketprc, over1, over2,
+                            hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                            hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
                             amount, qtybonus,
                             suppid, whid, nofaktur, becreff, tipetrans,
                             isupdateprice, isupdatepurchprice)
@@ -295,6 +311,9 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                                    %s, %s, %s,
                                    %s, %s, %s,
                                    %s, %s,
+                                   %s, %s, %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s, %s, %s,
                                    %s, %s, %s, %s, %s,
                                    %s, %s,
                                    %s, 'LAPANGAN', %s, %s, 1,
@@ -308,6 +327,19 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                          line['pctppn'], line['jlhppn'],
                          line['hjual'], line['hjual2'], line['hjual3'],
                          line['hjual4'], line['hjual5'],
+                         _bundling_flag(line),
+                         _bundling_val(line, 'bundling1', 'min_qty'),
+                         _bundling_val(line, 'bundling2', 'min_qty'),
+                         _bundling_val(line, 'bundling1', 'hjual1'),
+                         _bundling_val(line, 'bundling1', 'hjual2'),
+                         _bundling_val(line, 'bundling1', 'hjual3'),
+                         _bundling_val(line, 'bundling1', 'hjual4'),
+                         _bundling_val(line, 'bundling1', 'hjual5'),
+                         _bundling_val(line, 'bundling2', 'hjual1'),
+                         _bundling_val(line, 'bundling2', 'hjual2'),
+                         _bundling_val(line, 'bundling2', 'hjual3'),
+                         _bundling_val(line, 'bundling2', 'hjual4'),
+                         _bundling_val(line, 'bundling2', 'hjual5'),
                          line['amount'], line.get('foc', 0),
                          supplier_id, fp_number, fp_becreff,
                          iup, iup)
@@ -882,6 +914,9 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                             jlhdisc1, jlhdisc2, jlhdisc3,
                             pctppn, jlhppn,
                             hjual, hjual2, hjual3, hjual4, hjual5,
+                            ispaketprc, over1, over2,
+                            hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                            hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
                             amount, qtybonus,
                             suppid, whid, nofaktur, becreff, tipetrans,
                             isupdateprice, isupdatepurchprice)
@@ -891,6 +926,9 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                                    %s, %s, %s,
                                    %s, %s, %s,
                                    %s, %s,
+                                   %s, %s, %s, %s, %s,
+                                   %s, %s, %s,
+                                   %s, %s, %s, %s, %s,
                                    %s, %s, %s, %s, %s,
                                    %s, %s,
                                    %s, 'LAPANGAN', %s, %s, 1,
@@ -904,6 +942,19 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                          line['pctppn'], line['jlhppn'],
                          line['hjual'], line['hjual2'], line['hjual3'],
                          line['hjual4'], line['hjual5'],
+                         _bundling_flag(line),
+                         _bundling_val(line, 'bundling1', 'min_qty'),
+                         _bundling_val(line, 'bundling2', 'min_qty'),
+                         _bundling_val(line, 'bundling1', 'hjual1'),
+                         _bundling_val(line, 'bundling1', 'hjual2'),
+                         _bundling_val(line, 'bundling1', 'hjual3'),
+                         _bundling_val(line, 'bundling1', 'hjual4'),
+                         _bundling_val(line, 'bundling1', 'hjual5'),
+                         _bundling_val(line, 'bundling2', 'hjual1'),
+                         _bundling_val(line, 'bundling2', 'hjual2'),
+                         _bundling_val(line, 'bundling2', 'hjual3'),
+                         _bundling_val(line, 'bundling2', 'hjual4'),
+                         _bundling_val(line, 'bundling2', 'hjual5'),
                          line['amount'], line.get('foc', 0),
                          supplier_id, fp_number, fp_becreff,
                          iup, iup)

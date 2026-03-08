@@ -391,7 +391,7 @@
         var margin = _nettoPcs > 0 ? hj - _nettoPcs : 0;
         var marginPct = _nettoPcs > 0 ? (margin / _nettoPcs * 100) : 0;
         var sign = margin >= 0 ? '+' : '';
-        return label + ':' + fmtNum(hj)
+        return '<span class="is-label">' + label + ':</span> <span class="is-val">' + fmtNum(hj) + '</span>'
           + ' <span class="' + (margin < 0 ? 'text-danger' : 'text-success') + '">(' + sign + fmtNum(margin) + ' / ' + sign + marginPct.toFixed(1) + '%)</span>';
       }
       // Main jual

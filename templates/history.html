@@ -413,7 +413,7 @@
           if (!v) return '<span class="fp-disc-zero">-</span>';
           var n = parseFloat(v);
           if (n === 0) return '<span class="fp-disc-zero">-</span>';
-          return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+          return (Number.isInteger(n) ? n.toString() : n.toFixed(2)) + '%';
         };
         (data.lines || []).forEach(function(line, i) {
           var qtyKcl = Math.round(line.packing || 1);

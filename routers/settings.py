@@ -116,6 +116,15 @@ async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
             existing = await get_openai_config(db)
             existing.update(openai_data)
             await save_openai_config(db, existing)
+
+        # Save DB-stored settings (fuzzy matching, session)
+        fuzzy_data = {}
+        for k in _DB_KEYS:
+            if k in raw:
+                fuzzy_data[k] = raw.pop(k)
+        if fuzzy_data and db:
+            await app_settings.save_many(db, fuzzy_data)
+
         if raw:
             save_to_envrc(raw)
         return {'ok': True}

@@ -51,6 +51,14 @@
   if (!dom.viewport) return;
 
   // -----------------------------------------------------------------------
+  // Permissions (from server-rendered data attributes)
+  // -----------------------------------------------------------------------
+  var scannerPage = document.querySelector('.scanner-page');
+  var SHOW_BELI = scannerPage.dataset.showBeli === 'true';
+  var SHOW_JUAL = scannerPage.dataset.showJual === 'true';
+  var SHOW_MARGIN = scannerPage.dataset.showMargin === 'true';
+
+  // -----------------------------------------------------------------------
   // Config
   // -----------------------------------------------------------------------
   var COOLDOWN_MS = 2000;
@@ -575,42 +583,57 @@
     dom.sdPacking.textContent = item.packing ? (Math.round(item.packing) + ' ' + (item.satkecil || '')) : '-';
     dom.sdSatuan.textContent = (item.satbesar || '-') + ' / ' + (item.satkecil || '-');
 
-    dom.sdHbeliBsr.textContent = fmt(item.hbelibsr);
-    dom.sdHbeliKcl.textContent = fmt(item.hbelikcl);
-    dom.sdDisc1.textContent = fmtPct(item.pctdisc1);
-    dom.sdDisc2.textContent = fmtPct(item.pctdisc2);
-    dom.sdDisc3.textContent = fmtPct(item.pctdisc3);
-    dom.sdPPN.textContent = fmtPct(item.pctppn);
+    // Harga Beli (permission-gated)
+    if (SHOW_BELI) {
+      dom.sdHbeliBsr.textContent = fmt(item.hbelibsr);
+      dom.sdHbeliKcl.textContent = fmt(item.hbelikcl);
+      dom.sdDisc1.textContent = fmtPct(item.pctdisc1);
+      dom.sdDisc2.textContent = fmtPct(item.pctdisc2);
+      dom.sdDisc3.textContent = fmtPct(item.pctdisc3);
+      dom.sdPPN.textContent = fmtPct(item.pctppn);
 
-    var netto = item.hbelikcl || 0;
-    if (item.pctdisc1) netto *= (1 - item.pctdisc1 / 100);
-    if (item.pctdisc2) netto *= (1 - item.pctdisc2 / 100);
-    if (item.pctdisc3) netto *= (1 - item.pctdisc3 / 100);
-    if (item.pctppn) netto *= (1 + item.pctppn / 100);
-    dom.sdNetto.textContent = fmt(Math.round(netto));
+      var netto = item.hbelikcl || 0;
+      if (item.pctdisc1) netto *= (1 - item.pctdisc1 / 100);
+      if (item.pctdisc2) netto *= (1 - item.pctdisc2 / 100);
+      if (item.pctdisc3) netto *= (1 - item.pctdisc3 / 100);
+      if (item.pctppn) netto *= (1 + item.pctppn / 100);
+      dom.sdNetto.textContent = fmt(Math.round(netto));
+    }
 
-    var tiers = [
-      { label: 'H.Jual 1', val: item.hjual },
-      { label: 'Member', val: item.hjual2 },
-      { label: 'H.Jual 3', val: item.hjual3 },
-      { label: 'H.Jual 4', val: item.hjual4 },
-      { label: 'H.Jual 5', val: item.hjual5 },
-    ];
-    dom.sdJualBody.innerHTML = tiers.map(function(t) {
-      var hasMargin = t.val > 0 && netto > 0;
-      var margin = hasMargin ? (((t.val - netto) / netto) * 100).toFixed(2) + '%' : '-';
-      var marginClass = (hasMargin && t.val < netto) ? 'text-danger' : '';
-      return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
-    }).join('');
+    // Harga Jual (permission-gated)
+    if (SHOW_JUAL) {
+      var netto2 = item.hbelikcl || 0;
+      if (item.pctdisc1) netto2 *= (1 - item.pctdisc1 / 100);
+      if (item.pctdisc2) netto2 *= (1 - item.pctdisc2 / 100);
+      if (item.pctdisc3) netto2 *= (1 - item.pctdisc3 / 100);
+      if (item.pctppn) netto2 *= (1 + item.pctppn / 100);
 
-    var bundlings = item._bundlings || [];
-    if (bundlings.length > 0) {
-      dom.sdBundlingSection.classList.remove('d-none');
-      dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
-        return '<tr><td>' + b.qty + '</td><td class="text-end">' + fmt(b.hjual1) + '</td><td class="text-end">' + fmt(b.hjual2) + '</td><td class="text-end">' + fmt(b.hjual3) + '</td><td class="text-end">' + fmt(b.hjual4) + '</td><td class="text-end">' + fmt(b.hjual5) + '</td></tr>';
+      var tiers = [
+        { label: 'H.Jual 1', val: item.hjual },
+        { label: 'Member', val: item.hjual2 },
+        { label: 'H.Jual 3', val: item.hjual3 },
+        { label: 'H.Jual 4', val: item.hjual4 },
+        { label: 'H.Jual 5', val: item.hjual5 },
+      ];
+      dom.sdJualBody.innerHTML = tiers.map(function(t) {
+        if (SHOW_MARGIN) {
+          var hasMargin = t.val > 0 && netto2 > 0;
+          var margin = hasMargin ? (((t.val - netto2) / netto2) * 100).toFixed(2) + '%' : '-';
+          var marginClass = (hasMargin && t.val < netto2) ? 'text-danger' : '';
+          return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
+        }
+        return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td></tr>';
       }).join('');
-    } else {
-      dom.sdBundlingSection.classList.add('d-none');
+
+      var bundlings = item._bundlings || [];
+      if (bundlings.length > 0) {
+        dom.sdBundlingSection.classList.remove('d-none');
+        dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
+          return '<tr><td>' + b.qty + '</td><td class="text-end">' + fmt(b.hjual1) + '</td><td class="text-end">' + fmt(b.hjual2) + '</td><td class="text-end">' + fmt(b.hjual3) + '</td><td class="text-end">' + fmt(b.hjual4) + '</td><td class="text-end">' + fmt(b.hjual5) + '</td></tr>';
+        }).join('');
+      } else {
+        dom.sdBundlingSection.classList.add('d-none');
+      }
     }
 
     dom.stockDetail.classList.remove('d-none');
@@ -657,7 +680,7 @@
   function hideResults() {
     dom.stockDetail.classList.add('d-none');
     dom.noResultCard.classList.add('d-none');
-    dom.sdBundlingSection.classList.add('d-none');
+    if (dom.sdBundlingSection) dom.sdBundlingSection.classList.add('d-none');
   }
 
   function showNoResult() {

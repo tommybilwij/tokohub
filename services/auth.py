@@ -25,6 +25,9 @@ def _get_session_max_age() -> int:
 # Keys with ':' are rendered as indented sub-items in the permissions UI.
 PAGES = {
     'scanner':                  'Scanner',
+    'scanner:harga_beli':       'Harga Beli',
+    'scanner:harga_jual':       'Harga Jual',
+    'scanner:harga_jual:margin':'Margin Harga Jual',
     'faktur':                   'Faktur Pembelian',
     'faktur:input':             'Input Faktur Pembelian',
     'faktur:input:aliases':     'Alias',

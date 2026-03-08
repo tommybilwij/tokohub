@@ -220,6 +220,7 @@
     overlay.classList.remove('d-none');
     var mainContent = document.querySelector('.sh-page');
     if (mainContent) mainContent.classList.add('d-none');
+    history.replaceState(null, '', '#edit=' + encodeURIComponent(fpNumber));
   }
 
   // ------- Close overlay -------
@@ -227,6 +228,7 @@
     overlay.classList.add('d-none');
     var mainContent = document.querySelector('.sh-page');
     if (mainContent) mainContent.classList.remove('d-none');
+    history.replaceState(null, '', window.location.pathname + window.location.search);
     currentFP = null;
     editLines = [];
     beforePrices = {};
@@ -307,11 +309,11 @@
       }
       return '<tr>' +
         '<td class="jt-label">' + r.label + '</td>' +
-        '<td>' + hint + '<input type="text" class="jual-input' + cls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
-        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-pct">' + pctHint + '<input type="text" class="jual-pct-input' + pctCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
-        ' value="" placeholder="—" inputmode="decimal" ' + dis + '></td>' +
-        '<td class="jt-margin">' + mrgHint + '<span class="jual-margin' + mrgCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span></td>' +
+        '<td><input type="text" class="jual-input' + cls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        ' value="' + (val ? fmtNum(val) : '') + '" placeholder="—" inputmode="decimal" ' + dis + '>' + hint + '</td>' +
+        '<td class="jt-pct"><input type="text" class="jual-pct-input' + pctCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '"' +
+        ' value="" placeholder="—" inputmode="decimal" ' + dis + '>' + pctHint + '</td>' +
+        '<td class="jt-margin"><span class="jual-margin' + mrgCls + '" data-idx="' + idx + '" data-tier="' + t + '" data-field="' + r.field + '">—</span>' + mrgHint + '</td>' +
         '</tr>';
     }).join('');
     return '<table class="jual-table"><thead><tr><th></th><th>Harga</th><th>Mrg%</th><th>Margin</th></tr></thead><tbody>' + rowsHTML + '</tbody></table>';
@@ -366,6 +368,62 @@
         ? ' <span class="badge bg-warning text-dark" style="font-size:0.7em;vertical-align:middle"><i class="bi bi-exclamation-triangle-fill"></i> Berubah</span>'
         : '';
 
+      // Pre-compute for summary
+      var _net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
+      var _nettoBsr = _net.final + (line.bkirim || 0);
+      var _nettoPcs = line.packing > 0 ? _nettoBsr / line.packing : 0;
+      var _hbeliKcl = line.packing > 0 ? line.hbelibsr / line.packing : 0;
+
+      // Build discount summary — always show all 4
+      function _fmtPct(v) { return v ? (Number.isInteger(v) ? v : (+v).toFixed(2)) + '%' : '-'; }
+      var discStr = 'D1:' + _fmtPct(line.pctdisc1) + ' D2:' + _fmtPct(line.pctdisc2) + ' D3:' + _fmtPct(line.pctdisc3) + ' PPN:' + _fmtPct(line.pctppn);
+
+      // Build harga jual summary with margin (main + bundling tiers)
+      var jualParts = [];
+      var jualKeys = ['hjual', 'hjual2', 'hjual3', 'hjual4', 'hjual5'];
+      var jualLabels = ['HJ1', 'Mem', 'HJ3', 'HJ4', 'HJ5'];
+      function _jualEntry(label, hj) {
+        if (!hj) return '';
+        var margin = _nettoPcs > 0 ? hj - _nettoPcs : 0;
+        var marginPct = _nettoPcs > 0 ? (margin / _nettoPcs * 100) : 0;
+        var sign = margin >= 0 ? '+' : '';
+        return label + ':' + fmtNum(hj)
+          + ' <span class="' + (margin < 0 ? 'text-danger' : 'text-success') + '">(' + sign + fmtNum(margin) + ' / ' + sign + marginPct.toFixed(1) + '%)</span>';
+      }
+      // Main jual
+      jualKeys.forEach(function(k, i) {
+        var entry = _jualEntry(jualLabels[i], line[k]);
+        if (entry) jualParts.push(entry);
+      });
+      // Bundling tiers (bundling uses hjual1..hjual5, not hjual)
+      var bJualKeys = ['hjual1', 'hjual2', 'hjual3', 'hjual4', 'hjual5'];
+      [1, 2].forEach(function(t) {
+        var b = line['bundling' + t];
+        if (!b || !b.enabled) return;
+        var bParts = [];
+        bJualKeys.forEach(function(k, i) {
+          var entry = _jualEntry(jualLabels[i], b[k]);
+          if (entry) bParts.push(entry);
+        });
+        if (bParts.length) jualParts.push('<span class="text-info">B' + t + ' &ge;' + (b.minQty || 0) + '</span> ' + bParts.join(' | '));
+      });
+
+      // Summary grid
+      var summaryHtml = '<div class="item-summary">'
+        + '<div class="is-row">'
+        + '<div class="is-cell"><span class="is-label">Qty</span><span class="is-val">' + (line.qty || 0) + ' ' + esc(sat) + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Total</span><span class="is-val">' + fmtNum((line.hbelibsr || 0) * (line.qty || 0)) + '</span></div>'
+        + '<div class="is-cell"><span class="is-label">Disc</span><span class="is-val">' + discStr + '</span></div>'
+        + '</div>';
+      if (jualParts.length || _nettoPcs) {
+        summaryHtml += '<div class="is-row is-jual">'
+          + '<div class="is-cell"><span class="is-label">Netto/Pcs</span><span class="is-val">' + fmtNum(trunc2(_nettoPcs)) + '</span></div>'
+          + jualParts.map(function(p) {
+            return '<div class="is-cell">' + p + '</div>';
+          }).join('') + '</div>';
+      }
+      summaryHtml += '</div>';
+
       // Main row
       var tr = document.createElement('tr');
       tr.className = 'item-main';
@@ -373,15 +431,16 @@
       tr.innerHTML =
         '<td class="row-num"><span class="expand-toggle"><i class="bi bi-chevron-right"></i></span> ' + (idx + 1) + '</td>' +
         '<td><div><strong>' + esc(line.artname) + '</strong>' + changeIcon + '</div>' +
-          '<small class="text-muted"><code>' + esc(line.stockid) + '</code> &middot; ' + esc(sat) + ' (' + line.packing + ')</small></td>' +
+          '<small class="text-muted"><code>' + esc(line.stockid) + '</code> &middot; ' + esc(sat) + ' (' + line.packing + ')</small>' +
+          summaryHtml + '</td>' +
         '<td><code>' + esc(line.artpabrik) + '</code></td>' +
         '<td><button class="btn btn-sm btn-outline-danger btn-remove p-0 px-1" data-idx="' + idx + '" title="Hapus"><i class="bi bi-x-lg"></i></button></td>';
       elBody.appendChild(tr);
 
       // Detail row
-      var net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
-      var nettoBsr = net.final + (line.bkirim || 0);
-      var nettoPcs = line.packing > 0 ? nettoBsr / line.packing : 0;
+      var net = _net;
+      var nettoBsr = _nettoBsr;
+      var nettoPcs = _nettoPcs;
       var mainJual = { hjual1: line.hjual, hjual2: line.hjual2, hjual3: line.hjual3, hjual4: line.hjual4, hjual5: line.hjual5, _enabled: true };
 
       var detailTr = document.createElement('tr');
@@ -492,6 +551,35 @@
     // Update computed prices (margin displays)
     editLines.forEach(function (_, idx) { updateComputedPrices(idx); });
     elItemCount.textContent = editLines.length + ' item';
+    updateTotalsBar();
+  }
+
+  function updateTotalsBar() {
+    var bar = document.getElementById('editTotalsBar');
+    if (!bar) return;
+    var totalBeli = 0, totalJual = 0;
+    editLines.forEach(function(line) {
+      var net = calcNetPrice(line.hbelibsr, line.pctdisc1, line.pctdisc2, line.pctdisc3, line.pctppn);
+      var nettoBsr = net.final + (line.bkirim || 0);
+      var nettoPcs = line.packing > 0 ? nettoBsr / line.packing : 0;
+      var qtyKcl = (line.qty || 0) * (line.packing || 1) + (line.qtybonus || 0);
+      totalBeli += nettoPcs * qtyKcl;
+      var hj1 = line.hjual || 0;
+      if (hj1) totalJual += hj1 * qtyKcl;
+    });
+    document.getElementById('editTotalBeli').textContent = fmtNum(totalBeli);
+    document.getElementById('editTotalJual').textContent = fmtNum(totalJual);
+    var marginEl = document.getElementById('editTotalMargin');
+    if (totalBeli > 0 && totalJual > 0) {
+      var margin = totalJual - totalBeli;
+      var marginPct = (margin / totalBeli * 100);
+      var sign = margin >= 0 ? '+' : '';
+      var cls = margin >= 0 ? 'text-success' : 'text-danger';
+      marginEl.innerHTML = 'Margin: <b class="' + cls + '">' + sign + fmtNum(margin) + ' (' + sign + marginPct.toFixed(1) + '%)</b>';
+    } else {
+      marginEl.innerHTML = '';
+    }
+    bar.classList.remove('d-none');
   }
 
   function _discRow(idx, label, field, line, stk) {
@@ -523,10 +611,10 @@
     }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
-      '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
-      '<td class="disc-pcs" data-idx="' + idx + '" data-field="' + field + '">' + stkAmtPcsHint + '<input type="text" class="amt-input' + pcsCls + '" value="' + (amtPcs ? fmtNum(amtPcs) : '0') + '" readonly tabindex="-1"></td>' +
-      '<td>' + hint + '<input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
+      '<td><input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal">' + stkTotalHint + '</td>' +
+      '<td><input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal">' + stkAmtHint + '</td>' +
+      '<td class="disc-pcs" data-idx="' + idx + '" data-field="' + field + '"><input type="text" class="amt-input' + pcsCls + '" value="' + (amtPcs ? fmtNum(amtPcs) : '0') + '" readonly tabindex="-1">' + stkAmtPcsHint + '</td>' +
+      '<td><input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100">' + hint + '</td>' +
       '</tr>';
   }
 
@@ -681,6 +769,7 @@
         }
       });
     });
+    updateTotalsBar();
   }
 
   // ------- Bind table events -------
@@ -1165,4 +1254,13 @@
       openEdit(btn.dataset.fp);
     }
   });
+
+  // ------- Auto-open edit from URL hash on page load -------
+  (function() {
+    var hash = window.location.hash;
+    if (hash && hash.indexOf('#edit=') === 0) {
+      var fp = decodeURIComponent(hash.substring(6));
+      if (fp) openEdit(fp);
+    }
+  })();
 })();

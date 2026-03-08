@@ -54,6 +54,7 @@
             <th class="sh-sortable" data-col="supplier_name">Supplier <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable text-end" data-col="total">Total <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
+            <th class="sh-sortable" data-col="inputter">User <i class="bi bi-chevron-expand"></i></th>
             <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
@@ -342,6 +343,7 @@
             + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+            + '<td>' + (o.userid || '-') + '</td>'
             + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);
@@ -601,6 +603,7 @@
       case 'supplier_name': return (o.supplier_name || o.suppid || '').toLowerCase();
       case 'total': return Number(o.jlhfaktur) || 0;
       case 'total_items': return Number(o.line_count) || 0;
+      case 'inputter': return (o.userid || '').toLowerCase();
       default: return '';
     }
   }
@@ -644,6 +647,7 @@
         + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
         + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
         + '<td class="text-center">' + (o.line_count || 0) + '</td>'
+        + '<td>' + (o.userid || '-') + '</td>'
         + '<td class="text-center">' + priceSwitch + '</td>'
         + '<td class="text-nowrap">' + actions + '</td>';
       elBody.appendChild(tr);

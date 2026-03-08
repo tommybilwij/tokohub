@@ -2066,7 +2066,7 @@
       if (!v) return '<span class="fp-disc-zero">-</span>';
       const n = parseFloat(v);
       if (n === 0) return '<span class="fp-disc-zero">-</span>';
-      return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+      return (Number.isInteger(n) ? n.toString() : n.toFixed(2)) + '%';
     };
 
     dom.fpPreviewBody.innerHTML = '';

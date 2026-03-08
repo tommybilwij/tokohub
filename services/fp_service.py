@@ -226,7 +226,7 @@ async def preview_fp(pool, supplier_id, items, order_date=None, shipping_cost=0)
     }
 
 
-async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True):
+async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True, due_date=None, uraian=None):
     """Create Faktur Pembelian in two phases to minimise lock contention with MyPosse POS.
 
     Phase 1 (single transaction):
@@ -264,16 +264,17 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
                 fp_number = await _generate_fp_number(cursor, order_date)
 
                 # Insert Faktur Pembelian header (icbym)
+                _due = due_date or order_date
                 await cursor.execute(
                     """INSERT INTO icbym
                        (nofaktur, tipe, becreff, suppid, tglfaktur, duedate,
-                        jlhfaktur, lokasi, userid,
+                        jlhfaktur, lokasi, userid, uraian,
                         isupdateprice, islocked)
                        VALUES (%s, '1', %s, %s, %s, %s,
-                               %s, 'LAPANGAN', %s,
+                               %s, 'LAPANGAN', %s, %s,
                                %s, 0)""",
-                    (fp_number, fp_becreff, supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, 1 if update_price else 0)
+                    (fp_number, fp_becreff, supplier_id, order_date, _due,
+                     preview['grand_total'], userid, uraian, 1 if update_price else 0)
                 )
 
                 # Insert line items into sthist
@@ -451,10 +452,10 @@ async def commit_fp(pool, supplier_id, items, order_date=None, userid=None, ship
 
 
 async def delete_fp(pool, fp_number: str) -> dict:
-    """Delete a Faktur Pembelian: reverse stock balance, restore prices from snapshot, hard-delete rows."""
+    """Delete a Faktur Pembelian: reverse stock balance, restore prices from sthist history, hard-delete rows."""
     header = await execute_single(
         pool,
-        "SELECT nofaktur, becreff, islocked FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        "SELECT nofaktur, becreff, islocked, isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
         (fp_number,),
     )
     if not header:
@@ -463,6 +464,7 @@ async def delete_fp(pool, fp_number: str) -> dict:
         return {'error': 'Faktur terkunci, tidak bisa dihapus'}
 
     becreff = header['becreff']
+    had_update_price = header['isupdateprice']
 
     # Get sthist lines for reversal
     lines = await execute_query(
@@ -471,9 +473,16 @@ async def delete_fp(pool, fp_number: str) -> dict:
         (becreff,),
     )
 
-    # Get snapshot for price restoration
-    from services.snapshot_service import get_snapshot
-    snapshot = await get_snapshot(pool, fp_number)
+    # Build per-item noindex range (needed for restore lookups after deletion)
+    item_noindex = {}
+    for line in lines:
+        artno = line['stockid']
+        ni = line['noindex']
+        if artno not in item_noindex:
+            item_noindex[artno] = {'min': ni, 'max': ni}
+        else:
+            item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
+            item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
     # Phase 1 — Atomic: reverse stlastbal, delete sthist + icbym + snapshots
     async with pool.acquire() as conn:
@@ -494,6 +503,7 @@ async def delete_fp(pool, fp_number: str) -> dict:
                 await cursor.execute(
                     "DELETE FROM icbym WHERE nofaktur = %s AND tipe = '1'", (fp_number,),
                 )
+                # Clean up old snapshots if they exist
                 await cursor.execute(
                     "DELETE FROM tokohub.faktur_pembelian_snapshots WHERE po_number = %s", (fp_number,),
                 )
@@ -503,46 +513,36 @@ async def delete_fp(pool, fp_number: str) -> dict:
                 logger.exception("Faktur delete failed (Phase 1)")
                 raise
 
-    # Phase 2 — Restore stock prices from snapshot where no newer change exists
-    if snapshot:
-        noindex_max = max((l['noindex'] for l in lines), default=0)
-        for item in snapshot.get('items', []):
-            before = item.get('before')
-            if not before:
-                continue
-            artno = item['artno']
+    # Phase 2 — Restore stock prices from previous sthist entries
+    from services.stock_restore import (
+        get_previous_hbeli, get_previous_hjual,
+        has_newer_hbeli_update, has_newer_hjual_update,
+        get_init_hbeli, get_init_hjual,
+        RESTORE_HBELI_SQL, hbeli_params, RESTORE_HJUAL_SQL, hjual_params,
+    )
 
-            newer = await execute_single(
-                pool,
-                "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
-                (artno, noindex_max),
-            )
-            if newer:
-                continue
+    for artno, ni in item_noindex.items():
+        # Restore hbeli (FP always updates hbeli in stock)
+        if not await has_newer_hbeli_update(pool, artno, ni['max']):
+            prev = await get_previous_hbeli(pool, artno, ni['min'])
+            if not prev:
+                prev = await get_init_hbeli(pool, artno)
+            if prev:
+                try:
+                    await execute_modify(pool, RESTORE_HBELI_SQL, hbeli_params(prev, artno))
+                except Exception:
+                    logger.warning("Failed to restore hbeli for %s", artno, exc_info=True)
 
-            try:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock SET
-                        hbelibsr=%s, hbelikcl=%s, hbelinetto=%s,
-                        pctdisc1=%s, pctdisc2=%s, pctdisc3=%s, pctppn=%s,
-                        hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s,
-                        satbesar=%s, packing=%s,
-                        ispaketprc=%s, over1=%s, over2=%s,
-                        hjualo1=%s, hjual2o1=%s, hjual3o1=%s, hjual4o1=%s, hjual5o1=%s,
-                        hjualo2=%s, hjual2o2=%s, hjual3o2=%s, hjual4o2=%s, hjual5o2=%s
-                    WHERE artno=%s""",
-                    (before.get('hbelibsr', 0), before.get('hbelikcl', 0), before.get('hbelinetto_kcl', 0),
-                     before.get('pctdisc1', 0), before.get('pctdisc2', 0), before.get('pctdisc3', 0), before.get('pctppn', 0),
-                     before.get('hjual', 0), before.get('hjual2', 0), before.get('hjual3', 0), before.get('hjual4', 0), before.get('hjual5', 0),
-                     before.get('satbesar', ''), before.get('packing', 0),
-                     before.get('ispaketprc', 0), before.get('over1', 0), before.get('over2', 0),
-                     before.get('hjualo1', 0), before.get('hjual2o1', 0), before.get('hjual3o1', 0), before.get('hjual4o1', 0), before.get('hjual5o1', 0),
-                     before.get('hjualo2', 0), before.get('hjual2o2', 0), before.get('hjual3o2', 0), before.get('hjual4o2', 0), before.get('hjual5o2', 0),
-                     artno),
-                )
-            except Exception:
-                logger.warning("Failed to restore stock prices for %s", artno, exc_info=True)
+        # Restore hjual + bundling (only if this FP had update_price on)
+        if had_update_price and not await has_newer_hjual_update(pool, artno, ni['max']):
+            prev = await get_previous_hjual(pool, artno, ni['min'])
+            if not prev:
+                prev = await get_init_hjual(pool, artno)
+            if prev:
+                try:
+                    await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+                except Exception:
+                    logger.warning("Failed to restore hjual for %s", artno, exc_info=True)
 
     from services.stock_search import invalidate_cache
     invalidate_cache()
@@ -620,70 +620,47 @@ async def toggle_fp_update_price(pool, fp_number: str) -> dict:
     new_val = 0 if old_val else 1
     fp_becreff = row['becreff']
 
-    # Get snapshot for before/after states
-    from services.snapshot_service import get_snapshot
-    snap = await get_snapshot(pool, fp_number)
-    if not snap:
-        return {'error': 'Snapshot not found — cannot toggle update price'}
+    from services.stock_restore import (
+        get_previous_hjual, has_newer_hjual_update, get_init_hjual,
+        RESTORE_HJUAL_SQL, hjual_params,
+    )
 
-    items = snap.get('items', [])
+    # Get this FP's sthist lines (hjual + bundling + noindex)
+    fp_lines = await execute_query(
+        pool,
+        """SELECT stockid, noindex,
+                  hjual, hjual2, hjual3, hjual4, hjual5,
+                  ispaketprc, over1, over2,
+                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
+           FROM sthist WHERE becreff = %s AND tipetrans = 1""",
+        (fp_becreff,),
+    )
 
     if new_val:
-        # Turning ON: apply harga jual + bundling from snapshot "after" state
-        for item in items:
-            after = item.get('after')
-            if not after:
+        # Turning ON: apply this FP's hjual to stock (skip if newer update exists)
+        for line in fp_lines:
+            artno = line['stockid']
+            if await has_newer_hjual_update(pool, artno, line['noindex']):
                 continue
-            artno = item['artno']
             try:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock
-                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
-                           hjual4 = %s, hjual5 = %s,
-                           ispaketprc = %s, over1 = %s, over2 = %s,
-                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                       WHERE artno = %s""",
-                    (after.get('hjual', 0), after.get('hjual2', 0), after.get('hjual3', 0),
-                     after.get('hjual4', 0), after.get('hjual5', 0),
-                     after.get('ispaketprc', 0), after.get('over1', 0), after.get('over2', 0),
-                     after.get('hjualo1', 0), after.get('hjual2o1', 0), after.get('hjual3o1', 0),
-                     after.get('hjual4o1', 0), after.get('hjual5o1', 0),
-                     after.get('hjualo2', 0), after.get('hjual2o2', 0), after.get('hjual3o2', 0),
-                     after.get('hjual4o2', 0), after.get('hjual5o2', 0),
-                     artno),
-                )
+                await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(line, artno))
             except Exception:
                 logger.warning("Toggle update price: apply hjual failed for %s", artno, exc_info=True)
     else:
-        # Turning OFF: revert harga jual + bundling from snapshot "before" state
-        for item in items:
-            before = item.get('before')
-            if not before:
+        # Turning OFF: revert to previous hjual state (skip if newer update exists)
+        for line in fp_lines:
+            artno = line['stockid']
+            if await has_newer_hjual_update(pool, artno, line['noindex']):
                 continue
-            artno = item['artno']
-            try:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock
-                       SET hjual = %s, hjual2 = %s, hjual3 = %s,
-                           hjual4 = %s, hjual5 = %s,
-                           ispaketprc = %s, over1 = %s, over2 = %s,
-                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                       WHERE artno = %s""",
-                    (before.get('hjual', 0), before.get('hjual2', 0), before.get('hjual3', 0),
-                     before.get('hjual4', 0), before.get('hjual5', 0),
-                     before.get('ispaketprc', 0), before.get('over1', 0), before.get('over2', 0),
-                     before.get('hjualo1', 0), before.get('hjual2o1', 0), before.get('hjual3o1', 0),
-                     before.get('hjual4o1', 0), before.get('hjual5o1', 0),
-                     before.get('hjualo2', 0), before.get('hjual2o2', 0), before.get('hjual3o2', 0),
-                     before.get('hjual4o2', 0), before.get('hjual5o2', 0),
-                     artno),
-                )
-            except Exception:
-                logger.warning("Toggle update price: revert hjual failed for %s", artno, exc_info=True)
+            prev = await get_previous_hjual(pool, artno, line['noindex'])
+            if not prev:
+                prev = await get_init_hjual(pool, artno)
+            if prev:
+                try:
+                    await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+                except Exception:
+                    logger.warning("Toggle update price: revert hjual failed for %s", artno, exc_info=True)
 
     # Update header flag
     await execute_modify(
@@ -710,8 +687,8 @@ async def get_fp_detail(pool, fp_number):
     """Get full detail of a specific Faktur Pembelian."""
     header = await execute_single(
         pool,
-        """SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
-                  b.userid, v.name AS supplier_name, b.isupdateprice, b.islocked
+        """SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.duedate, b.uraian,
+                  b.jlhfaktur, b.userid, v.name AS supplier_name, b.isupdateprice, b.islocked
            FROM icbym b
            LEFT JOIN vendor v ON v.id = b.suppid
            WHERE b.nofaktur = %s AND b.tipe = '1'""",
@@ -780,7 +757,7 @@ async def get_fp_detail(pool, fp_number):
     return header
 
 
-async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True):
+async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True, due_date=None, uraian=None):
     """Update an existing Faktur Pembelian: reverse old stock, replace sthist lines, apply new stock.
 
     Same two-phase approach as commit_fp.
@@ -846,13 +823,14 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                 await cursor.execute("DELETE FROM sthist WHERE becreff = %s AND tipetrans = 1", (fp_becreff,))
 
                 # Update header
+                _due = due_date or order_date
                 await cursor.execute(
                     """UPDATE icbym
                        SET suppid = %s, tglfaktur = %s, duedate = %s,
-                           jlhfaktur = %s, userid = %s, isupdateprice = %s
+                           jlhfaktur = %s, userid = %s, uraian = %s, isupdateprice = %s
                        WHERE nofaktur = %s AND tipe = '1'""",
-                    (supplier_id, order_date, order_date,
-                     preview['grand_total'], userid, 1 if update_price else 0, fp_number)
+                    (supplier_id, order_date, _due,
+                     preview['grand_total'], userid, uraian, 1 if update_price else 0, fp_number)
                 )
 
                 # Insert new sthist lines
@@ -926,19 +904,6 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
     # Harga jual + bundling: only when update_price=True.
     # When update_price=False, revert hjual + bundling to original snapshot "before" state.
 
-    # Load original snapshot "before" state for reverting hjual when unchecked
-    orig_before = {}
-    if not update_price:
-        try:
-            from services.snapshot_service import get_snapshot
-            snap = await get_snapshot(pool, fp_number)
-            if snap:
-                for item in snap.get('items', []):
-                    if item.get('before'):
-                        orig_before[item['artno']] = item['before']
-        except Exception:
-            logger.warning("Failed to load snapshot for hjual revert on %s", fp_number, exc_info=True)
-
     for line in preview['lines']:
         try:
             if update_price:
@@ -979,30 +944,17 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                      line['satuanbsr'], line['packing'],
                      line['artno']),
                 )
-                # Revert hjual + bundling to original "before" snapshot values
-                ob = orig_before.get(line['artno'])
-                if ob:
+                # Revert hjual + bundling from previous sthist entry
+                # New sthist lines have isupdateprice=0, so get_latest_hjual skips them
+                from services.stock_restore import get_latest_hjual, get_init_hjual, RESTORE_HJUAL_SQL, hjual_params
+                prev_hjual = await get_latest_hjual(pool, line['artno'])
+                if not prev_hjual:
+                    prev_hjual = await get_init_hjual(pool, line['artno'])
+                if prev_hjual:
                     try:
-                        await execute_modify(
-                            pool,
-                            """UPDATE stock
-                               SET hjual = %s, hjual2 = %s, hjual3 = %s,
-                                   hjual4 = %s, hjual5 = %s,
-                                   ispaketprc = %s, over1 = %s, over2 = %s,
-                                   hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                                   hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                               WHERE artno = %s""",
-                            (ob.get('hjual', 0), ob.get('hjual2', 0), ob.get('hjual3', 0),
-                             ob.get('hjual4', 0), ob.get('hjual5', 0),
-                             ob.get('ispaketprc', 0), ob.get('over1', 0), ob.get('over2', 0),
-                             ob.get('hjualo1', 0), ob.get('hjual2o1', 0), ob.get('hjual3o1', 0),
-                             ob.get('hjual4o1', 0), ob.get('hjual5o1', 0),
-                             ob.get('hjualo2', 0), ob.get('hjual2o2', 0), ob.get('hjual3o2', 0),
-                             ob.get('hjual4o2', 0), ob.get('hjual5o2', 0),
-                             line['artno']),
-                        )
+                        await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev_hjual, line['artno']))
                     except Exception:
-                        logger.warning("Revert hjual from snapshot failed for %s", line['artno'], exc_info=True)
+                        logger.warning("Revert hjual from sthist failed for %s", line['artno'], exc_info=True)
         except Exception:
             logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
 

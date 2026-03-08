@@ -15,6 +15,8 @@
   var elSuppInput = document.getElementById('editSuppInput');
   var elSuppMenu = document.getElementById('editSuppMenu');
   var elDate = document.getElementById('editDate');
+  var elDueDate = document.getElementById('editDueDate');
+  var elUraian = document.getElementById('editUraian');
   var elUser = document.getElementById('editUser');
   var elBody = document.getElementById('editTableBody');
   var elBtnSave = document.getElementById('editBtnSave');
@@ -175,6 +177,8 @@
     elTitle.textContent = 'Edit Faktur Pembelian: ' + data.nofaktur;
     setEditSupplier(data.suppid || '');
     elDate.value = data.tglfaktur || '';
+    if (elDueDate) elDueDate.value = data.duedate || data.tglfaktur || '';
+    if (elUraian) elUraian.value = data.uraian || '';
     if (elUpdatePrice) elUpdatePrice.checked = !!data.isupdateprice;
 
     editLines = (data.lines || []).map(function (l) {
@@ -1211,6 +1215,8 @@
           userid: elUser.value,
           items: items,
           order_date: elDate.value,
+          due_date: elDueDate ? elDueDate.value : '',
+          uraian: elUraian ? elUraian.value : '',
           update_price: elUpdatePrice ? elUpdatePrice.checked : true,
         }),
       });

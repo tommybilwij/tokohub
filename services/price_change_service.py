@@ -239,17 +239,23 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
 
     becreff = header['becreff']
 
-    # Get old sthist lines to restore prices
+    # Get old sthist lines for restoration
     old_lines = await execute_query(
         pool,
-        """SELECT stockid, oprice, noindex,
-                  hjual, hjual2, hjual3, hjual4, hjual5,
-                  hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
-                  hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
-           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
-    noindex_max = max((l['noindex'] for l in old_lines), default=0)
+
+    # Build per-item noindex range
+    item_noindex = {}
+    for line in old_lines:
+        artno = line['stockid']
+        ni = line['noindex']
+        if artno not in item_noindex:
+            item_noindex[artno] = {'min': ni, 'max': ni}
+        else:
+            item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
+            item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
     # Phase 1: Atomic — delete old sthist lines
     async with pool.acquire() as conn:
@@ -263,40 +269,22 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                 await conn.rollback()
                 raise
 
-    # Phase 2: Restore old stock prices where no newer change exists
-    for line in old_lines:
-        artno = line['stockid']
-        newer = await execute_single(
-            pool,
-            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
-            (artno, noindex_max),
-        )
-        if newer:
+    # Phase 2: Restore old stock hjual+bundling from previous sthist entries
+    from services.stock_restore import (
+        get_previous_hjual, has_newer_hjual_update, get_init_hjual,
+        RESTORE_HJUAL_SQL, hjual_params,
+    )
+    for artno, ni in item_noindex.items():
+        if await has_newer_hjual_update(pool, artno, ni['max']):
             continue
-        old_hjual = float(line.get('oprice') or 0)
-        if not old_hjual:
-            continue
-        prev = await execute_single(
-            pool,
-            """SELECT hjual2, hjual3, hjual4, hjual5
-               FROM sthist WHERE stockid = %s AND noindex < %s
-               ORDER BY noindex DESC LIMIT 1""",
-            (artno, min(l['noindex'] for l in old_lines if l['stockid'] == artno)),
-        )
-        try:
-            if prev:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
-                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
-                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
-                )
-            else:
-                await execute_modify(
-                    pool, "UPDATE stock SET hjual=%s WHERE artno=%s", (old_hjual, artno),
-                )
-        except Exception:
-            logger.warning("Failed to restore price for %s during update", artno, exc_info=True)
+        prev = await get_previous_hjual(pool, artno, ni['min'])
+        if not prev:
+            prev = await get_init_hjual(pool, artno)
+        if prev:
+            try:
+                await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+            except Exception:
+                logger.warning("Failed to restore price for %s during update", artno, exc_info=True)
 
     # Phase 3: Re-read current stock prices and apply new changes
     artnos = [i['artno'] for i in items]
@@ -422,7 +410,7 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
 
 
 async def delete_ph(pool, ph_number: str) -> dict:
-    """Delete a Perubahan Harga: restore old prices where possible, hard-delete rows."""
+    """Delete a Perubahan Harga: restore old hjual+bundling from sthist history, hard-delete rows."""
     header = await execute_single(
         pool,
         "SELECT nobukti, becreff, islocked FROM icphg WHERE nobukti = %s",
@@ -438,12 +426,20 @@ async def delete_ph(pool, ph_number: str) -> dict:
     # Get sthist lines for price restoration
     lines = await execute_query(
         pool,
-        """SELECT stockid, oprice, noindex,
-                  hjual, hjual2, hjual3, hjual4, hjual5
-           FROM sthist WHERE becreff = %s AND tipetrans = 0""",
+        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
-    noindex_max = max((l['noindex'] for l in lines), default=0)
+
+    # Build per-item noindex range
+    item_noindex = {}
+    for line in lines:
+        artno = line['stockid']
+        ni = line['noindex']
+        if artno not in item_noindex:
+            item_noindex[artno] = {'min': ni, 'max': ni}
+        else:
+            item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
+            item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
 
     # Phase 1 — Atomic: delete sthist + icphg
     async with pool.acquire() as conn:
@@ -461,45 +457,23 @@ async def delete_ph(pool, ph_number: str) -> dict:
                 logger.exception("Price change delete failed")
                 raise
 
-    # Phase 2 — Restore prices where no newer change exists
-    for line in lines:
-        artno = line['stockid']
-        newer = await execute_single(
-            pool,
-            "SELECT 1 FROM sthist WHERE stockid = %s AND noindex > %s LIMIT 1",
-            (artno, noindex_max),
-        )
-        if newer:
-            continue
+    # Phase 2 — Restore hjual + bundling from previous sthist entries
+    from services.stock_restore import (
+        get_previous_hjual, has_newer_hjual_update, get_init_hjual,
+        RESTORE_HJUAL_SQL, hjual_params,
+    )
 
-        old_hjual = float(line.get('oprice') or 0)
-        if not old_hjual:
+    for artno, ni in item_noindex.items():
+        if await has_newer_hjual_update(pool, artno, ni['max']):
             continue
-
-        # oprice only stores old hjual; look for previous sthist to get hjual2-5
-        prev = await execute_single(
-            pool,
-            """SELECT hjual2, hjual3, hjual4, hjual5
-               FROM sthist WHERE stockid = %s AND noindex < %s
-               ORDER BY noindex DESC LIMIT 1""",
-            (artno, min(l['noindex'] for l in lines if l['stockid'] == artno)),
-        )
-        try:
-            if prev:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s WHERE artno=%s",
-                    (old_hjual, float(prev['hjual2'] or 0), float(prev['hjual3'] or 0),
-                     float(prev['hjual4'] or 0), float(prev['hjual5'] or 0), artno),
-                )
-            else:
-                await execute_modify(
-                    pool,
-                    "UPDATE stock SET hjual=%s WHERE artno=%s",
-                    (old_hjual, artno),
-                )
-        except Exception:
-            logger.warning("Failed to restore price for %s", artno, exc_info=True)
+        prev = await get_previous_hjual(pool, artno, ni['min'])
+        if not prev:
+            prev = await get_init_hjual(pool, artno)
+        if prev:
+            try:
+                await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+            except Exception:
+                logger.warning("Failed to restore hjual for %s", artno, exc_info=True)
 
     try:
         from services.stock_search import invalidate_cache

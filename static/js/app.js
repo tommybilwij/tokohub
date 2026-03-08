@@ -27,6 +27,8 @@
     userSelect:      $('#userSelect'),
     vendorSelect:    $('#vendorSelect'),
     orderDate:       $('#orderDate'),
+    dueDateInput:    $('#dueDateInput'),
+    keteranganInput: $('#keteranganInput'),
     itemNameInput:   $('#itemNameInput'),
     btnAddItem:      $('#btnAddItem'),
     shippingCostInput: null, // removed — now per-item
@@ -118,6 +120,8 @@
           user: dom.userSelect ? dom.userSelect.value : '',
           vendor: dom.vendorSelect ? dom.vendorSelect.value : '',
           orderDate: dom.orderDate ? dom.orderDate.value : '',
+          dueDate: dom.dueDateInput ? dom.dueDateInput.value : '',
+          keterangan: dom.keteranganInput ? dom.keteranganInput.value : '',
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
@@ -199,6 +203,8 @@
           if (window._setVendorInput) window._setVendorInput(draft.header.vendor);
         }
         if (draft.header.orderDate && dom.orderDate) dom.orderDate.value = draft.header.orderDate;
+        if (draft.header.dueDate && dom.dueDateInput) dom.dueDateInput.value = draft.header.dueDate;
+        if (draft.header.keterangan && dom.keteranganInput) dom.keteranganInput.value = draft.header.keterangan;
       }
 
       return true;
@@ -425,6 +431,8 @@
     dom.userSelect.addEventListener('change', _saveStateDebounced);
     dom.vendorSelect.addEventListener('change', _saveStateDebounced);
     dom.orderDate.addEventListener('change', _saveStateDebounced);
+    if (dom.dueDateInput) dom.dueDateInput.addEventListener('change', _saveStateDebounced);
+    if (dom.keteranganInput) dom.keteranganInput.addEventListener('input', _saveStateDebounced);
 
     // Per-item shipping cost: delegate change events
     document.addEventListener('change', (e) => {
@@ -2044,6 +2052,8 @@
           supplier_id: supplierId,
           items,
           order_date: dom.orderDate.value,
+          due_date: dom.dueDateInput ? dom.dueDateInput.value : '',
+          uraian: dom.keteranganInput ? dom.keteranganInput.value : '',
         },
       });
 
@@ -2135,6 +2145,8 @@
           userid: userId,
           items,
           order_date: dom.orderDate.value,
+          due_date: dom.dueDateInput ? dom.dueDateInput.value : '',
+          uraian: dom.keteranganInput ? dom.keteranganInput.value : '',
           update_price: updatePriceEl ? updatePriceEl.checked : true,
         },
       });

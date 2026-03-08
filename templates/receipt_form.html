@@ -52,6 +52,18 @@
           <input type="date" id="orderDate" class="form-control" value="{{ today }}">
         </div>
 
+        <!-- Est. Terima -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Est. Terima</label>
+          <input type="date" id="dueDateInput" class="form-control" value="{{ today }}">
+        </div>
+
+        <!-- Keterangan -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" id="keteranganInput" class="form-control" maxlength="50" placeholder="Opsional, maks 50 karakter">
+        </div>
+
         <hr>
 
         <!-- Tabs: Manual / Photo / CSV -->

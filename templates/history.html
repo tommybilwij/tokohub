@@ -154,11 +154,19 @@
         <input type="date" class="form-control form-control-sm" id="editDate">
       </div>
       <div class="col-md-2">
+        <label class="form-label mb-1"><small>Est. Terima</small></label>
+        <input type="date" class="form-control form-control-sm" id="editDueDate">
+      </div>
+      <div class="col-md-2">
         <label class="form-label mb-1"><small>User</small></label>
         <input type="text" class="form-control form-control-sm" id="editUserDisplay" value="{{ user.username if user else '' }}" readonly>
         <input type="hidden" id="editUser" value="{{ user.username if user else '' }}">
       </div>
-      <div class="col-md-5">
+      <div class="col-md-3">
+        <label class="form-label mb-1"><small>Keterangan</small></label>
+        <input type="text" class="form-control form-control-sm" id="editUraian" maxlength="50" placeholder="Maks 50 karakter">
+      </div>
+      <div class="col-md-4">
         <label class="form-label mb-1"><small>Tambah Item</small></label>
         <div class="position-relative">
           <input type="text" class="form-control form-control-sm" id="editSearchInput" placeholder="Cari nama / barcode...">

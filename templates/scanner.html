@@ -6,15 +6,21 @@
 
   <!-- Camera Card -->
   <div class="card mb-3">
-    <div class="card-header card-header-primary d-flex align-items-center justify-content-between py-2">
-      <h6 class="mb-0"><i class="bi bi-camera-video"></i> Camera</h6>
-      <div class="d-flex align-items-center gap-2">
-        <select id="cameraSelect" class="form-select form-select-sm scanner-cam-select d-none">
-          <option value="">Pilih kamera...</option>
-        </select>
-        <button id="btnToggleCamera" class="btn btn-sm btn-light">
-          <i class="bi bi-play-fill"></i> Start
-        </button>
+    <div class="card-header card-header-primary py-2">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
+        <h6 class="mb-0"><i class="bi bi-camera-video"></i> Camera</h6>
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+          <select id="scanMethod" class="form-select form-select-sm" style="width:auto;font-size:var(--fs-xs)">
+            <option value="zxing" selected>ZXing</option>
+            <option value="quagga">Quagga2</option>
+          </select>
+          <select id="cameraSelect" class="form-select form-select-sm scanner-cam-select d-none">
+            <option value="">Pilih kamera...</option>
+          </select>
+          <button id="btnToggleCamera" class="btn btn-sm btn-light">
+            <i class="bi bi-play-fill"></i> Start
+          </button>
+        </div>
       </div>
     </div>
     <div class="card-body p-0 position-relative">
@@ -162,6 +168,11 @@
 {% endblock %}
 
 {% block scripts %}
+<script type="module">
+import { readBarcodesFromImageData } from "https://cdn.jsdelivr.net/npm/zxing-wasm@1/dist/reader/index.js";
+window.zxingReadBarcodes = readBarcodesFromImageData;
+window.dispatchEvent(new Event('zxing-ready'));
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 <script src="{{ url_for('static', filename='js/scanner.js') }}?v={{ range(10000,99999) | random }}"></script>
 {% endblock %}

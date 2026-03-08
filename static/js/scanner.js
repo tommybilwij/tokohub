@@ -1,9 +1,9 @@
 /**
  * Scanner Page - Barcode scanner + stock lookup
  *
- * Detection strategy:
- *   1. BarcodeDetector API (native, hardware-accelerated, handles shake/blur)
- *   2. Quagga2 fallback (JS-based, for browsers without BarcodeDetector)
+ * Detection methods (user-selectable via dropdown):
+ *   1. ZXing (default) — WebAssembly-based, fast and accurate
+ *   2. Quagga2 — JS-based fallback
  *
  * Anti-shake: requires CONFIRM_COUNT consecutive identical reads before accepting.
  * Center-crop: only scans the middle portion of the frame for faster, more accurate reads.
@@ -19,6 +19,7 @@
     viewport:       $('#scannerViewport'),
     btnToggle:      $('#btnToggleCamera'),
     cameraSelect:   $('#cameraSelect'),
+    scanMethod:     $('#scanMethod'),
     placeholder:    $('.scanner-placeholder'),
     crosshair:      $('.scanner-crosshair'),
     searchInput:    $('#searchInput'),
@@ -54,13 +55,14 @@
   // -----------------------------------------------------------------------
   var COOLDOWN_MS = 2000;
   var CONFIRM_COUNT = 2;
-  var CROP_RATIO = 0.6;       // scan center 60% of frame width
-  var CROP_HEIGHT_RATIO = 0.3; // scan center 30% of frame height
-  var SCAN_INTERVAL_MS = 150;  // min ms between decode attempts
+  var CROP_RATIO = 0.7;        // scan center 70% of frame width
+  var CROP_HEIGHT_RATIO = 0.4;  // scan center 40% of frame height
+  var SCAN_INTERVAL_MS = 80;    // min ms between decode attempts
 
-  // Processing canvas for Quagga fallback
-  var PROC_W = 1280;
-  var PROC_H = 720;
+  // Processing canvas — 640x480 is optimal: small enough for fast
+  // getImageData/toDataURL, large enough for reliable barcode decode
+  var PROC_W = 640;
+  var PROC_H = 480;
   var procCanvas = document.createElement('canvas');
   procCanvas.width = PROC_W;
   procCanvas.height = PROC_H;
@@ -80,23 +82,20 @@
   var isDecoding = false;
   var torchOn = false;
   var torchTrack = null;
-  var useNativeDetector = false;
-  var nativeDetector = null;
+  var zxingReady = !!window.zxingReadBarcodes;
+  var frameCount = 0;  // alternates fast/accurate passes for ZXing
 
-  // -----------------------------------------------------------------------
-  // Feature detection: BarcodeDetector API
-  // -----------------------------------------------------------------------
-  if (typeof BarcodeDetector !== 'undefined') {
-    try {
-      nativeDetector = new BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'codabar']
-      });
-      useNativeDetector = true;
-    } catch (e) {
-      // BarcodeDetector exists but failed (e.g. unsupported formats)
-    }
+  // Listen for ZXing WASM module ready
+  if (!zxingReady) {
+    window.addEventListener('zxing-ready', function() {
+      zxingReady = true;
+    });
   }
 
+  // ZXing barcode formats
+  var ZXING_FORMATS = ['EAN-13', 'EAN-8', 'UPC-A', 'UPC-E', 'Code128', 'Code39', 'ITF', 'Codabar'];
+
+  // Quagga readers
   var QUAGGA_READERS = ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader', 'i2of5_reader', 'codabar_reader'];
 
   // -----------------------------------------------------------------------
@@ -125,6 +124,10 @@
     var d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
+  }
+
+  function getSelectedMethod() {
+    return dom.scanMethod ? dom.scanMethod.value : 'zxing';
   }
 
   // -----------------------------------------------------------------------
@@ -243,39 +246,86 @@
     lastScanTime = timestamp;
     isDecoding = true;
 
-    if (useNativeDetector) {
-      detectNative();
+    var method = getSelectedMethod();
+    if (method === 'zxing') {
+      detectZXing();
     } else {
       detectQuagga();
     }
   }
 
   // -----------------------------------------------------------------------
-  // Native BarcodeDetector (best for mobile + shaky hands)
+  // Center-crop frame to processing canvas + auto-contrast
   // -----------------------------------------------------------------------
-  function detectNative() {
-    // Detect directly from the video element — the browser handles
-    // frame capture, focus, and motion blur internally.
-    nativeDetector.detect(videoEl).then(function(barcodes) {
+  function cropFrameToCanvas() {
+    var vw = videoEl.videoWidth;
+    var vh = videoEl.videoHeight;
+    var cropW = Math.round(vw * CROP_RATIO);
+    var cropH = Math.round(vh * CROP_HEIGHT_RATIO);
+    var cropX = Math.round((vw - cropW) / 2);
+    var cropY = Math.round((vh - cropH) / 2);
+    procCtx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, PROC_W, PROC_H);
+  }
+
+  /**
+   * Enhance contrast of the processing canvas in-place.
+   * Converts to grayscale and stretches histogram — helps in poor lighting
+   * or washed-out images common on mobile cameras.
+   */
+  function enhanceContrast() {
+    var imgData = procCtx.getImageData(0, 0, PROC_W, PROC_H);
+    var d = imgData.data;
+    var len = d.length;
+    // Find min/max luminance (sample every 4th pixel for speed)
+    var lo = 255, hi = 0;
+    for (var i = 0; i < len; i += 16) {
+      var gray = (d[i] * 77 + d[i+1] * 150 + d[i+2] * 29) >> 8;
+      if (gray < lo) lo = gray;
+      if (gray > hi) hi = gray;
+    }
+    var range = hi - lo;
+    if (range < 30) return imgData; // already very low contrast, skip (probably blank)
+    if (range > 220) return imgData; // already good contrast
+    // Stretch histogram
+    var scale = 255 / range;
+    for (var j = 0; j < len; j += 4) {
+      d[j]   = Math.min(255, Math.max(0, ((d[j]   - lo) * scale) | 0));
+      d[j+1] = Math.min(255, Math.max(0, ((d[j+1] - lo) * scale) | 0));
+      d[j+2] = Math.min(255, Math.max(0, ((d[j+2] - lo) * scale) | 0));
+    }
+    procCtx.putImageData(imgData, 0, 0);
+    return imgData;
+  }
+
+  // -----------------------------------------------------------------------
+  // ZXing WASM detection (default, best accuracy)
+  //
+  // Alternates between fast pass (no tryHarder) and accurate pass (tryHarder)
+  // so easy barcodes decode in ~5ms while hard ones still get detected.
+  // -----------------------------------------------------------------------
+  function detectZXing() {
+    if (!zxingReady || !window.zxingReadBarcodes) {
       isDecoding = false;
-      if (barcodes.length > 0) {
-        // Pick the barcode closest to the center of the frame
-        var vw = videoEl.videoWidth;
-        var vh = videoEl.videoHeight;
-        var cx = vw / 2;
-        var cy = vh / 2;
-        var best = null;
-        var bestDist = Infinity;
-        for (var i = 0; i < barcodes.length; i++) {
-          var b = barcodes[i].boundingBox;
-          if (!b) { best = barcodes[i]; break; }
-          var bx = b.x + b.width / 2;
-          var by = b.y + b.height / 2;
-          var dist = Math.abs(bx - cx) + Math.abs(by - cy);
-          if (dist < bestDist) { bestDist = dist; best = barcodes[i]; }
-        }
-        if (best && best.rawValue) {
-          onBarcodeDetected(best.rawValue);
+      return;
+    }
+
+    cropFrameToCanvas();
+    enhanceContrast();
+    var imageData = procCtx.getImageData(0, 0, PROC_W, PROC_H);
+
+    frameCount++;
+    var useTryHarder = (frameCount % 2 === 0); // every other frame
+
+    window.zxingReadBarcodes(imageData, {
+      tryHarder: useTryHarder,
+      formats: ZXING_FORMATS,
+      maxNumberOfSymbols: 3
+    }).then(function(results) {
+      isDecoding = false;
+      if (results.length > 0) {
+        var best = pickClosestToCenter(results);
+        if (best && best.text) {
+          onBarcodeDetected(best.text);
         }
       }
     }).catch(function() {
@@ -283,26 +333,46 @@
     });
   }
 
+  function pickClosestToCenter(results) {
+    var cx = PROC_W / 2;
+    var cy = PROC_H / 2;
+    var best = null;
+    var bestDist = Infinity;
+    for (var i = 0; i < results.length; i++) {
+      var r = results[i];
+      if (!r.text) continue;
+      var pos = r.position;
+      if (pos && pos.topLeft && pos.bottomRight) {
+        var bx = (pos.topLeft.x + pos.bottomRight.x) / 2;
+        var by = (pos.topLeft.y + pos.bottomRight.y) / 2;
+        var dist = Math.abs(bx - cx) + Math.abs(by - cy);
+        if (dist < bestDist) { bestDist = dist; best = r; }
+      } else {
+        if (!best) best = r;
+      }
+    }
+    return best;
+  }
+
   // -----------------------------------------------------------------------
-  // Quagga2 fallback (center-cropped for accuracy)
+  // Quagga2 detection (center-cropped, contrast-enhanced)
   // -----------------------------------------------------------------------
   function detectQuagga() {
-    var vw = videoEl.videoWidth;
-    var vh = videoEl.videoHeight;
-
-    // Center-crop: extract the middle portion of the frame
-    var cropW = Math.round(vw * CROP_RATIO);
-    var cropH = Math.round(vh * CROP_HEIGHT_RATIO);
-    var cropX = Math.round((vw - cropW) / 2);
-    var cropY = Math.round((vh - cropH) / 2);
-
-    procCtx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, PROC_W, PROC_H);
-
-    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.9);
+    cropFrameToCanvas();
+    enhanceContrast();
+    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.8);
     Quagga.decodeSingle({
       src: dataUrl,
-      decoder: { readers: QUAGGA_READERS, multiple: false },
+      numOfWorkers: 0,
+      decoder: {
+        readers: QUAGGA_READERS,
+        multiple: false
+      },
       locate: true,
+      locator: {
+        patchSize: 'medium',
+        halfSample: true
+      }
     }, function(result) {
       isDecoding = false;
       if (result && result.codeResult && result.codeResult.code) {
@@ -384,6 +454,12 @@
 
   dom.cameraSelect.addEventListener('change', function() {
     if (cameraRunning) { stopCamera(); startCamera(); }
+  });
+
+  // Method switch: reset confirmation state when switching
+  dom.scanMethod.addEventListener('change', function() {
+    pendingCode = null;
+    pendingCount = 0;
   });
 
   // -----------------------------------------------------------------------

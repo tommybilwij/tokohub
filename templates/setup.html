@@ -15,27 +15,25 @@
 
         <div class="text-center mb-4">
           <h3><i class="bi bi-shop"></i> TokoHub Setup</h3>
-          <p class="text-muted">Periksa pengaturan sebelum memulai.</p>
+          {% if db_connected %}
+          <p class="text-muted">Langkah 2 dari 2 &mdash; Pengaturan aplikasi</p>
+          <div class="d-flex justify-content-center gap-2 mb-2">
+            <span class="badge bg-success rounded-pill px-3 py-2"><i class="bi bi-check-lg"></i> 1. Koneksi</span>
+            <span class="badge bg-primary rounded-pill px-3 py-2">2. Pengaturan</span>
+          </div>
+          {% else %}
+          <p class="text-muted">Langkah 1 dari 2 &mdash; Koneksi database & server</p>
+          <div class="d-flex justify-content-center gap-2 mb-2">
+            <span class="badge bg-primary rounded-pill px-3 py-2">1. Koneksi</span>
+            <span class="badge bg-secondary rounded-pill px-3 py-2">2. Pengaturan</span>
+          </div>
+          {% endif %}
         </div>
 
         <form id="setupForm">
 
-          <!-- Toko -->
-          <div class="card mb-3">
-            <div class="card-body">
-              <h5 class="card-title"><i class="bi bi-shop-window"></i> Toko</h5>
-              <div class="row g-2">
-                <div class="col-md-6">
-                  <label class="form-label">Nama Toko</label>
-                  <input type="text" class="form-control form-control-sm" name="store_name" placeholder="Toko Segar">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Lokasi</label>
-                  <input type="text" class="form-control form-control-sm" name="store_location" placeholder="Kota / Kecamatan">
-                </div>
-              </div>
-            </div>
-          </div>
+          {# ── STEP 1: Database + Server (shown when DB not connected) ── #}
+          {% if not db_connected %}
 
           <!-- Database -->
           <div class="card mb-3">
@@ -95,6 +93,33 @@
                     <input type="text" class="form-control form-control-sm" name="mdns_hostname" placeholder="tokohub" value="tokohub">
                     <span class="input-group-text">.local</span>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Step 1 -->
+          <div class="d-grid mb-4">
+            <button type="submit" class="btn btn-primary btn-lg fw-bold" id="btnMulai">
+              <i class="bi bi-arrow-right"></i> Lanjutkan
+            </button>
+          </div>
+
+          {% else %}
+          {# ── STEP 2: App settings (shown when DB is connected) ── #}
+
+          <!-- Toko -->
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5 class="card-title"><i class="bi bi-shop-window"></i> Toko</h5>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Nama Toko</label>
+                  <input type="text" class="form-control form-control-sm" name="store_name" placeholder="Toko Segar">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Lokasi</label>
+                  <input type="text" class="form-control form-control-sm" name="store_location" placeholder="Kota / Kecamatan">
                 </div>
               </div>
             </div>
@@ -193,12 +218,14 @@
             </div>
           </div>
 
-          <!-- Submit -->
+          <!-- Submit Step 2 -->
           <div class="d-grid mb-4">
             <button type="submit" class="btn btn-warning btn-lg fw-bold" id="btnMulai">
               <i class="bi bi-play-fill"></i> Mulai
             </button>
           </div>
+
+          {% endif %}
 
         </form>
       </div>
@@ -208,57 +235,61 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
   (function() {
+    var dbConnected = {{ 'true' if db_connected else 'false' }};
+
     // Load current settings and populate form
     fetch('/api/settings')
       .then(r => r.json())
       .then(cfg => {
-        setVal('db.host', cfg.db.host);
-        setVal('db.port', cfg.db.port);
-        setVal('db.user', cfg.db.user);
-        setVal('db.name', cfg.db.name);
-        setVal('db.pool_size', cfg.db.pool_size);
-        // password left empty (masked on server)
-
-        setVal('store_name', cfg.store_name);
-        setVal('store_location', cfg.store_location);
-
-        setVal('server_host', cfg.server_host);
-        setVal('server_port', cfg.server_port);
-        document.getElementById('lanModeCheck').checked = cfg.lan_mode;
-        setVal('mdns_hostname', cfg.mdns_hostname);
-        toggleMdns(cfg.lan_mode);
-
-        setVal('openai.api_base', cfg.openai.api_base);
-        setVal('openai.deployment_id', cfg.openai.deployment_id);
-        setVal('openai.api_version', cfg.openai.api_version);
-
-        setVal('fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
-        setVal('fuzzy_top_n', cfg.fuzzy_top_n);
-        setVal('fuzzy_min_score', cfg.fuzzy_min_score);
-        setVal('pc_top_n', cfg.pc_top_n);
-        setVal('pc_min_score', cfg.pc_min_score);
-        setVal('po_top_n', cfg.po_top_n);
-        setVal('po_min_score', cfg.po_min_score);
-        setVal('session_max_age', cfg.session_max_age || 86400);
+        if (!dbConnected) {
+          // Step 1: populate DB + Server fields
+          setVal('db.host', cfg.db.host);
+          setVal('db.port', cfg.db.port);
+          setVal('db.user', cfg.db.user);
+          setVal('db.name', cfg.db.name);
+          setVal('db.pool_size', cfg.db.pool_size);
+          setVal('server_host', cfg.server_host);
+          setVal('server_port', cfg.server_port);
+          var lanCheck = document.getElementById('lanModeCheck');
+          if (lanCheck) { lanCheck.checked = cfg.lan_mode; toggleMdns(cfg.lan_mode); }
+          setVal('mdns_hostname', cfg.mdns_hostname);
+        } else {
+          // Step 2: populate app settings
+          setVal('store_name', cfg.store_name);
+          setVal('store_location', cfg.store_location);
+          setVal('openai.api_base', cfg.openai.api_base);
+          setVal('openai.deployment_id', cfg.openai.deployment_id);
+          setVal('openai.api_version', cfg.openai.api_version);
+          setVal('fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
+          setVal('fuzzy_top_n', cfg.fuzzy_top_n);
+          setVal('fuzzy_min_score', cfg.fuzzy_min_score);
+          setVal('pc_top_n', cfg.pc_top_n);
+          setVal('pc_min_score', cfg.pc_min_score);
+          setVal('po_top_n', cfg.po_top_n);
+          setVal('po_min_score', cfg.po_min_score);
+          setVal('session_max_age', cfg.session_max_age || 86400);
+        }
       })
       .catch(function() {
         // First install — no DB yet, keep HTML default values
       });
 
     function setVal(name, value) {
-      const el = document.querySelector('#setupForm [name="' + name + '"]');
-      if (el) el.value = value;
+      var el = document.querySelector('#setupForm [name="' + name + '"]');
+      if (el && value !== undefined && value !== null) el.value = value;
     }
 
-    // Toggle mDNS field
+    // Toggle mDNS field (step 1 only)
     function toggleMdns(checked) {
-      document.getElementById('mdnsHostnameGroup').style.display = checked ? '' : 'none';
+      var g = document.getElementById('mdnsHostnameGroup');
+      if (g) g.style.display = checked ? '' : 'none';
     }
-    document.getElementById('lanModeCheck').addEventListener('change', function() {
-      toggleMdns(this.checked);
-    });
+    var lanCheck = document.getElementById('lanModeCheck');
+    if (lanCheck) {
+      lanCheck.addEventListener('change', function() { toggleMdns(this.checked); });
+    }
 
-    // Session preset buttons
+    // Session preset buttons (step 2 only)
     document.querySelectorAll('.session-preset').forEach(function(btn) {
       btn.addEventListener('click', function() {
         document.getElementById('sessionMaxAge').value = this.dataset.val;
@@ -267,12 +298,11 @@
 
     // Collect form into nested object
     function collectForm(form) {
-      const data = {};
-      form.querySelectorAll('input').forEach(input => {
-        const name = input.name;
+      var data = {};
+      form.querySelectorAll('input').forEach(function(input) {
+        var name = input.name;
         if (!name) return;
-
-        let val;
+        var val;
         if (input.type === 'checkbox') {
           val = input.checked;
         } else if (input.type === 'password') {
@@ -283,8 +313,7 @@
         } else {
           val = input.value;
         }
-
-        const parts = name.split('.');
+        var parts = name.split('.');
         if (parts.length === 2) {
           if (!data[parts[0]]) data[parts[0]] = {};
           data[parts[0]][parts[1]] = val;
@@ -298,47 +327,77 @@
     // Submit handler
     document.getElementById('setupForm').addEventListener('submit', function(e) {
       e.preventDefault();
-      const btn = document.getElementById('btnMulai');
+      var btn = document.getElementById('btnMulai');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
 
-      const payload = collectForm(this);
+      var payload = collectForm(this);
       fetch('/api/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-        .then(r => r.json())
-        .then(res => {
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
           if (res.ok) {
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memulai ulang server...';
-            // Trigger server restart, then poll until ready
-            fetch('/api/restart', { method: 'POST' }).catch(() => {});
-            setTimeout(function pollReady(attempts) {
-              attempts = attempts || 0;
-              fetch('/health').then(r => {
-                if (r.ok) window.location.href = '/';
-                else throw new Error();
-              }).catch(() => {
-                if (attempts < 30) {
-                  setTimeout(() => pollReady(attempts + 1), 1000);
-                } else {
-                  btn.disabled = false;
-                  btn.innerHTML = '<i class="bi bi-play-fill"></i> Mulai';
-                  alert('Server tidak merespons. Coba refresh halaman.');
-                }
-              });
-            }, 1500);
+            fetch('/api/restart', { method: 'POST' }).catch(function() {});
+            if (!dbConnected) {
+              // Step 1: wait for server + DB connection
+              btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memulai ulang server...';
+              setTimeout(function pollDb(attempts) {
+                attempts = attempts || 0;
+                fetch('/health').then(function(r) { return r.json(); })
+                  .then(function(data) {
+                    if (data.db) {
+                      window.location.href = '/setup';
+                    } else {
+                      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menghubungkan ke database...';
+                      throw new Error('db not ready');
+                    }
+                  })
+                  .catch(function() {
+                    if (attempts < 60) {
+                      setTimeout(function() { pollDb(attempts + 1); }, 1000);
+                    } else {
+                      btn.disabled = false;
+                      btn.innerHTML = '<i class="bi bi-arrow-right"></i> Lanjutkan';
+                      alert('Gagal menghubungkan ke database. Periksa konfigurasi dan coba lagi.');
+                    }
+                  });
+              }, 1500);
+            } else {
+              // Step 2: just wait for server restart
+              btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memulai ulang server...';
+              setTimeout(function pollReady(attempts) {
+                attempts = attempts || 0;
+                fetch('/health').then(function(r) {
+                  if (r.ok) window.location.href = '/';
+                  else throw new Error();
+                }).catch(function() {
+                  if (attempts < 30) {
+                    setTimeout(function() { pollReady(attempts + 1); }, 1000);
+                  } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-play-fill"></i> Mulai';
+                    alert('Server tidak merespons. Coba refresh halaman.');
+                  }
+                });
+              }, 1500);
+            }
           } else {
             alert('Gagal menyimpan: ' + (res.error || 'Unknown error'));
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-fill"></i> Mulai';
+            btn.innerHTML = dbConnected
+              ? '<i class="bi bi-play-fill"></i> Mulai'
+              : '<i class="bi bi-arrow-right"></i> Lanjutkan';
           }
         })
-        .catch(err => {
+        .catch(function(err) {
           alert('Error: ' + err.message);
           btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-play-fill"></i> Mulai';
+          btn.innerHTML = dbConnected
+            ? '<i class="bi bi-play-fill"></i> Mulai'
+            : '<i class="bi bi-arrow-right"></i> Lanjutkan';
         });
     });
   })();

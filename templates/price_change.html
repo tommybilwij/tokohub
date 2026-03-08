@@ -34,12 +34,16 @@
 <!-- Edit mode: inline search row (hidden by default) -->
 <div id="pcEditSearchRow" class="d-none mb-3">
   <div class="row g-2">
-    <div class="col-md-12">
+    <div class="col-md-8">
       <label class="form-label mb-1"><small>Tambah Item</small></label>
       <div class="position-relative">
         <input type="text" class="form-control form-control-sm" id="pcEditSearchInput" placeholder="Cari nama / barcode..." autocomplete="off">
         <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:200px;overflow-y:auto" id="pcEditSearchResults"></div>
       </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label mb-1"><small>Keterangan</small></label>
+      <input type="text" class="form-control form-control-sm" id="pcEditUraianInput" maxlength="50" placeholder="Maks 50 karakter">
     </div>
   </div>
 </div>
@@ -60,6 +64,10 @@
             </button>
           </div>
           <div class="list-group position-absolute w-100 shadow d-none" style="z-index:10;max-height:300px;overflow-y:auto" id="pcSearchResults"></div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label fw-semibold mb-1">Keterangan</label>
+          <input type="text" class="form-control form-control-sm" id="pcUraianInput" maxlength="50" placeholder="Opsional, maks 50 karakter">
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 """HTML page routes."""
 
 import aiomysql
+from datetime import date
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -26,7 +27,7 @@ async def _user_ctx(request: Request, user: dict | None) -> dict:
         pool = request.app.state.db_pool
         perms = await get_role_permissions(pool, user['role'])
         nav = [p for p in perms.split(',') if p in PAGES]
-    return {'user': user, 'nav_pages': nav}
+    return {'user': user, 'nav_pages': nav, 'today': date.today().isoformat()}
 
 
 async def _check_page(request: Request, user: dict | None, page: str):
@@ -143,11 +144,7 @@ async def pesanan_pembelian_input_page(
 ):
     denied = await _check_page(request, user, 'pesanan:input')
     if denied: return denied
-    from datetime import date
-    return templates.TemplateResponse(request, 'pesanan_pembelian_input.html', {
-        'today': date.today().isoformat(),
-        **await _user_ctx(request, user),
-    })
+    return templates.TemplateResponse(request, 'pesanan_pembelian_input.html', await _user_ctx(request, user))
 
 
 @router.get('/scanner')

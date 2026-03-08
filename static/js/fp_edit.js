@@ -29,8 +29,8 @@
   var currentFP = null;
   var editLines = [];
   var vendors = [];
-  var beforePrices = {}; // snapshot "before" prices keyed by artno (stok sebelum input faktur)
-  var afterPrices = {};  // snapshot "after" prices keyed by artno (values submitted in input faktur)
+  var beforePrices = {}; // previous sthist prices keyed by artno (stok sebelum input faktur)
+  var afterPrices = {};  // this FP's sthist prices keyed by artno (values submitted in input faktur)
 
   // ------- Helpers -------
   function fmtNum(n) {
@@ -209,7 +209,7 @@
       };
     });
 
-    // Fetch snapshot data for comparison
+    // Fetch comparison data from sthist history
     var snap = await fetchSnapshot(fpNumber);
     beforePrices = snap.before;
     afterPrices = snap.after;

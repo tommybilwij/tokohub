@@ -186,10 +186,10 @@ async def get_fp(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
 
 @router.get('/api/fp/{fp_number}/snapshot')
 async def get_fp_snapshot(fp_number: str, db: aiomysql.Pool = Depends(get_db)):
-    from services.snapshot_service import get_snapshot
-    result = await get_snapshot(db, fp_number)
+    from services.fp_service import get_fp_comparison
+    result = await get_fp_comparison(db, fp_number)
     if not result:
-        return JSONResponse({'error': 'No snapshot found'}, status_code=404)
+        return JSONResponse({'error': 'No comparison data found'}, status_code=404)
     return result
 
 

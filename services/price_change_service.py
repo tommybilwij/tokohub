@@ -62,7 +62,7 @@ async def _generate_ph_number(cursor, order_date):
     return f"{prefix}{seq:05d}"
 
 
-async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict:
+async def commit_price_change(pool, items: list[dict], userid: str = '', uraian: str = '') -> dict:
     """Commit price changes.
 
     Each item: {artno, hjual, hjual2, hjual3, hjual4, hjual5}
@@ -190,15 +190,16 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
                 )
 
             # Insert icphg header
-            uraian = ', '.join(i.get('artno', '') for i in items[:3])
-            if len(items) > 3:
-                uraian += f' +{len(items) - 3}'
-            # Use first item artname if available for more readable uraian
-            first_stock = before_map.get(items[0]['artno'])
-            if first_stock:
-                uraian = first_stock['artname'] or uraian
-                if len(items) > 1:
-                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            if not uraian:
+                uraian = ', '.join(i.get('artno', '') for i in items[:3])
+                if len(items) > 3:
+                    uraian += f' +{len(items) - 3}'
+                # Use first item artname if available for more readable uraian
+                first_stock = before_map.get(items[0]['artno'])
+                if first_stock:
+                    uraian = first_stock['artname'] or uraian
+                    if len(items) > 1:
+                        uraian = uraian[:80] + f' +{len(items) - 1}'
             await cursor.execute(
                 """INSERT INTO icphg (nobukti, becreff, tglberlaku, uraian, userid)
                    VALUES (%s, %s, %s, %s, %s)""",
@@ -220,7 +221,7 @@ async def commit_price_change(pool, items: list[dict], userid: str = '') -> dict
     return {'ok': True, 'ph_number': ph_number, 'item_count': len(items)}
 
 
-async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -> dict:
+async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', uraian: str = '') -> dict:
     """Update an existing Perubahan Harga.
 
     Strategy: delete old sthist lines, restore old stock prices,
@@ -385,14 +386,15 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '') -
                 )
 
             # Update icphg header
-            uraian = ', '.join(i.get('artno', '') for i in items[:3])
-            if len(items) > 3:
-                uraian += f' +{len(items) - 3}'
-            first_stock = before_map.get(items[0]['artno'])
-            if first_stock:
-                uraian = first_stock['artname'] or uraian
-                if len(items) > 1:
-                    uraian = uraian[:80] + f' +{len(items) - 1}'
+            if not uraian:
+                uraian = ', '.join(i.get('artno', '') for i in items[:3])
+                if len(items) > 3:
+                    uraian += f' +{len(items) - 3}'
+                first_stock = before_map.get(items[0]['artno'])
+                if first_stock:
+                    uraian = first_stock['artname'] or uraian
+                    if len(items) > 1:
+                        uraian = uraian[:80] + f' +{len(items) - 1}'
             await cursor.execute(
                 "UPDATE icphg SET uraian = %s, userid = %s WHERE nobukti = %s",
                 (uraian[:200], userid, ph_number)

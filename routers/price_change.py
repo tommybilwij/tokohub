@@ -48,7 +48,8 @@ async def api_commit_price_change(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
-        result = await commit_price_change(db, items, userid=user['username'] if user else '')
+        uraian = (data.get('uraian') or '').strip()[:50]
+        result = await commit_price_change(db, items, userid=user['username'] if user else '', uraian=uraian)
         return result
     except Exception as e:
         logger.exception("Price change commit failed")
@@ -68,8 +69,9 @@ async def api_ph_update(
     if not items:
         return JSONResponse({'error': 'No items'}, status_code=400)
     try:
+        uraian = (data.get('uraian') or '').strip()[:50]
         result = await update_ph(db, ph_number, items,
-                                 userid=user['username'] if user else '')
+                                 userid=user['username'] if user else '', uraian=uraian)
         if 'error' in result:
             return JSONResponse(result, status_code=400)
         return result

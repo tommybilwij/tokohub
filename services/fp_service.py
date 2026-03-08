@@ -570,7 +570,7 @@ async def get_fp_history(pool, page=1, per_page=20,
     rows = await execute_query(
         pool,
         f"""SELECT b.nofaktur, b.becreff, b.suppid, b.tglfaktur, b.jlhfaktur,
-                  b.userid, v.name AS supplier_name,
+                  b.userid, b.uraian, v.name AS supplier_name,
                   (SELECT COUNT(*) FROM sthist s WHERE s.becreff = b.becreff AND s.tipetrans = 1) AS line_count,
                   b.isupdateprice, b.islocked
            FROM icbym b
@@ -681,6 +681,77 @@ async def toggle_fp_update_price(pool, fp_number: str) -> dict:
 
     logger.info("Toggle update price for %s: %s -> %s", fp_number, old_val, new_val)
     return {'ok': True, 'fp_number': fp_number, 'isupdateprice': new_val}
+
+
+async def get_fp_comparison(pool, fp_number: str) -> dict | None:
+    """Get before/after comparison data for FP edit from sthist history.
+
+    'before' = previous sthist entry (PH or FP with isupdateprice=1)
+    'after'  = this FP's own sthist entry
+    """
+    header = await execute_single(
+        pool,
+        "SELECT becreff FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
+    )
+    if not header:
+        return None
+
+    _COLS = """stockid, noindex, artpabrik, artname,
+               satuanbsr, satuankcl, packing,
+               hbelibsr, hbelikcl, hbelinetto,
+               pctdisc1, pctdisc2, pctdisc3, pctppn,
+               hjual, hjual2, hjual3, hjual4, hjual5,
+               ispaketprc, over1, over2,
+               hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+               hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
+               qty, amount, qtybonus"""
+
+    lines = await execute_query(
+        pool,
+        f"SELECT {_COLS} FROM sthist WHERE becreff = %s AND tipetrans = 1 ORDER BY noindex",
+        (header['becreff'],),
+    )
+
+    def _to_dict(row):
+        """Convert sthist row to frontend-compatible dict."""
+        d = {}
+        for k, v in dict(row).items():
+            if isinstance(v, Decimal):
+                d[k] = float(v)
+            else:
+                d[k] = v
+        # Remap sthist column names to match frontend expectations
+        d['artno'] = d.pop('stockid', '')
+        d['satbesar'] = d.pop('satuanbsr', '')
+        d['satkecil'] = d.pop('satuankcl', '')
+        return d
+
+    items = []
+    for line in lines:
+        artno = line['stockid']
+        ni = line['noindex']
+
+        # "after" = this FP's sthist values
+        after = _to_dict(line)
+        after['qty_besar'] = after.get('qty', 0)
+        after['foc'] = after.pop('qtybonus', 0)
+        after['shipping_cost'] = 0
+
+        # "before" = previous sthist (PH or FP with update_price=true)
+        prev = await execute_single(
+            pool,
+            f"""SELECT {_COLS} FROM sthist
+                WHERE stockid = %s AND noindex < %s
+                  AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
+                ORDER BY noindex DESC LIMIT 1""",
+            (artno, ni),
+        )
+        before = _to_dict(prev) if prev else None
+
+        items.append({'artno': artno, 'before': before, 'after': after})
+
+    return {'items': items}
 
 
 async def get_fp_detail(pool, fp_number):

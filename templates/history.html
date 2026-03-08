@@ -55,6 +55,7 @@
             <th class="sh-sortable text-end" data-col="total">Total <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="inputter">User <i class="bi bi-chevron-expand"></i></th>
+            <th>Keterangan</th>
             <th class="text-center">Update Harga Jual</th>
             <th></th>
           </tr>
@@ -359,6 +360,7 @@
             + '<td class="text-end">' + fmtNum(o.jlhfaktur) + '</td>'
             + '<td class="text-center">' + (o.line_count || 0) + '</td>'
             + '<td>' + (o.userid || '-') + '</td>'
+            + '<td class="small" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (o.uraian || '') + '">' + (o.uraian ? '<span class="text-body-secondary">' + o.uraian + '</span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
             + '<td class="text-center">' + priceSwitch + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);

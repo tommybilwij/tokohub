@@ -595,7 +595,13 @@
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({items: payload}),
+        body: JSON.stringify({
+          items: payload,
+          uraian: (editPH
+            ? (document.getElementById('pcEditUraianInput') || {}).value
+            : (document.getElementById('pcUraianInput') || {}).value
+          ) || '',
+        }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -657,6 +663,9 @@
           window.showToast && showToast('Error: ' + data.error, 'danger');
           return;
         }
+        // Populate uraian for edit mode
+        const editUraianEl = document.getElementById('pcEditUraianInput');
+        if (editUraianEl) editUraianEl.value = data.uraian || '';
         // Fetch current stock prices for all items to get bundling info
         const artnos = (data.lines || []).map(l => l.stockid);
         let stockMap = {};

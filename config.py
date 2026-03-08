@@ -184,20 +184,14 @@ _KEY_TO_ENV = {
     'db.password': 'DB_PASSWORD',
     'db.name': 'DB_NAME',
     'db.pool_size': 'DB_POOL_SIZE',
-    'fuzzy_cache_ttl': 'FUZZY_CACHE_TTL',
-    'fuzzy_top_n': 'FUZZY_TOP_N',
-    'fuzzy_min_score': 'FUZZY_MIN_SCORE',
-    'pc_top_n': 'PC_TOP_N',
-    'pc_min_score': 'PC_MIN_SCORE',
-    'po_top_n': 'PO_TOP_N',
-    'po_min_score': 'PO_MIN_SCORE',
+    # fuzzy settings now stored in DB (tokohub.app_settings)
     'server_port': 'SERVER_PORT',
     'server_host': 'SERVER_HOST',
     'lan_mode': 'LAN_MODE',
     'mdns_hostname': 'MDNS_HOSTNAME',
     'store_name': 'STORE_NAME',
     'store_location': 'STORE_LOCATION',
-    'session_max_age': 'SESSION_MAX_AGE',
+    # session_max_age now stored in DB (tokohub.app_settings)
 }
 
 

@@ -100,11 +100,13 @@
             <div class="position-relative" style="max-width:280px">
               <input type="text" class="form-control form-control-sm" id="poFilterInput"
                      placeholder="Cari nama / artno..." autocomplete="off">
+              <div class="progress d-none" id="poFilterLoading" style="height:2px;position:absolute;bottom:0;left:0;right:0;border-radius:0 0 4px 4px;z-index:1060"><div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width:100%"></div></div>
               <div class="dropdown-menu w-100 shadow-sm" id="poFilterMenu" style="max-height:300px;overflow:auto;z-index:1050"></div>
             </div>
             <div class="position-relative" style="max-width:280px;flex:1">
               <input type="text" class="form-control form-control-sm" id="poAddItemInput"
                      placeholder="+ Tambah item lain..." autocomplete="off">
+              <div class="progress d-none" id="poAddItemLoading" style="height:2px;position:absolute;bottom:0;left:0;right:0;border-radius:0 0 4px 4px;z-index:1060"><div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width:100%"></div></div>
               <div class="dropdown-menu w-100 shadow-sm" id="poAddItemMenu" style="max-height:250px;overflow:auto;z-index:1050"></div>
             </div>
             <div class="form-check form-switch mb-0 ms-auto">
@@ -674,6 +676,7 @@
   (function() {
     var filterInput = document.getElementById('poFilterInput');
     var filterMenu = document.getElementById('poFilterMenu');
+    var filterLoading = document.getElementById('poFilterLoading');
     var fuzzyTimer = null;
     var lastFuzzyResults = [];
 
@@ -682,11 +685,13 @@
       renderItems();
       clearTimeout(fuzzyTimer);
       var q = filterInput.value.trim();
-      if (q.length < 2) { filterMenu.classList.remove('show'); return; }
+      if (q.length < 2) { filterMenu.classList.remove('show'); filterLoading.classList.add('d-none'); return; }
+      filterLoading.classList.remove('d-none');
       fuzzyTimer = setTimeout(function() {
         fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=po')
           .then(function(r) { return r.json(); })
           .then(function(results) {
+            filterLoading.classList.add('d-none');
             lastFuzzyResults = results || [];
             filterMenu.innerHTML = '';
             if (!results.length) {
@@ -787,7 +792,7 @@
           addItemToList(r);
           var row = btn.closest('.list-group-item');
           row.classList.add('bg-light', 'text-muted');
-          btn.outerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Ditambahkan</span>';
+          btn.outerHTML = '<span class="badge bg-info text-white"><i class="bi bi-check-lg me-1"></i>Ditambahkan</span>';
         }
       });
     });
@@ -802,17 +807,20 @@
   (function() {
     var addInput = document.getElementById('poAddItemInput');
     var addMenu = document.getElementById('poAddItemMenu');
+    var addLoading = document.getElementById('poAddItemLoading');
     var addTimer = null;
     var addLastResults = [];
 
     addInput.addEventListener('input', function() {
       clearTimeout(addTimer);
       var q = addInput.value.trim();
-      if (q.length < 2) { addMenu.classList.remove('show'); return; }
+      if (q.length < 2) { addMenu.classList.remove('show'); addLoading.classList.add('d-none'); return; }
+      addLoading.classList.remove('d-none');
       addTimer = setTimeout(function() {
         fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&mode=po')
           .then(function(r) { return r.json(); })
           .then(function(results) {
+            addLoading.classList.add('d-none');
             addLastResults = results || [];
             addMenu.innerHTML = '';
             if (!results.length) {

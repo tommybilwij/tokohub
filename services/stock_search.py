@@ -47,7 +47,9 @@ def _extract_sizes(text):
 async def _load_stock_cache(pool):
     """Refresh the in-memory stock list if stale."""
     now = time.time()
-    if _stock_cache['items'] and (now - _stock_cache['timestamp']) < settings.fuzzy_cache_ttl:
+    from services.app_settings import _cache, _DEFAULTS
+    cache_ttl = int(_cache.get('fuzzy_cache_ttl', _DEFAULTS.get('fuzzy_cache_ttl', '300')))
+    if _stock_cache['items'] and (now - _stock_cache['timestamp']) < cache_ttl:
         return _stock_cache['items']
 
     rows = await execute_query(

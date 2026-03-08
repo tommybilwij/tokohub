@@ -17,9 +17,9 @@ SESSION_COOKIE = 'tokohub_session'
 
 
 def _get_session_max_age() -> int:
-    """Get session max age from config."""
-    from config import settings
-    return settings.session_max_age
+    """Get session max age from DB cache (falls back to default)."""
+    from services.app_settings import _cache, _DEFAULTS
+    return int(_cache.get('session_max_age', _DEFAULTS.get('session_max_age', '86400')))
 
 # All pages that can be permission-controlled
 # Keys with ':' are rendered as indented sub-items in the permissions UI.

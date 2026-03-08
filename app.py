@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
     if pool is not None:
         from services.schema import ensure_tokohub_schema
         await ensure_tokohub_schema(pool)
+        from services.app_settings import get_all
+        await get_all(pool)  # populate in-memory cache
     yield
     async with _lifespan_lock:
         _lifespan_count -= 1

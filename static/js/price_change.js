@@ -54,6 +54,43 @@
     document.getElementById('pcEditSearchRow').classList.add('d-none');
   }
 
+  // --- Draft persistence (input mode only) ---
+  var PC_DRAFT_KEY = 'pc_input_draft';
+
+  function saveDraft() {
+    if (editPH) return;
+    try {
+      var draft = items.map(function(it) {
+        return {
+          artno: it.artno, artname: it.artname, artpabrik: it.artpabrik,
+          hbelibsr: it.hbelibsr, hbelikcl: it.hbelikcl, hbelinetto: it.hbelinetto,
+          packing: it.packing, satbesar: it.satbesar,
+          pctdisc1: it.pctdisc1, pctdisc2: it.pctdisc2, pctdisc3: it.pctdisc3, pctppn: it.pctppn,
+          hjual: it.hjual, hjual2: it.hjual2, hjual3: it.hjual3, hjual4: it.hjual4, hjual5: it.hjual5,
+          newHjual: it.newHjual, newHjual2: it.newHjual2, newHjual3: it.newHjual3, newHjual4: it.newHjual4, newHjual5: it.newHjual5,
+          bundling1: it.bundling1, bundling2: it.bundling2,
+        };
+      });
+      localStorage.setItem(PC_DRAFT_KEY, JSON.stringify(draft));
+    } catch(e) {}
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(PC_DRAFT_KEY); } catch(e) {}
+  }
+
+  function restoreDraft() {
+    if (editPH) return;
+    try {
+      var raw = localStorage.getItem(PC_DRAFT_KEY);
+      if (!raw) return;
+      var draft = JSON.parse(raw);
+      if (!Array.isArray(draft) || !draft.length) return;
+      draft.forEach(function(it) { items.push(it); });
+      render();
+    } catch(e) {}
+  }
+
   function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }
   function fmtNz(n) { return n ? fmt(n) : '—'; }
   function parseNum(s) { return parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0; }
@@ -265,6 +302,7 @@
     };
     items.push(item);
     render();
+    saveDraft();
   }
 
   function render() {
@@ -452,6 +490,7 @@
 
         // Update main row display
         updateMainRow(idx);
+        saveDraft();
       });
     });
 
@@ -470,6 +509,7 @@
         if (minqty) minqty.disabled = !el.checked;
         // Toggle disabled on jual inputs within
         fields?.querySelectorAll('.pc-hjual').forEach(inp => inp.disabled = !el.checked);
+        saveDraft();
       });
     });
 
@@ -480,6 +520,7 @@
         const idx = parseInt(el.dataset.idx);
         const tier = el.dataset.tier;
         items[idx][`bundling${tier}`].minQty = parseFloat(el.value) || 0;
+        saveDraft();
       });
     });
 
@@ -489,6 +530,7 @@
         e.stopPropagation();
         items.splice(parseInt(el.dataset.idx), 1);
         render();
+        saveDraft();
       });
     });
   }
@@ -557,6 +599,7 @@
       });
       const data = await res.json();
       if (data.ok) {
+        clearDraft();
         document.getElementById('pcSuccessNumber').textContent = data.ph_number;
         document.getElementById('pcSuccessCount').textContent = data.item_count;
         new bootstrap.Modal(document.getElementById('pcSuccessModal')).show();
@@ -577,6 +620,7 @@
       return;
     }
     items.length = 0;
+    clearDraft();
     render();
     bootstrap.Modal.getInstance(document.getElementById('pcSuccessModal'))?.hide();
     searchInput.focus();
@@ -589,9 +633,15 @@
       : Promise.resolve(confirm(`Hapus semua ${items.length} item?`)));
     if (!confirmed) return;
     items.length = 0;
+    clearDraft();
     render();
     searchInput.focus();
   });
+
+  // -----------------------------------------------------------------------
+  // Restore draft on page load (input mode only)
+  // -----------------------------------------------------------------------
+  restoreDraft();
 
   // -----------------------------------------------------------------------
   // Edit mode: load existing PH data

@@ -436,6 +436,7 @@
               '<th></th>' +
               '<th class="dp-th-total"><span class="dp-unit-bsr">/' + esc(sat) + '</span> &times; <span class="dp-qty-bsr">' + (line.qty || 1) + '</span> =</th>' +
               '<th class="dp-unit-bsr">/' + esc(sat) + '</th>' +
+              '<th>/Pcs</th>' +
               '<th>%</th>' +
             '</tr></thead><tbody>' +
               _discRow(idx, 'Diskon 1', 'pctdisc1', line, stk) +
@@ -511,10 +512,19 @@
       amtCls = changedCls(stkAmt, amt);
       totalCls = changedCls(stkAmt * qtyBsr, amt * qtyBsr);
     }
+    var pack = line.packing || 1;
+    var amtPcs = pack > 0 ? amt / pack : 0;
+    var stkAmtPcsHint = '';
+    if (stk.hbelibsr != null) {
+      var stkPk = stk.packing || 1;
+      var stkAmtPcs = stkPk > 0 ? (stkAmtMap[field] || 0) / stkPk : 0;
+      stkAmtPcsHint = '<div class="sblm-hint">' + (stkAmtPcs ? fmtNum(stkAmtPcs) : '—') + '</div>';
+    }
     return '<tr>' +
       '<td class="bt-label">' + label + '</td>' +
       '<td>' + stkTotalHint + '<input type="text" class="amt-total edit-disc-total' + totalCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt * qtyBsr) : '') + '" placeholder="0" inputmode="decimal"></td>' +
       '<td>' + stkAmtHint + '<input type="text" class="amt-input edit-disc-amt' + amtCls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (amt ? fmtNum(amt) : '') + '" placeholder="0" inputmode="decimal"></td>' +
+      '<td class="text-end text-muted disc-pcs" data-idx="' + idx + '" data-field="' + field + '">' + stkAmtPcsHint + (amtPcs ? fmtNum(amtPcs) : '0') + '</td>' +
       '<td>' + hint + '<input type="number" class="pct-input edit-disc-pct' + cls + '" data-idx="' + idx + '" data-field="' + field + '" value="' + (line[field] || '') + '" placeholder="—" step="any" min="0" max="100"></td>' +
       '</tr>';
   }
@@ -577,6 +587,16 @@
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? fmtNum(amtMap[f]) : '';
       var totEl = document.querySelector('.edit-disc-total[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (totEl && document.activeElement !== totEl) totEl.value = amtMap[f] ? fmtNum(amtMap[f] * qtyBsr) : '';
+      var pcsEl = document.querySelector('.disc-pcs[data-idx="' + idx + '"][data-field="' + f + '"]');
+      if (pcsEl) {
+        var amtPcs = (pk > 0 && amtMap[f]) ? amtMap[f] / pk : 0;
+        var stkAmtPcsHtml = '';
+        if (hasStk) {
+          var stkPcsAmt = (stk.packing || 1) > 0 ? (stkAmtMap2[f] || 0) / (stk.packing || 1) : 0;
+          stkAmtPcsHtml = '<div class="sblm-hint">' + (stkPcsAmt ? fmtNum(stkPcsAmt) : '—') + '</div>';
+        }
+        pcsEl.innerHTML = stkAmtPcsHtml + (amtPcs ? fmtNum(amtPcs) : '0');
+      }
       var pctEl = document.querySelector('.edit-disc-pct[data-idx="' + idx + '"][data-field="' + f + '"]');
       if (hasStk) {
         var stkAmt = stkAmtMap2[f] || 0;

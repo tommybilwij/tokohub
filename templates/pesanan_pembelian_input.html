@@ -214,8 +214,8 @@
     if (draft.targetDays) document.getElementById('poTargetDays').value = draft.targetDays;
 
     // If there was data loaded, auto-reload and apply saved orders
-    if (draft.hasData && draft.orders && Object.keys(draft.orders).length > 0) {
-      _pendingDraftOrders = draft.orders;
+    if (draft.hasData) {
+      _pendingDraftOrders = draft.orders || {};
       loadItems();
     }
   }

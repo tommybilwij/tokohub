@@ -905,6 +905,11 @@
       if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
       const totalEl = document.querySelector(`.edit-disc-total[data-idx="${idx}"][data-field="${f}"]`);
       if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
+      const pcsEl = document.querySelector(`.disc-pcs[data-idx="${idx}"][data-field="${f}"]`);
+      if (pcsEl) {
+        const amtPcs = (qtyKcl > 0 && amtMap[f]) ? amtMap[f] / qtyKcl : 0;
+        pcsEl.textContent = amtPcs ? formatNumber(amtPcs) : '0';
+      }
     });
 
     // Per-item shipping cost
@@ -1205,6 +1210,7 @@
                     <th></th>
                     <th class="dp-th-total"><span class="dp-unit-bsr">/${satuanBsr}</span> &times; <span class="dp-qty-bsr">${item.qtyBesar || 1}</span> =</th>
                     <th class="dp-unit-bsr">/${satuanBsr}</th>
+                    <th>/Pcs</th>
                     <th>%</th>
                   </tr>
                 </thead>
@@ -1215,6 +1221,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc1">0</td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
                                value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1224,6 +1231,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc2">0</td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
                                value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1233,6 +1241,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="ppn">0</td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
                                value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>
@@ -1242,6 +1251,7 @@
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
                                value="" placeholder="0" inputmode="decimal"></td>
+                    <td class="text-end text-muted disc-pcs" data-idx="${idx}" data-field="disc3">0</td>
                     <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
                                value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
                   </tr>

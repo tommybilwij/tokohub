@@ -55,14 +55,13 @@
   // -----------------------------------------------------------------------
   var COOLDOWN_MS = 2000;
   var CONFIRM_COUNT = 2;
-  var CROP_RATIO = 0.7;        // scan center 70% of frame width
-  var CROP_HEIGHT_RATIO = 0.4;  // scan center 40% of frame height
+  var CROP_RATIO = 0.8;        // scan center 80% of frame width
+  var CROP_HEIGHT_RATIO = 0.5;  // scan center 50% of frame height
   var SCAN_INTERVAL_MS = 80;    // min ms between decode attempts
 
-  // Processing canvas — 640x480 is optimal: small enough for fast
-  // getImageData/toDataURL, large enough for reliable barcode decode
-  var PROC_W = 640;
-  var PROC_H = 480;
+  // Quagga processing canvas — 800x600 gives enough detail for reliable decode
+  var PROC_W = 800;
+  var PROC_H = 600;
   var procCanvas = document.createElement('canvas');
   procCanvas.width = PROC_W;
   procCanvas.height = PROC_H;
@@ -373,11 +372,31 @@
 
   // -----------------------------------------------------------------------
   // Quagga2 detection (center-cropped, contrast-enhanced)
+  //
+  // Multi-pass: tries locate first, falls back to no-locate with
+  // multiple patch sizes for difficult/blurry barcodes.
   // -----------------------------------------------------------------------
+  var quaggaPass = 0; // cycles through configs each frame
+
+  var QUAGGA_CONFIGS = [
+    // Pass 0: standard locate with medium patch
+    { locate: true, locator: { patchSize: 'medium', halfSample: true } },
+    // Pass 1: large patch — better for far/small barcodes
+    { locate: true, locator: { patchSize: 'large', halfSample: true } },
+    // Pass 2: small patch — better for close-up/large barcodes
+    { locate: true, locator: { patchSize: 'small', halfSample: false } },
+    // Pass 3: no locate, scan entire frame — catches barcodes locator misses
+    { locate: false, locator: { patchSize: 'medium', halfSample: true } },
+  ];
+
   function detectQuagga() {
     cropFrameToCanvas();
     enhanceContrast();
-    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.8);
+    var dataUrl = procCanvas.toDataURL('image/jpeg', 0.85);
+
+    var cfg = QUAGGA_CONFIGS[quaggaPass % QUAGGA_CONFIGS.length];
+    quaggaPass++;
+
     Quagga.decodeSingle({
       src: dataUrl,
       numOfWorkers: 0,
@@ -385,11 +404,8 @@
         readers: QUAGGA_READERS,
         multiple: false
       },
-      locate: true,
-      locator: {
-        patchSize: 'medium',
-        halfSample: true
-      }
+      locate: cfg.locate,
+      locator: cfg.locator
     }, function(result) {
       isDecoding = false;
       if (result && result.codeResult && result.codeResult.code) {

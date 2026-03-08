@@ -2132,6 +2132,136 @@ body {
   white-space: nowrap;
 }
 
+/* --- PO Input Table --- */
+.po-month-header {
+  background: var(--clr-primary-50, #e8f0fe) !important;
+  border-left: 1px solid var(--clr-neutral-200);
+  border-right: 1px solid var(--clr-neutral-200);
+}
+
+#poItemTable {
+  font-size: var(--fs-sm);
+}
+#poItemTable thead th {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 4px 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--clr-neutral-300);
+}
+#poItemTable tbody td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+#poItemTable tbody tr:nth-child(even) {
+  background: var(--clr-neutral-50);
+}
+
+/* Sticky first 3 columns (checkbox, #, name) for horizontal scroll */
+#poItemTable th:nth-child(1),
+#poItemTable td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+#poItemTable th:nth-child(2),
+#poItemTable td:nth-child(2) {
+  position: sticky;
+  left: 28px;
+  z-index: 2;
+  background: #fff;
+}
+#poItemTable th:nth-child(3),
+#poItemTable td:nth-child(3) {
+  position: sticky;
+  left: 56px;
+  z-index: 2;
+  background: #fff;
+  border-right: 2px solid var(--clr-neutral-300);
+}
+#poItemTable thead th:nth-child(1),
+#poItemTable thead th:nth-child(2),
+#poItemTable thead th:nth-child(3) {
+  z-index: 4;
+}
+#poItemTable tbody tr:nth-child(even) td:nth-child(1),
+#poItemTable tbody tr:nth-child(even) td:nth-child(2),
+#poItemTable tbody tr:nth-child(even) td:nth-child(3) {
+  background: var(--clr-neutral-50);
+}
+#poItemTable tbody tr.po-has-order td:nth-child(1),
+#poItemTable tbody tr.po-has-order td:nth-child(2),
+#poItemTable tbody tr.po-has-order td:nth-child(3) {
+  background: #f1f8e9;
+}
+
+/* Column group separators */
+.po-col-sep { border-left: 2px solid var(--clr-neutral-300) !important; }
+
+/* Sales month cells */
+.po-cell-month { color: var(--clr-neutral-700); }
+
+/* Stock column */
+.po-cell-stok { background: #f8f9fa; }
+
+/* Saran column - subtle highlight */
+.po-cell-saran { background: #fffde7; }
+
+/* Order column - highlight for input */
+.po-cell-order { background: #e8f5e9; }
+.po-cell-order {
+  white-space: nowrap;
+}
+.po-cell-order input.form-control {
+  display: inline-block;
+  width: 56px;
+  border-color: var(--clr-accent-300);
+  background: #fff;
+  font-size: var(--fs-sm);
+  padding: 2px 4px;
+  height: 26px;
+  vertical-align: middle;
+}
+.po-cell-order input.form-control:focus {
+  box-shadow: 0 0 0 2px rgba(67,160,71,.25);
+}
+.po-order-unit {
+  display: inline-block;
+  width: 30px;
+  margin-left: 4px;
+  text-align: left;
+  color: var(--clr-neutral-500);
+  font-size: var(--fs-2xs);
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Harga columns */
+.po-cell-harga { color: var(--clr-neutral-700); }
+
+/* Group header row */
+.po-group-header th {
+  text-align: center;
+  background: var(--clr-neutral-100) !important;
+  border-bottom: 1px solid var(--clr-neutral-300) !important;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: var(--fs-2xs) !important;
+  color: var(--clr-neutral-500);
+}
+.po-group-header .po-gh-sales { background: var(--clr-primary-50) !important; color: var(--clr-primary-700); }
+.po-group-header .po-gh-order { background: #e8f5e9 !important; color: var(--clr-accent-800); }
+.po-group-header .po-gh-saran { background: #fffde7 !important; color: #f57f17; }
+.po-group-header .po-gh-harga, th.po-gh-harga { background: #fce4ec !important; color: #c62828; }
+
+/* Highlight rows with order > 0 */
+#poItemTable tbody tr.po-has-order {
+  background: #f1f8e9 !important;
+}
+
 .sh-sortable {
   cursor: pointer;
   user-select: none;

@@ -114,6 +114,41 @@ async def history_page(
     })
 
 
+@router.get('/pesanan-pembelian')
+async def pesanan_pembelian_page(
+    request: Request,
+    db: aiomysql.Pool = Depends(get_db),
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    pool = request.app.state.db_pool
+    has_entry = await has_page_access(pool, user['role'], 'pesanan:input')
+    has_list = await has_page_access(pool, user['role'], 'pesanan:daftar')
+    if not has_entry and not has_list:
+        denied = await _check_page(request, user, 'pesanan')
+        if denied: return denied
+    can_delete = await has_page_access(pool, user['role'], 'pesanan:daftar:delete')
+    return templates.TemplateResponse(request, 'pesanan_pembelian.html', {
+        'can_entry': has_entry, 'can_delete': can_delete,
+        **await _user_ctx(request, user),
+    })
+
+
+@router.get('/pesanan-pembelian/input')
+async def pesanan_pembelian_input_page(
+    request: Request,
+    templates: Jinja2Templates = Depends(get_templates),
+    user: dict = Depends(get_current_user),
+):
+    denied = await _check_page(request, user, 'pesanan:input')
+    if denied: return denied
+    from datetime import date
+    return templates.TemplateResponse(request, 'pesanan_pembelian_input.html', {
+        'today': date.today().isoformat(),
+        **await _user_ctx(request, user),
+    })
+
+
 @router.get('/scanner')
 async def scanner_page(
     request: Request,

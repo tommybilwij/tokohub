@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Pesanan Pembelian{% endblock %}
+
+{% block content %}
+<div class="sh-page" data-can-delete="{{ can_delete | default(false) | tojson }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0"><i class="bi bi-cart-check"></i> Pesanan Pembelian</h5>
+    {% if can_entry | default(false) %}
+    <a href="/pesanan-pembelian/input" class="btn btn-primary">
+      <i class="bi bi-plus-lg"></i> Buat Pesanan Baru
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="sh-filter-bar">
+    <div class="sh-custom-range">
+      <label class="sh-date-label">Dari
+        <input type="date" id="hDateFrom" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Sampai
+        <input type="date" id="hDateTo" class="form-control form-control-sm">
+      </label>
+      <label class="sh-date-label">Supplier
+        <div class="h-supp-dropdown" id="hSuppDropdown">
+          <input type="text" class="form-control form-control-sm" id="hSuppInput" placeholder="Semua" autocomplete="off" style="min-width:220px">
+          <input type="hidden" id="hSupplier" value="">
+          <div class="h-supp-menu d-none" id="hSuppMenu"></div>
+        </div>
+      </label>
+      <button class="btn btn-sm btn-primary" id="hBtnSearch">
+        <i class="bi bi-search"></i> Cari
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="text-center py-4 d-none" id="hLoading">
+    <div class="spinner-border spinner-border-sm text-primary"></div>
+    <span class="ms-2 text-muted">Memuat data...</span>
+  </div>
+
+  <!-- Results -->
+  <div class="d-none" id="hResults">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <small class="text-muted" id="hResultCount"></small>
+    </div>
+    <div class="table-responsive">
+      <table class="sh-table">
+        <thead>
+          <tr>
+            <th>No. Pesanan</th>
+            <th>Tanggal</th>
+            <th>Supplier</th>
+            <th class="text-center">Items</th>
+            <th>Periode Sales</th>
+            <th>Dibuat</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="hTableBody"></tbody>
+      </table>
+    </div>
+    <nav class="mt-2" id="hPagination">
+      <ul class="pagination pagination-sm mb-0 justify-content-center" id="hPageList"></ul>
+    </nav>
+  </div>
+
+  <!-- Empty State -->
+  <div class="text-center py-5 d-none" id="hEmpty">
+    <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+    <p class="text-muted mt-2 mb-0">Tidak ada pesanan untuk filter ini.</p>
+  </div>
+</div>
+
+<!-- PO Detail Modal -->
+<div class="modal fade" id="poDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detail Pesanan: <span id="detailPONumber"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row mb-3">
+          <div class="col-md-4"><strong>Supplier:</strong> <span id="detailSupplier"></span></div>
+          <div class="col-md-4"><strong>Tanggal:</strong> <span id="detailDate"></span></div>
+          <div class="col-md-4"><strong>Periode:</strong> <span id="detailPeriod"></span></div>
+        </div>
+        <div class="table-responsive">
+          <table class="fp-preview-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Artno</th>
+                <th>Barcode</th>
+                <th>Nama Barang</th>
+                <th class="text-end">Isi</th>
+                <th class="text-end">Qty Order</th>
+                <th>Sat. Besar</th>
+                <th class="text-end">Qty Kcl</th>
+                <th>Sat. Kcl</th>
+                <th class="text-end">H.Beli Bsr</th>
+              </tr>
+            </thead>
+            <tbody id="detailLines"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-outline-primary" id="detailExportCSV">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+        </a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  'use strict';
+
+  var pageEl = document.querySelector('.sh-page');
+  var canDelete = pageEl.dataset.canDelete === 'true';
+
+  var elDateFrom = document.getElementById('hDateFrom');
+  var elDateTo = document.getElementById('hDateTo');
+  var elSupplier = document.getElementById('hSupplier');
+  var elLoading = document.getElementById('hLoading');
+  var elResults = document.getElementById('hResults');
+  var elEmpty = document.getElementById('hEmpty');
+  var elBody = document.getElementById('hTableBody');
+  var elCount = document.getElementById('hResultCount');
+  var elPageList = document.getElementById('hPageList');
+  var currentPage = 1;
+
+  var today = new Date().toISOString().split('T')[0];
+  var d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  elDateFrom.value = d30.toISOString().split('T')[0];
+  elDateTo.value = today;
+
+  var allVendors = [];
+  fetch('/api/vendors')
+    .then(function(r) { return r.json(); })
+    .then(function(vendors) {
+      allVendors = vendors.map(function(v) {
+        return { id: v.id, label: v.id + ' - ' + (v.name || v.id) };
+      });
+      loadData(1);
+    });
+
+  function buildSuppMenu(inputEl, menuEl, hiddenEl, onSelect) {
+    function render(filter) {
+      var q = (filter || '').toLowerCase();
+      var items = q ? allVendors.filter(function(v) { return v.label.toLowerCase().indexOf(q) >= 0; }) : allVendors;
+      menuEl.innerHTML = '';
+      var semua = document.createElement('div');
+      semua.className = 'h-supp-item';
+      semua.textContent = 'Semua';
+      semua.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        hiddenEl.value = '';
+        inputEl.value = '';
+        inputEl.placeholder = 'Semua';
+        menuEl.classList.add('d-none');
+        if (onSelect) onSelect('', '');
+      });
+      menuEl.appendChild(semua);
+      items.slice(0, 50).forEach(function(v) {
+        var div = document.createElement('div');
+        div.className = 'h-supp-item';
+        div.textContent = v.label;
+        div.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          hiddenEl.value = v.id;
+          inputEl.value = v.label;
+          menuEl.classList.add('d-none');
+          if (onSelect) onSelect(v.id, v.label);
+        });
+        menuEl.appendChild(div);
+      });
+      menuEl.classList.remove('d-none');
+    }
+    var saved = '';
+    inputEl.addEventListener('focus', function() { saved = inputEl.value; inputEl.value = ''; render(''); });
+    inputEl.addEventListener('input', function() { render(inputEl.value); });
+    inputEl.addEventListener('blur', function() {
+      menuEl.classList.add('d-none');
+      if (!inputEl.value && saved) inputEl.value = saved;
+    });
+    inputEl.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { menuEl.classList.add('d-none'); inputEl.blur(); }
+    });
+  }
+
+  buildSuppMenu(
+    document.getElementById('hSuppInput'),
+    document.getElementById('hSuppMenu'),
+    elSupplier,
+    function() { loadData(1); }
+  );
+
+  document.getElementById('hBtnSearch').addEventListener('click', function() { loadData(1); });
+
+  function fmtNum(n) { return new Intl.NumberFormat('id-ID').format(Math.round(n)); }
+
+  function loadData(page) {
+    currentPage = page || 1;
+    elLoading.classList.remove('d-none');
+    elResults.classList.add('d-none');
+    elEmpty.classList.add('d-none');
+
+    var params = new URLSearchParams();
+    params.set('page', currentPage);
+    if (elDateFrom.value) params.set('date_from', elDateFrom.value);
+    if (elDateTo.value) params.set('date_to', elDateTo.value);
+    if (elSupplier.value) params.set('supplier', elSupplier.value);
+
+    fetch('/api/po/list?' + params.toString())
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        elLoading.classList.add('d-none');
+        var items = data.items || [];
+        var total = data.total || 0;
+        if (items.length === 0) { elEmpty.classList.remove('d-none'); return; }
+
+        elResults.classList.remove('d-none');
+        elCount.textContent = total + ' pesanan ditemukan';
+        elBody.innerHTML = '';
+
+        items.forEach(function(o) {
+          var tr = document.createElement('tr');
+          var actions = '<button class="btn btn-sm btn-outline-primary btn-view-po" data-po="' + o.po_number + '" title="Lihat"><i class="bi bi-eye"></i></button>';
+          actions += ' <a href="/api/po/' + encodeURIComponent(o.po_number) + '/export?format=csv" class="btn btn-sm btn-outline-success" title="Export CSV"><i class="bi bi-file-earmark-spreadsheet"></i></a>';
+          if (canDelete) {
+            actions += ' <button class="btn btn-sm btn-outline-danger btn-delete-po" data-po="' + o.po_number + '" title="Hapus"><i class="bi bi-trash"></i></button>';
+          }
+          tr.innerHTML = '<td><code>' + o.po_number + '</code></td>'
+            + '<td>' + (o.tgl_pesanan || '-') + '</td>'
+            + '<td>' + (o.supplier_name || o.suppid || '') + '</td>'
+            + '<td class="text-center">' + (o.total_items || 0) + '</td>'
+            + '<td>' + (o.date_from || '') + ' ~ ' + (o.date_to || '') + '</td>'
+            + '<td>' + (o.created_by || '') + '</td>'
+            + '<td class="text-nowrap">' + actions + '</td>';
+          elBody.appendChild(tr);
+        });
+
+        renderPagination(total);
+        bindListButtons();
+      });
+  }
+
+  function renderPagination(total) {
+    var totalPages = Math.ceil(total / 20);
+    elPageList.innerHTML = '';
+    if (totalPages <= 1) return;
+    var startPage = Math.max(1, currentPage - 2);
+    var endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+    if (currentPage > 1) addPageBtn('«', currentPage - 1);
+    for (var p = startPage; p <= endPage; p++) addPageBtn(p, p, p === currentPage);
+    if (currentPage < totalPages) addPageBtn('»', currentPage + 1);
+  }
+
+  function addPageBtn(label, page, active) {
+    var li = document.createElement('li');
+    li.className = 'page-item' + (active ? ' active' : '');
+    var a = document.createElement('a');
+    a.className = 'page-link'; a.href = '#'; a.textContent = label;
+    a.addEventListener('click', function(e) { e.preventDefault(); loadData(page); });
+    li.appendChild(a); elPageList.appendChild(li);
+  }
+
+  function bindListButtons() {
+    document.querySelectorAll('#hTableBody .btn-view-po').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var po = btn.dataset.po;
+        var res = await fetch('/api/po/' + encodeURIComponent(po));
+        var data = await res.json();
+        if (data.error) { window.showToast && showToast(data.error, 'danger'); return; }
+        document.getElementById('detailPONumber').textContent = data.po_number;
+        document.getElementById('detailSupplier').textContent = data.supplier_name || data.suppid;
+        document.getElementById('detailDate').textContent = data.tgl_pesanan || '';
+        document.getElementById('detailPeriod').textContent = (data.date_from || '') + ' ~ ' + (data.date_to || '');
+        document.getElementById('detailExportCSV').href = '/api/po/' + encodeURIComponent(po) + '/export?format=csv';
+        var tbody = document.getElementById('detailLines');
+        tbody.innerHTML = '';
+        (data.lines || []).forEach(function(line, i) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + (i + 1) + '</td>'
+            + '<td><code>' + line.artno + '</code></td>'
+            + '<td>' + line.artpabrik + '</td>'
+            + '<td>' + line.artname + '</td>'
+            + '<td class="text-end">' + Math.round(line.packing) + '</td>'
+            + '<td class="text-end">' + line.qty_order + '</td>'
+            + '<td>' + line.satbesar + '</td>'
+            + '<td class="text-end">' + Math.round(line.qty_order_kcl) + '</td>'
+            + '<td>' + line.satkecil + '</td>'
+            + '<td class="text-end">' + fmtNum(line.hbelibsr) + '</td>';
+          tbody.appendChild(tr);
+        });
+        new bootstrap.Modal(document.getElementById('poDetailModal')).show();
+      });
+    });
+
+    document.querySelectorAll('#hTableBody .btn-delete-po').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var po = btn.dataset.po;
+        var confirmed = await (window.showConfirm ? showConfirm('Hapus pesanan ' + po + '?') : Promise.resolve(confirm('Hapus pesanan ' + po + '?')));
+        if (!confirmed) return;
+        var res = await fetch('/api/po/' + encodeURIComponent(po), { method: 'DELETE' });
+        var data = await res.json();
+        if (data.ok) {
+          window.showToast && showToast('Pesanan ' + po + ' berhasil dihapus');
+          loadData(currentPage);
+        } else {
+          window.showToast && showToast(data.error || 'Gagal menghapus', 'danger');
+        }
+      });
+    });
+  }
+
+})();
+</script>
+{% endblock %}

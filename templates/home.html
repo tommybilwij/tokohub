@@ -32,6 +32,17 @@
     </a>
   </div>
   {% endif %}
+  {% if 'pesanan' in nav_pages or 'pesanan:input' in nav_pages or 'pesanan:daftar' in nav_pages %}
+  <div class="col-6 col-md-4 col-xl-3">
+    <a href="/pesanan-pembelian" class="card card-home text-decoration-none">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-cart-check home-icon"></i>
+        <h6 class="mt-2 mb-0">Pesanan Pembelian</h6>
+        <small class="text-muted">Buat & kelola pesanan</small>
+      </div>
+    </a>
+  </div>
+  {% endif %}
   {% if 'price_change' in nav_pages or 'price_change:daftar' in nav_pages or 'price_change:input' in nav_pages %}
   <div class="col-6 col-md-4 col-xl-3">
     <a href="/perubahan-harga" class="card card-home text-decoration-none">

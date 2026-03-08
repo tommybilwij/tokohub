@@ -189,7 +189,7 @@ async def _generate_po_number(cursor, order_date: date) -> str:
     )
     row = await cursor.fetchone()
     if row:
-        last_seq = int(row['po_number'][len(prefix):])
+        last_seq = int(row[0][len(prefix):])
         seq = last_seq + 1
     else:
         seq = 1

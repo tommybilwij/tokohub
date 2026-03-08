@@ -78,7 +78,7 @@
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Detail Pesanan: <span id="detailPONumber"></span></h5>
+        <h5 class="modal-title">Detail Pesanan Pembelian: <span id="detailPONumber"></span></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -96,11 +96,8 @@
                 <th>Barcode</th>
                 <th>Nama Barang</th>
                 <th class="text-end">Isi</th>
-                <th class="text-end">Qty Order</th>
-                <th>Sat. Besar</th>
-                <th class="text-end">Qty Kcl</th>
-                <th>Sat. Kcl</th>
-                <th class="text-end">H.Beli Bsr</th>
+                <th class="text-end">QTY Order</th>
+                <th class="text-end">Total Harga Beli</th>
               </tr>
             </thead>
             <tbody id="detailLines"></tbody>
@@ -295,16 +292,23 @@
         tbody.innerHTML = '';
         (data.lines || []).forEach(function(line, i) {
           var tr = document.createElement('tr');
+          var packing = Math.round(line.packing) || 1;
+          var qtyBsr = Math.floor(line.qty_order || 0);
+          var totalKcl = Math.round(line.qty_order_kcl || 0);
+          var remKcl = Math.round(totalKcl - qtyBsr * packing);
+          var qtyParts = [];
+          if (qtyBsr > 0) qtyParts.push(fmtNum(qtyBsr) + ' ' + line.satbesar);
+          if (remKcl > 0) qtyParts.push(fmtNum(remKcl) + ' ' + (line.satkecil || 'Pcs'));
+          var qtyStr = qtyParts.join(' ') || fmtNum(totalKcl) + ' ' + (line.satkecil || 'Pcs');
+          var hbelikcl = packing > 0 ? (line.hbelibsr || 0) / packing : 0;
+          var totalHarga = hbelikcl * totalKcl;
           tr.innerHTML = '<td>' + (i + 1) + '</td>'
             + '<td><code>' + line.artno + '</code></td>'
             + '<td>' + line.artpabrik + '</td>'
             + '<td>' + line.artname + '</td>'
-            + '<td class="text-end">' + Math.round(line.packing) + '</td>'
-            + '<td class="text-end">' + line.qty_order + '</td>'
-            + '<td>' + line.satbesar + '</td>'
-            + '<td class="text-end">' + Math.round(line.qty_order_kcl) + '</td>'
-            + '<td>' + line.satkecil + '</td>'
-            + '<td class="text-end">' + fmtNum(line.hbelibsr) + '</td>';
+            + '<td class="text-end">' + packing + '/' + line.satbesar + '</td>'
+            + '<td class="text-end">' + qtyStr + '</td>'
+            + '<td class="text-end">' + fmtNum(totalHarga) + '</td>';
           tbody.appendChild(tr);
         });
         new bootstrap.Modal(document.getElementById('poDetailModal')).show();
@@ -378,15 +382,14 @@
       }
 
       // Decorative circles (3 grey circles, top center)
-      var circleR = 3.5;
+      var circleR = 2;
       var circleY = y + 5;
       var circleCenterX = pageW / 2;
       doc.setFillColor(200, 200, 200);
-      doc.setDrawColor(200, 200, 200);
-      doc.circle(circleCenterX - 10, circleY, circleR, 'F');
-      doc.circle(circleCenterX, circleY, circleR, 'F');
-      doc.circle(circleCenterX + 10, circleY, circleR, 'F');
-      doc.setDrawColor(0);
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.3);
+      doc.circle(circleCenterX - 40, circleY, circleR, 'FD');
+      doc.circle(circleCenterX + 40, circleY, circleR, 'FD');
 
       // Right side: "PESANAN PEMBELIAN" title
       doc.setFont('helvetica', 'bold');
@@ -396,7 +399,7 @@
       // Page number
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text('Hal: ' + (pg + 1), pageW - marginR, y + 8, { align: 'right' });
+      doc.text('Hal: ' + (pg + 1) + '/' + totalPages, pageW - marginR, y + 8, { align: 'right' });
 
       y += 12;
 

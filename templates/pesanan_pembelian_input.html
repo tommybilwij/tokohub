@@ -99,6 +99,11 @@
           <div class="d-flex gap-2 align-items-center p-2 border-bottom">
             <input type="text" class="form-control form-control-sm" id="poFilterInput"
                    placeholder="Cari nama / artno..." style="max-width:280px">
+            <div class="position-relative" style="max-width:280px;flex:1">
+              <input type="text" class="form-control form-control-sm" id="poAddItemInput"
+                     placeholder="+ Tambah item lain..." autocomplete="off">
+              <div class="dropdown-menu w-100 shadow-sm" id="poAddItemMenu" style="max-height:250px;overflow:auto"></div>
+            </div>
             <div class="form-check form-switch mb-0 ms-auto">
               <input type="checkbox" class="form-check-input" id="poHideZero">
               <label class="form-check-label small" for="poHideZero">Sembunyikan qty 0</label>
@@ -175,6 +180,16 @@
         orders[item.artno] = { bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0, chk: item._checked !== false };
       }
     });
+    var extraItems = [];
+    poItems.forEach(function(item) {
+      if (item._isExtra) {
+        extraItems.push({
+          artno: item.artno, artpabrik: item.artpabrik, artname: item.artname,
+          packing: item.packing, satbesar: item.satbesar, satkecil: item.satkecil,
+          hbelibsr: item.hbelibsr, bsr: item._orderBsr || 0, kcl: item._orderRemKcl || 0,
+        });
+      }
+    });
     var draft = {
       suppid: suppHidden.value,
       suppLabel: suppInput.value,
@@ -183,6 +198,7 @@
       salesTo: document.getElementById('poSalesTo').value,
       targetDays: document.getElementById('poTargetDays').value,
       orders: orders,
+      extraItems: extraItems,
       hasData: poItems.length > 0,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)); } catch(e) {}
@@ -200,6 +216,7 @@
   }
 
   var _pendingDraftOrders = null;
+  var _pendingExtraItems = [];
 
   function restoreDraft() {
     var draft = loadDraft();
@@ -216,6 +233,7 @@
     // If there was data loaded, auto-reload and apply saved orders
     if (draft.hasData) {
       _pendingDraftOrders = draft.orders || {};
+      _pendingExtraItems = draft.extraItems || [];
       loadItems();
     }
   }
@@ -223,7 +241,9 @@
   function applyDraftOrders() {
     if (!_pendingDraftOrders) return;
     var orders = _pendingDraftOrders;
+    var extras = _pendingExtraItems || [];
     _pendingDraftOrders = null;
+    _pendingExtraItems = [];
 
     poItems.forEach(function(item) {
       var saved = orders[item.artno];
@@ -232,6 +252,22 @@
         item._orderRemKcl = saved.kcl || 0;
         if (saved.chk === false) item._checked = false;
       }
+    });
+
+    // Restore extra items (items added from other suppliers)
+    var existingArtnos = {};
+    poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+    extras.forEach(function(ex) {
+      if (existingArtnos[ex.artno]) return;
+      poItems.push({
+        artno: ex.artno, artpabrik: ex.artpabrik || '', artname: ex.artname || '',
+        packing: ex.packing || 1, satbesar: ex.satbesar || 'Pcs', satkecil: ex.satkecil || 'Pcs',
+        hbelibsr: ex.hbelibsr || 0,
+        _monthData: {}, _maxMonthKcl: 0, _stockQty: 0,
+        _suggKcl: 0, _suggBsr: 0, _suggRemKcl: 0,
+        _orderBsr: ex.bsr || 0, _orderRemKcl: ex.kcl || 0,
+        _checked: true, _isExtra: true,
+      });
     });
 
     renderItems();
@@ -462,7 +498,7 @@
       var cells = '<td class="text-center"><input type="checkbox" class="po-row-check" data-idx="' + idx + '"' + (isChecked ? ' checked' : '') + (isDisabled ? ' disabled' : '') + '></td>'
         + '<td class="text-muted">' + shown + '</td>'
         + '<td class="text-nowrap"><span title="' + item.artno + (item.artpabrik ? ' | ' + item.artpabrik : '') + '">'
-        + item.artname + '</span></td>'
+        + item.artname + '</span>' + (item._isExtra ? ' <span class="badge bg-info" style="font-size:.6rem">tambahan</span>' : '') + '</td>'
         + '<td class="text-center text-nowrap" style="border-left:2px solid #dee2e6">' + Math.round(packing) + '/' + item.satbesar + '</td>';
 
       // Month sales with unit
@@ -648,6 +684,96 @@
   document.getElementById('poFilterInput').addEventListener('input', renderItems);
   document.getElementById('poHideZero').addEventListener('change', renderItems);
 
+  // --- Add Item search ---
+  (function() {
+    var addInput = document.getElementById('poAddItemInput');
+    var addMenu = document.getElementById('poAddItemMenu');
+    var addTimer = null;
+
+    addInput.addEventListener('input', function() {
+      clearTimeout(addTimer);
+      var q = addInput.value.trim();
+      if (q.length < 2) { addMenu.classList.remove('show'); return; }
+      addTimer = setTimeout(function() {
+        fetch('/api/stock/search?q=' + encodeURIComponent(q) + '&limit=20')
+          .then(function(r) { return r.json(); })
+          .then(function(results) {
+            addMenu.innerHTML = '';
+            if (!results.length) {
+              addMenu.innerHTML = '<div class="px-3 py-2 text-muted small">Tidak ditemukan</div>';
+              addMenu.classList.add('show');
+              return;
+            }
+            // Filter out items already in the list
+            var existingArtnos = {};
+            poItems.forEach(function(it) { existingArtnos[it.artno] = true; });
+            results.forEach(function(r) {
+              var div = document.createElement('div');
+              div.className = 'dropdown-item small' + (existingArtnos[r.artno] ? ' text-muted' : '');
+              div.style.cursor = 'pointer';
+              div.style.whiteSpace = 'normal';
+              div.innerHTML = '<strong>' + r.artno + '</strong> — ' + (r.artname || '')
+                + ' <span class="text-muted">(' + Math.round(r.packing || 1) + '/' + (r.satbesar || 'Pcs') + ')</span>'
+                + (existingArtnos[r.artno] ? ' <span class="badge bg-secondary">sudah ada</span>' : '');
+              if (!existingArtnos[r.artno]) {
+                div.addEventListener('mousedown', function(e) {
+                  e.preventDefault();
+                  addItemToList(r);
+                  addInput.value = '';
+                  addMenu.classList.remove('show');
+                });
+              }
+              addMenu.appendChild(div);
+            });
+            addMenu.classList.add('show');
+          });
+      }, 300);
+    });
+
+    addInput.addEventListener('blur', function() {
+      setTimeout(function() { addMenu.classList.remove('show'); }, 200);
+    });
+
+    addInput.addEventListener('focus', function() {
+      if (addMenu.children.length && addInput.value.trim().length >= 2) addMenu.classList.add('show');
+    });
+  })();
+
+  function addItemToList(stockItem) {
+    var newItem = {
+      artno: stockItem.artno,
+      artpabrik: stockItem.artpabrik || '',
+      artname: stockItem.artname || '',
+      packing: parseFloat(stockItem.packing) || 1,
+      satbesar: stockItem.satbesar || 'Pcs',
+      satkecil: stockItem.satkecil || 'Pcs',
+      hbelibsr: parseFloat(stockItem.hbelibsr) || 0,
+      _monthData: {},
+      _maxMonthKcl: 0,
+      _stockQty: 0,
+      _suggKcl: 0,
+      _suggBsr: 0,
+      _suggRemKcl: 0,
+      _orderBsr: 0,
+      _orderRemKcl: 0,
+      _checked: true,
+      _isExtra: true,
+    };
+
+    // Fetch stock balance for this item
+    fetch('/api/po/stock-balance?suppid=' + encodeURIComponent(suppHidden.value || '') + '&artno=' + encodeURIComponent(stockItem.artno))
+      .catch(function() {});
+
+    poItems.push(newItem);
+    renderItems();
+    updateSummary();
+    saveDraft();
+
+    // Scroll to the new item
+    var tbody = document.getElementById('poItemBody');
+    if (tbody.lastElementChild) tbody.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   // Save draft on form field changes
   ['poOrderDate', 'poSalesFrom', 'poSalesTo', 'poTargetDays'].forEach(function(id) {
     document.getElementById(id).addEventListener('change', function() { if (poItems.length) saveDraft(); });
@@ -688,16 +814,23 @@
 
       // Build order map from existing PO lines: {artno: {bsr, kcl}}
       var orderMap = {};
+      var editExtraLines = [];
       (data.lines || []).forEach(function(line) {
         var packing = line.packing || 1;
         var totalKcl = Math.round(line.qty_order_kcl || 0);
         var bsr = Math.floor(line.qty_order || 0);
         var remKcl = Math.round(totalKcl - bsr * packing);
         orderMap[line.artno] = { bsr: bsr, kcl: remKcl };
+        editExtraLines.push({
+          artno: line.artno, artpabrik: line.artpabrik || '', artname: line.artname || '',
+          packing: packing, satbesar: line.satbesar || 'Pcs', satkecil: line.satkecil || 'Pcs',
+          hbelibsr: parseFloat(line.hbelibsr) || 0, bsr: bsr, kcl: remKcl,
+        });
       });
 
-      // Set pending orders and load items
+      // Set pending orders and extra items (for items not in vendor list)
       _pendingDraftOrders = orderMap;
+      _pendingExtraItems = editExtraLines;
       await loadItems();
     } catch (err) {
       window.showToast && showToast('Gagal memuat pesanan: ' + err.message, 'danger');

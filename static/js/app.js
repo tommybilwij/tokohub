@@ -443,6 +443,16 @@
     // FP commit
     dom.btnCommitFP.addEventListener('click', commitFP);
 
+    // Update Harga Jual toggle — change commit button label
+    var fpUpdatePriceEl = document.getElementById('fpUpdatePrice');
+    if (fpUpdatePriceEl) {
+      fpUpdatePriceEl.addEventListener('change', function() {
+        dom.btnCommitFP.innerHTML = fpUpdatePriceEl.checked
+          ? '<i class="bi bi-check-circle"></i> Buat Faktur & Update Harga Jual'
+          : '<i class="bi bi-check-circle"></i> Buat Faktur';
+      });
+    }
+
     // New receipt after success
     dom.btnNewReceipt.addEventListener('click', () => {
       bootstrap.Modal.getInstance(dom.fpSuccessModal).hide();

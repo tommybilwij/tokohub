@@ -172,7 +172,7 @@
     }
 
     currentFP = data;
-    elTitle.textContent = 'Edit Faktur: ' + data.nofaktur;
+    elTitle.textContent = 'Edit Faktur Pembelian: ' + data.nofaktur;
     setEditSupplier(data.suppid || '');
     elDate.value = data.tglfaktur || '';
     if (elUpdatePrice) elUpdatePrice.checked = !!data.isupdateprice;
@@ -218,13 +218,15 @@
 
     renderTable();
     overlay.classList.remove('d-none');
-    document.body.style.overflow = 'hidden';
+    var mainContent = document.querySelector('.sh-page');
+    if (mainContent) mainContent.classList.add('d-none');
   }
 
   // ------- Close overlay -------
   function closeEdit() {
     overlay.classList.add('d-none');
-    document.body.style.overflow = '';
+    var mainContent = document.querySelector('.sh-page');
+    if (mainContent) mainContent.classList.remove('d-none');
     currentFP = null;
     editLines = [];
     beforePrices = {};

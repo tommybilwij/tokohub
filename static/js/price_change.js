@@ -10,23 +10,48 @@
 
   const editPH = typeof _pcEditPH !== 'undefined' ? _pcEditPH : '';
 
-  const searchInput = document.getElementById('pcSearchInput');
-  const searchResults = document.getElementById('pcSearchResults');
+  var searchInput = document.getElementById('pcSearchInput');
+  var searchResults = document.getElementById('pcSearchResults');
   const tableBody = document.getElementById('pcTableBody');
   const itemCount = document.getElementById('pcItemCount');
   const btnCommit = document.getElementById('pcBtnCommit');
   const btnClear = document.getElementById('pcBtnClear');
 
-  // Edit mode UI setup
-  var pcBtnBack = document.getElementById('pcBtnBack');
-  var pcPageTitle = document.getElementById('pcPageTitle');
-  var pcPageSubtitle = document.getElementById('pcPageSubtitle');
+  // Edit mode: switch to FP-edit-style layout
   if (editPH) {
-    if (pcPageTitle) pcPageTitle.textContent = 'Edit Perubahan Harga: ' + editPH;
-    if (pcPageSubtitle) pcPageSubtitle.textContent = '';
+    // Show edit header, hide normal header
+    document.getElementById('pcNormalHeader').classList.add('d-none');
+    var editHeader = document.getElementById('pcEditHeader');
+    editHeader.classList.remove('d-none');
+    document.getElementById('pcEditTitle').textContent = 'Edit Perubahan Harga: ' + editPH;
+
+    // Show inline search row, hide left panel, make right panel full-width
+    document.getElementById('pcEditSearchRow').classList.remove('d-none');
+    document.getElementById('pcLeftPanel').classList.add('d-none');
+    var rightPanel = document.getElementById('pcRightPanel');
+    rightPanel.className = 'col-12';
+
+    // Hide card footer (Simpan/Hapus) — save is in header now
+    document.getElementById('pcFooter').classList.add('d-none');
+
+    // Wire edit header save button to same commit logic
+    document.getElementById('pcEditBtnSave').addEventListener('click', function() {
+      btnCommit.click();
+    });
+
+    // Wire edit search input to same search logic
+    var editSearchInput = document.getElementById('pcEditSearchInput');
+    var editSearchResultsEl = document.getElementById('pcEditSearchResults');
+    searchInput = editSearchInput;
+    searchResults = editSearchResultsEl;
+
     if (btnCommit) btnCommit.innerHTML = '<i class="bi bi-check-lg"></i> Simpan Perubahan';
+    var newLabel = document.getElementById('pcBtnNewLabel');
+    if (newLabel) newLabel.textContent = 'Kembali ke Riwayat';
   } else {
-    if (pcBtnBack) pcBtnBack.classList.add('d-none');
+    // Normal mode: hide edit header and edit search row
+    document.getElementById('pcEditHeader').classList.add('d-none');
+    document.getElementById('pcEditSearchRow').classList.add('d-none');
   }
 
   function fmt(n) { return new Intl.NumberFormat('id-ID', {maximumFractionDigits:2}).format(n); }

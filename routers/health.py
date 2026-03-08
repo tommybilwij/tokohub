@@ -11,7 +11,8 @@ router = APIRouter()
 @router.get('/health')
 async def health(request: Request):
     db_ok = getattr(request.app.state, 'db_pool', None) is not None
-    return {'status': 'ok', 'db': db_ok}
+    setup_ok = getattr(request.app.state, 'setup_complete', False)
+    return {'status': 'ok', 'db': db_ok, 'setup_complete': setup_ok}
 
 
 @router.get('/api/lan/status')

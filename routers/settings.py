@@ -108,7 +108,7 @@ async def api_settings_post(data: SettingsUpdate, db: aiomysql.Pool = Depends(ge
 
 
 @router.post('/api/setup')
-async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
+async def api_setup(request: Request, data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
     raw = _strip_masked(data.model_dump(exclude_none=True))
     try:
         # Extract DB-stored settings before saving envrc
@@ -122,7 +122,7 @@ async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
         if raw:
             save_to_envrc(raw)
 
-        # Save DB-stored settings only if pool is available
+        # Save DB-stored settings only if pool is available (Step 2)
         if db:
             if openai_data:
                 existing = await get_openai_config(db)
@@ -130,6 +130,9 @@ async def api_setup(data: SettingsUpdate, db: aiomysql.Pool = Depends(get_db)):
                 await save_openai_config(db, existing)
             if fuzzy_data:
                 await app_settings.save_many(db, fuzzy_data)
+            # Mark setup as complete so middleware stops redirecting
+            await app_settings.save_many(db, {'setup_complete': '1'})
+            request.app.state.setup_complete = True
 
         return {'ok': True}
     except Exception as e:

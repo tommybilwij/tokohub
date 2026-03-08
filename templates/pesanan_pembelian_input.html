@@ -53,11 +53,11 @@
           <small class="text-muted d-block mb-2">Analisa penjualan per bulan</small>
           <div class="mb-2">
             <label class="form-label small mb-1">Dari</label>
-            <input type="date" id="poSalesFrom" class="form-control">
+            <input type="month" id="poSalesFrom" class="form-control">
           </div>
           <div class="mb-2">
             <label class="form-label small mb-1">Sampai</label>
-            <input type="date" id="poSalesTo" class="form-control">
+            <input type="month" id="poSalesTo" class="form-control">
           </div>
         </div>
 
@@ -146,10 +146,11 @@
     document.getElementById('poCreateSave').innerHTML = '<i class="bi bi-check-circle"></i> Update Pesanan';
   }
 
-  // Default sales period: last 3 months
-  var d90 = new Date(); d90.setMonth(d90.getMonth() - 3);
-  document.getElementById('poSalesFrom').value = d90.toISOString().split('T')[0];
-  document.getElementById('poSalesTo').value = today;
+  // Default sales period: last 6 months
+  var dFrom = new Date(); dFrom.setMonth(dFrom.getMonth() - 6);
+  document.getElementById('poSalesFrom').value = dFrom.getFullYear() + '-' + String(dFrom.getMonth() + 1).padStart(2, '0');
+  var dNow = new Date();
+  document.getElementById('poSalesTo').value = dNow.getFullYear() + '-' + String(dNow.getMonth() + 1).padStart(2, '0');
 
   // --- Draft persistence ---
   function saveDraft() {
@@ -290,13 +291,27 @@
 
   document.getElementById('poLoadItems').addEventListener('click', loadItems);
 
+  // Convert month input (YYYY-MM) to first and last day of month
+  function monthToDateRange(fromMonth, toMonth) {
+    var fromDate = fromMonth + '-01';
+    var toParts = toMonth.split('-');
+    var toY = parseInt(toParts[0]), toM = parseInt(toParts[1]);
+    var lastDay = new Date(toY, toM, 0).getDate();
+    var toDate = toMonth + '-' + String(lastDay).padStart(2, '0');
+    return { from: fromDate, to: toDate };
+  }
+
   async function loadItems() {
     var suppid = suppHidden.value;
-    var salesFrom = document.getElementById('poSalesFrom').value;
-    var salesTo = document.getElementById('poSalesTo').value;
+    var salesFromMonth = document.getElementById('poSalesFrom').value;
+    var salesToMonth = document.getElementById('poSalesTo').value;
 
     if (!suppid) { window.showToast && showToast('Pilih supplier dulu', 'warning'); return; }
-    if (!salesFrom || !salesTo) { window.showToast && showToast('Pilih periode sales', 'warning'); return; }
+    if (!salesFromMonth || !salesToMonth) { window.showToast && showToast('Pilih periode sales', 'warning'); return; }
+
+    var range = monthToDateRange(salesFromMonth, salesToMonth);
+    var salesFrom = range.from;
+    var salesTo = range.to;
 
     document.getElementById('poEmptyState').classList.add('d-none');
     document.getElementById('poItemsLoading').classList.remove('d-none');
@@ -332,8 +347,8 @@
           var targetDays = parseInt(document.getElementById('poTargetDays').value) || 30;
           var projected = (maxMonthKcl / 30) * targetDays;
           suggKcl = Math.max(0, Math.ceil(projected - stockQty));
-          suggBsr = packing > 1 ? Math.floor(suggKcl / packing) : suggKcl;
-          suggRemKcl = packing > 1 ? Math.round(suggKcl - suggBsr * packing) : 0;
+          suggBsr = packing > 1 ? Math.floor(suggKcl / packing) : 0;
+          suggRemKcl = packing > 1 ? Math.round(suggKcl - suggBsr * packing) : suggKcl;
         }
 
         item._monthData = monthData;
@@ -374,35 +389,27 @@
     // --- Two-row header with column groups ---
     var skcl0 = 'Kcl';
 
-    // Row 1: group headers (no rowspan - full columns in both rows)
+    // Row 1: group headers — first 4 cols, Stok, Saran, Order all use rowspan=2
     var gRow = '<tr class="po-group-header">'
-      + '<th style="background:#fff !important;border:none"></th>'
-      + '<th style="background:#fff !important;border:none"></th>'
-      + '<th style="background:#fff !important;border:none"></th>'
-      + '<th style="background:#fff !important;border:none"></th>'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="text-center align-bottom"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
+      + '<th rowspan="2" style="width:28px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-bottom">#</th>'
+      + '<th rowspan="2" style="min-width:180px;background:#e9ecef !important;border-bottom:1px solid #dee2e6" class="align-bottom">Nama Barang</th>'
+      + '<th rowspan="2" style="width:40px;background:#e0f2f1 !important;border-bottom:1px solid #dee2e6;border-left:2px solid #dee2e6" class="text-center align-bottom">Isi</th>'
       + '<th colspan="' + poMonths.length + '" class="po-gh-sales po-col-sep">Penjualan (' + skcl0 + ')</th>'
-      + '<th class="po-col-sep">Stok (' + skcl0 + ')</th>'
-      + '<th class="po-gh-saran po-col-sep">Saran</th>'
-      + '<th colspan="2" class="po-gh-order po-col-sep">Order</th>'
+      + '<th rowspan="2" class="po-col-sep text-end align-middle" style="width:70px">Stok (' + skcl0 + ')</th>'
+      + '<th rowspan="2" class="po-gh-saran po-col-sep text-center align-middle" style="width:90px">Saran</th>'
+      + '<th rowspan="2" colspan="2" class="po-gh-order po-col-sep text-center align-middle" style="width:125px">Order</th>'
       + '<th colspan="2" class="po-gh-harga po-col-sep">Harga Beli</th>'
       + '</tr>';
 
-    // Row 2: all individual column headers
-    var hRow = '<tr>'
-      + '<th style="width:28px" class="text-center"><input type="checkbox" id="poCheckAll" title="Pilih semua"></th>'
-      + '<th style="width:28px">#</th>'
-      + '<th style="min-width:180px">Nama Barang</th>'
-      + '<th class="text-center" style="width:40px">Isi</th>';
+    // Row 2: only month sub-headers and harga sub-headers
+    var hRow = '<tr>';
 
     poMonths.forEach(function(m, i) {
       hRow += '<th class="text-end po-month-header' + (i === 0 ? ' po-col-sep' : '') + '">' + fmtMonth(m) + '</th>';
     });
 
-    hRow += '<th class="text-end po-col-sep" style="width:70px">Kcl</th>'
-      + '<th class="text-center po-gh-saran po-col-sep" style="width:90px">Qty</th>'
-      + '<th class="text-center po-gh-order po-col-sep" style="width:70px">Bsr</th>'
-      + '<th class="text-center po-gh-order" style="width:55px">Kcl</th>'
-      + '<th class="text-end po-gh-harga po-col-sep" style="width:70px">Per Kcl</th>'
+    hRow += '<th class="text-end po-gh-harga po-col-sep" style="width:70px">Per Kcl</th>'
       + '<th class="text-end po-gh-harga" style="width:80px">Total</th>'
       + '</tr>';
 
@@ -433,7 +440,7 @@
         + '<td class="text-muted">' + shown + '</td>'
         + '<td class="text-nowrap"><span title="' + item.artno + (item.artpabrik ? ' | ' + item.artpabrik : '') + '">'
         + item.artname + '</span></td>'
-        + '<td class="text-center text-nowrap">' + Math.round(packing) + '/' + item.satbesar + '</td>';
+        + '<td class="text-center text-nowrap" style="border-left:2px solid #dee2e6">' + Math.round(packing) + '/' + item.satbesar + '</td>';
 
       // Month sales with unit
       var skcl = item.satkecil || 'Pcs';
@@ -463,11 +470,11 @@
       }
 
       // Order inputs
-      var orderBsr = '<input type="text" inputmode="numeric" class="form-control form-control-sm text-end po-order-bsr po-order-input" '
-        + 'data-idx="' + idx + '" value="' + fmtNum(item._orderBsr || 0) + '">'
+      var orderBsr = '<input type="number" min="0" step="1" class="form-control form-control-sm text-end po-order-bsr po-order-input" '
+        + 'data-idx="' + idx + '" value="' + (item._orderBsr || 0) + '">'
         + '<small class="po-order-unit">' + item.satbesar + '</small>';
-      var orderKcl = '<input type="text" inputmode="numeric" class="form-control form-control-sm text-end po-order-kcl po-order-input" '
-        + 'data-idx="' + idx + '" value="' + fmtNum(item._orderRemKcl || 0) + '">'
+      var orderKcl = '<input type="number" min="0" step="1" class="form-control form-control-sm text-end po-order-kcl po-order-input" '
+        + 'data-idx="' + idx + '" value="' + (item._orderRemKcl || 0) + '">'
         + '<small class="po-order-unit">' + (item.satkecil || 'Pcs') + '</small>';
 
       // Harga
@@ -522,28 +529,53 @@
     tbody.querySelectorAll('.po-order-bsr').forEach(function(input) {
       input.addEventListener('change', function() {
         var idx = parseInt(input.dataset.idx);
-        var val = parseOrderVal(input.value);
+        var val = parseInt(input.value) || 0;
+        if (val < 0) val = 0;
         poItems[idx]._orderBsr = val;
-        input.value = fmtNum(val);
+        input.value = val;
         updateRowTotal(idx);
         updateSummary();
         saveDraft();
       });
-      input.addEventListener('focus', function() { input.value = poItems[parseInt(input.dataset.idx)]._orderBsr || 0; input.select(); });
-      input.addEventListener('blur', function() { input.value = fmtNum(poItems[parseInt(input.dataset.idx)]._orderBsr || 0); });
     });
     tbody.querySelectorAll('.po-order-kcl').forEach(function(input) {
       input.addEventListener('change', function() {
         var idx = parseInt(input.dataset.idx);
-        var val = parseOrderVal(input.value);
+        var val = parseInt(input.value) || 0;
+        if (val < 0) val = 0;
+        var packing = poItems[idx].packing || 1;
+        // Auto-carry: if kcl >= packing, add to bsr
+        if (packing > 1 && val >= packing) {
+          var carry = Math.floor(val / packing);
+          val = val % packing;
+          poItems[idx]._orderBsr = (poItems[idx]._orderBsr || 0) + carry;
+          var bsrInput = tbody.querySelector('.po-order-bsr[data-idx="' + idx + '"]');
+          if (bsrInput) bsrInput.value = poItems[idx]._orderBsr;
+        }
         poItems[idx]._orderRemKcl = val;
-        input.value = fmtNum(val);
+        input.value = val;
         updateRowTotal(idx);
         updateSummary();
         saveDraft();
       });
-      input.addEventListener('focus', function() { input.value = poItems[parseInt(input.dataset.idx)]._orderRemKcl || 0; input.select(); });
-      input.addEventListener('blur', function() { input.value = fmtNum(poItems[parseInt(input.dataset.idx)]._orderRemKcl || 0); });
+    });
+
+    // Up/Down arrow navigation between order inputs
+    tbody.addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      var input = e.target;
+      if (!input.classList.contains('po-order-input')) return;
+      e.preventDefault();
+      var isBsr = input.classList.contains('po-order-bsr');
+      var cls = isBsr ? '.po-order-bsr' : '.po-order-kcl';
+      var all = Array.from(tbody.querySelectorAll(cls));
+      var curIdx = all.indexOf(input);
+      if (curIdx < 0) return;
+      var nextIdx = e.key === 'ArrowUp' ? curIdx - 1 : curIdx + 1;
+      if (nextIdx >= 0 && nextIdx < all.length) {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        all[nextIdx].focus();
+      }
     });
 
     // Row checkboxes
@@ -599,17 +631,17 @@
   // Clear all order quantities
   document.getElementById('poClearAll').addEventListener('click', async function() {
     var confirmed = await (window.showConfirm
-      ? showConfirm('Hapus semua qty order?')
-      : Promise.resolve(confirm('Hapus semua qty order?')));
+      ? showConfirm('Hapus semua data dan kembali ke awal?')
+      : Promise.resolve(confirm('Hapus semua data dan kembali ke awal?')));
     if (!confirmed) return;
-    poItems.forEach(function(it) {
-      it._orderBsr = 0;
-      it._orderRemKcl = 0;
-      it._checked = false;
-    });
-    renderItems();
+    poItems = [];
+    poMonths = [];
+    document.getElementById('poItemsContainer').classList.add('d-none');
+    document.getElementById('poEmptyState').classList.remove('d-none');
+    document.getElementById('poClearAll').classList.add('d-none');
+    document.getElementById('poCreateSave').disabled = true;
     updateSummary();
-    saveDraft();
+    localStorage.removeItem('po_draft');
   });
 
   // --- Edit mode: load existing PO data ---
@@ -626,8 +658,8 @@
 
       // Set dates
       if (data.tgl_pesanan) document.getElementById('poOrderDate').value = data.tgl_pesanan;
-      if (data.date_from) document.getElementById('poSalesFrom').value = data.date_from;
-      if (data.date_to) document.getElementById('poSalesTo').value = data.date_to;
+      if (data.date_from) document.getElementById('poSalesFrom').value = data.date_from.substring(0, 7);
+      if (data.date_to) document.getElementById('poSalesTo').value = data.date_to.substring(0, 7);
 
       // Build order map from existing PO lines: {artno: {bsr, kcl}}
       var orderMap = {};
@@ -651,8 +683,8 @@
   document.getElementById('poCreateSave').addEventListener('click', async function() {
     var suppid = suppHidden.value;
     var orderDate = document.getElementById('poOrderDate').value;
-    var salesFrom = document.getElementById('poSalesFrom').value;
-    var salesTo = document.getElementById('poSalesTo').value;
+    var salesFromMonth = document.getElementById('poSalesFrom').value;
+    var salesToMonth = document.getElementById('poSalesTo').value;
 
     if (!suppid || !orderDate) {
       window.showToast && showToast('Lengkapi supplier dan tanggal', 'warning');
@@ -680,6 +712,12 @@
       return;
     }
 
+    if (!salesFromMonth || !salesToMonth) {
+      window.showToast && showToast('Lengkapi periode sales', 'warning');
+      return;
+    }
+    var salesRange = monthToDateRange(salesFromMonth, salesToMonth);
+
     var isEdit = !!editPO;
     var confirmMsg = isEdit
       ? 'Update pesanan ' + editPO + ' dengan ' + itemsToSave.length + ' item?'
@@ -697,8 +735,8 @@
         suppid: suppid,
         items: itemsToSave,
         order_date: orderDate,
-        date_from: salesFrom,
-        date_to: salesTo,
+        date_from: salesRange.from,
+        date_to: salesRange.to,
       };
       if (!isEdit) payload.created_by = currentUser;
 

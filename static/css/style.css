@@ -2159,8 +2159,9 @@ body {
 }
 
 /* Sticky first 3 columns (checkbox, #, name) for horizontal scroll */
-#poItemTable th:nth-child(1),
-#poItemTable td:nth-child(1) {
+/* Only target first header row and body rows (second header row has different nth-child due to rowspan) */
+#poItemTable thead tr:first-child th:nth-child(1),
+#poItemTable tbody td:nth-child(1) {
   position: sticky;
   left: 0;
   z-index: 2;
@@ -2168,8 +2169,8 @@ body {
   min-width: 28px;
   max-width: 28px;
 }
-#poItemTable th:nth-child(2),
-#poItemTable td:nth-child(2) {
+#poItemTable thead tr:first-child th:nth-child(2),
+#poItemTable tbody td:nth-child(2) {
   position: sticky;
   left: 28px;
   z-index: 2;
@@ -2177,17 +2178,17 @@ body {
   min-width: 32px;
   max-width: 32px;
 }
-#poItemTable th:nth-child(3),
-#poItemTable td:nth-child(3) {
+#poItemTable thead tr:first-child th:nth-child(3),
+#poItemTable tbody td:nth-child(3) {
   position: sticky;
   left: 60px;
   z-index: 2;
   background: #fff;
   box-shadow: 2px 0 4px rgba(0,0,0,.08);
 }
-#poItemTable thead th:nth-child(1),
-#poItemTable thead th:nth-child(2),
-#poItemTable thead th:nth-child(3) {
+#poItemTable thead tr:first-child th:nth-child(1),
+#poItemTable thead tr:first-child th:nth-child(2),
+#poItemTable thead tr:first-child th:nth-child(3) {
   z-index: 4;
 }
 #poItemTable tbody tr:nth-child(even) td:nth-child(1),

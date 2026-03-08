@@ -1844,6 +1844,9 @@ body {
   align-items: center;
   padding: 2px 0;
 }
+.sd-beli-item.sd-beli-full {
+  grid-column: 1 / -1;
+}
 
 .sd-beli-label {
   font-size: var(--fs-sm);

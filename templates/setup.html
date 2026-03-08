@@ -25,9 +25,13 @@
             <div class="card-body">
               <h5 class="card-title"><i class="bi bi-shop-window"></i> Toko</h5>
               <div class="row g-2">
-                <div class="col-12">
+                <div class="col-md-6">
                   <label class="form-label">Nama Toko</label>
                   <input type="text" class="form-control form-control-sm" name="store_name" placeholder="Toko Segar">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Lokasi</label>
+                  <input type="text" class="form-control form-control-sm" name="store_location" placeholder="Kota / Kecamatan">
                 </div>
               </div>
             </div>
@@ -40,15 +44,15 @@
               <div class="row g-2">
                 <div class="col-md-8">
                   <label class="form-label">Host</label>
-                  <input type="text" class="form-control form-control-sm" name="db.host">
+                  <input type="text" class="form-control form-control-sm" name="db.host" value="127.0.0.1">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Port</label>
-                  <input type="number" class="form-control form-control-sm" name="db.port">
+                  <input type="number" class="form-control form-control-sm" name="db.port" value="3306">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">User</label>
-                  <input type="text" class="form-control form-control-sm" name="db.user">
+                  <input type="text" class="form-control form-control-sm" name="db.user" value="root">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Password</label>
@@ -56,7 +60,11 @@
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Database</label>
-                  <input type="text" class="form-control form-control-sm" name="db.name">
+                  <input type="text" class="form-control form-control-sm" name="db.name" value="myposse">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Pool Size</label>
+                  <input type="number" class="form-control form-control-sm" name="db.pool_size" min="1" max="50" value="10">
                 </div>
               </div>
             </div>
@@ -69,11 +77,11 @@
               <div class="row g-2">
                 <div class="col-md-4">
                   <label class="form-label">Host</label>
-                  <input type="text" class="form-control form-control-sm" name="server_host">
+                  <input type="text" class="form-control form-control-sm" name="server_host" value="127.0.0.1">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Port</label>
-                  <input type="number" class="form-control form-control-sm" name="server_port" min="1" max="65535">
+                  <input type="number" class="form-control form-control-sm" name="server_port" min="1" max="65535" value="5000">
                 </div>
                 <div class="col-md-4 d-flex align-items-end">
                   <div class="form-check">
@@ -84,7 +92,7 @@
                 <div class="col-md-4" id="mdnsHostnameGroup" style="display:none;">
                   <label class="form-label">Hostname mDNS</label>
                   <div class="input-group input-group-sm">
-                    <input type="text" class="form-control form-control-sm" name="mdns_hostname" placeholder="tokohub">
+                    <input type="text" class="form-control form-control-sm" name="mdns_hostname" placeholder="tokohub" value="tokohub">
                     <span class="input-group-text">.local</span>
                   </div>
                 </div>
@@ -107,11 +115,11 @@
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Deployment ID</label>
-                  <input type="text" class="form-control form-control-sm" name="openai.deployment_id">
+                  <input type="text" class="form-control form-control-sm" name="openai.deployment_id" value="gpt-4o-standard">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">API Version</label>
-                  <input type="text" class="form-control form-control-sm" name="openai.api_version">
+                  <input type="text" class="form-control form-control-sm" name="openai.api_version" value="2024-08-01-preview">
                 </div>
               </div>
             </div>
@@ -124,15 +132,15 @@
               <div class="row g-2">
                 <div class="col-md-4">
                   <label class="form-label">Cache TTL (detik)</label>
-                  <input type="number" class="form-control form-control-sm" name="fuzzy_cache_ttl" min="0">
+                  <input type="number" class="form-control form-control-sm" name="fuzzy_cache_ttl" min="0" value="300">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Top N</label>
-                  <input type="number" class="form-control form-control-sm" name="fuzzy_top_n" min="1" max="50">
+                  <input type="number" class="form-control form-control-sm" name="fuzzy_top_n" min="1" max="50" value="5">
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Min Score</label>
-                  <input type="number" class="form-control form-control-sm" name="fuzzy_min_score" min="0" max="100">
+                  <input type="number" class="form-control form-control-sm" name="fuzzy_min_score" min="0" max="100" value="40">
                 </div>
               </div>
             </div>
@@ -161,9 +169,11 @@
         setVal('db.port', cfg.db.port);
         setVal('db.user', cfg.db.user);
         setVal('db.name', cfg.db.name);
+        setVal('db.pool_size', cfg.db.pool_size);
         // password left empty (masked on server)
 
         setVal('store_name', cfg.store_name);
+        setVal('store_location', cfg.store_location);
 
         setVal('server_host', cfg.server_host);
         setVal('server_port', cfg.server_port);
@@ -178,6 +188,9 @@
         setVal('fuzzy_cache_ttl', cfg.fuzzy_cache_ttl);
         setVal('fuzzy_top_n', cfg.fuzzy_top_n);
         setVal('fuzzy_min_score', cfg.fuzzy_min_score);
+      })
+      .catch(function() {
+        // First install — no DB yet, keep HTML default values
       });
 
     function setVal(name, value) {

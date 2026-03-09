@@ -515,7 +515,7 @@
       dom.sdJualBody.innerHTML = tiers.map(function(t) {
         if (SHOW_MARGIN) {
           var hasMargin = t.val > 0 && netto2 > 0;
-          var margin = hasMargin ? (((t.val - netto2) / netto2) * 100).toFixed(2) + '%' : '-';
+          var margin = hasMargin ? fmt(t.val - netto2) : '-';
           var marginClass = (hasMargin && t.val < netto2) ? 'text-danger' : '';
           return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(t.val) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
         }
@@ -534,10 +534,17 @@
         ];
         dom.sdBundlingBody.innerHTML = bundlings.map(function(b) {
           var rows = tierLabels.map(function(t) {
+            if (SHOW_MARGIN) {
+              var hasMargin = b[t.key] > 0 && netto2 > 0;
+              var margin = hasMargin ? fmt(b[t.key] - netto2) : '-';
+              var marginClass = (hasMargin && b[t.key] < netto2) ? 'text-danger' : '';
+              return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(b[t.key]) + '</td><td class="text-end ' + marginClass + '">' + margin + '</td></tr>';
+            }
             return '<tr><td>' + t.label + '</td><td class="text-end">' + fmt(b[t.key]) + '</td></tr>';
           }).join('');
+          var marginHeader = SHOW_MARGIN ? '<th>Margin</th>' : '';
           return '<div class="sd-section-header"><i class="bi bi-box2"></i> Bundling (Qty: ' + b.qty + ')</div>'
-            + '<table class="sd-jual-table"><thead><tr><th>Tier</th><th>Harga</th></tr></thead>'
+            + '<table class="sd-jual-table"><thead><tr><th>Tier</th><th>Harga</th>' + marginHeader + '</tr></thead>'
             + '<tbody>' + rows + '</tbody></table>';
         }).join('');
       } else {

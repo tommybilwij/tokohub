@@ -95,8 +95,8 @@
           <h5 class="mb-0"><i class="bi bi-list-check"></i> Daftar Barang</h5>
           <span class="badge badge-counter" id="poItemCount">0 item</span>
         </div>
-        <div class="card-body p-0">
-          <div class="d-flex gap-2 align-items-center p-2 border-bottom">
+        <div class="card-body p-0" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <div class="d-flex gap-2 align-items-center p-2 border-bottom flex-wrap">
             <div class="position-relative" style="max-width:280px">
               <input type="text" class="form-control form-control-sm" id="poFilterInput"
                      placeholder="Cari nama / artno..." autocomplete="off">
@@ -114,7 +114,7 @@
               <label class="form-check-label small" for="poHideZero">Sembunyikan qty 0</label>
             </div>
           </div>
-          <div class="table-responsive" style="max-height:calc(100vh - 300px);overflow:auto">
+          <div class="table-responsive" style="max-height:calc(100vh - 300px);overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch">
             <table class="table table-hover table-sm mb-0" id="poItemTable" style="white-space:nowrap">
               <thead class="sticky-top bg-white" id="poTableHead"></thead>
               <tbody id="poItemBody"></tbody>

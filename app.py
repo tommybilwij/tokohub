@@ -163,7 +163,7 @@ def main():
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
 
-            https_port = 8443
+            https_port = 5001
             import socket, time as _time
             max_retries = 10
             for attempt in range(1, max_retries + 1):

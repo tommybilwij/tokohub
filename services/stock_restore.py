@@ -4,6 +4,9 @@ When reverting a transaction (delete, update, toggle), these helpers
 find the correct "before" state by looking at previous sthist entries.
 
 Key rules:
+- Precedence is determined by tanggal (invoice date) first, then noindex
+  as tiebreaker for same-date entries.  This means a backdated FP will
+  NOT overwrite prices set by a newer-dated FP or PH.
 - Only FP (tipetrans=1) updates hbeli in stock (always, regardless of isupdateprice)
 - Only PH (tipetrans=0) and FP with isupdateprice=1 update hjual in stock
 - Both FP and PH sthist entries have valid hbeli values
@@ -15,25 +18,29 @@ from services.db import execute_single
 
 logger = logging.getLogger(__name__)
 
+# Ordering clause used throughout: tanggal first, noindex as tiebreaker
+_NEWER = "(tanggal > %s OR (tanggal = %s AND noindex > %s))"
+_OLDER = "(tanggal < %s OR (tanggal = %s AND noindex < %s))"
+
 
 # ---------------------------------------------------------------------------
 # Previous state lookups
 # ---------------------------------------------------------------------------
 
-async def get_previous_hjual(pool, artno: str, before_noindex: int) -> dict | None:
+async def get_previous_hjual(pool, artno: str, tanggal, noindex: int) -> dict | None:
     """Find hjual/bundling state from the most recent price-updating
-    sthist entry before a given noindex."""
+    sthist entry before a given (tanggal, noindex)."""
     return await execute_single(
         pool,
-        """SELECT hjual, hjual2, hjual3, hjual4, hjual5,
+        f"""SELECT hjual, hjual2, hjual3, hjual4, hjual5,
                   ispaketprc, over1, over2,
                   hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
                   hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2
            FROM sthist
-           WHERE stockid = %s AND noindex < %s
+           WHERE stockid = %s AND {_OLDER}
              AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
-           ORDER BY noindex DESC LIMIT 1""",
-        (artno, before_noindex),
+           ORDER BY tanggal DESC, noindex DESC LIMIT 1""",
+        (artno, tanggal, tanggal, noindex),
     )
 
 
@@ -52,25 +59,25 @@ async def get_latest_hjual(pool, artno: str) -> dict | None:
            FROM sthist
            WHERE stockid = %s
              AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
-           ORDER BY noindex DESC LIMIT 1""",
+           ORDER BY tanggal DESC, noindex DESC LIMIT 1""",
         (artno,),
     )
 
 
-async def get_previous_hbeli(pool, artno: str, before_noindex: int) -> dict | None:
+async def get_previous_hbeli(pool, artno: str, tanggal, noindex: int) -> dict | None:
     """Find hbeli/discount/packing state from the most recent
-    sthist entry (FP or PH) before a given noindex."""
+    sthist entry (FP or PH) before a given (tanggal, noindex)."""
     return await execute_single(
         pool,
-        """SELECT hbelibsr, hbelikcl, hbelinetto,
+        f"""SELECT hbelibsr, hbelikcl, hbelinetto,
                   pctdisc1, pctdisc2, pctdisc3, pctppn,
                   jlhdisc1, jlhdisc2, jlhdisc3, jlhppn,
                   packing, satuanbsr AS satbesar, satuankcl AS satkecil
            FROM sthist
-           WHERE stockid = %s AND noindex < %s
+           WHERE stockid = %s AND {_OLDER}
              AND tipetrans IN (0, 1)
-           ORDER BY noindex DESC LIMIT 1""",
-        (artno, before_noindex),
+           ORDER BY tanggal DESC, noindex DESC LIMIT 1""",
+        (artno, tanggal, tanggal, noindex),
     )
 
 
@@ -78,33 +85,37 @@ async def get_previous_hbeli(pool, artno: str, before_noindex: int) -> dict | No
 # Newer-update checks
 # ---------------------------------------------------------------------------
 
-async def has_newer_hjual_update(pool, artno: str, after_noindex: int) -> bool:
-    """Check if a newer PH or FP-with-update has already overwritten hjual."""
+async def has_newer_hjual_update(pool, artno: str, tanggal, noindex: int) -> bool:
+    """Check if a newer (by tanggal, then noindex) PH or FP-with-update
+    has already overwritten hjual."""
     row = await execute_single(
         pool,
-        """SELECT 1 FROM sthist
-           WHERE stockid = %s AND noindex > %s
+        f"""SELECT 1 FROM sthist
+           WHERE stockid = %s AND {_NEWER}
              AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
            LIMIT 1""",
-        (artno, after_noindex),
+        (artno, tanggal, tanggal, noindex),
     )
     return bool(row)
 
 
-async def has_newer_hbeli_update(pool, artno: str, after_noindex: int) -> bool:
-    """Check if a newer FP has already overwritten hbeli."""
+async def has_newer_hbeli_update(pool, artno: str, tanggal, noindex: int) -> bool:
+    """Check if a newer (by tanggal, then noindex) FP has already overwritten hbeli."""
     row = await execute_single(
         pool,
-        """SELECT 1 FROM sthist
-           WHERE stockid = %s AND noindex > %s AND tipetrans = 1
+        f"""SELECT 1 FROM sthist
+           WHERE stockid = %s AND {_NEWER}
+             AND tipetrans = 1
            LIMIT 1""",
-        (artno, after_noindex),
+        (artno, tanggal, tanggal, noindex),
     )
     return bool(row)
 
 
 # ---------------------------------------------------------------------------
 # Init-value fallbacks (first-ever transaction for an item)
+# Used only by delete operations where the transaction is fully removed.
+# Toggle/edit operations keep current stock value when no previous entry.
 # ---------------------------------------------------------------------------
 
 async def get_init_hjual(pool, artno: str) -> dict | None:

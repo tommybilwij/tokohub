@@ -253,10 +253,10 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
 
     becreff = header['becreff']
 
-    # Get old sthist lines with noindex + oprice for in-place update
+    # Get old sthist lines with noindex + oprice + tanggal for in-place update
     old_lines = await execute_query(
         pool,
-        "SELECT stockid, noindex, oprice FROM sthist WHERE becreff = %s AND tipetrans = 0",
+        "SELECT stockid, noindex, oprice, tanggal FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
     old_map = {line['stockid']: line for line in old_lines}
@@ -403,13 +403,14 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
             )
             await conn.commit()
 
-    # Phase 2 — Deferred stock updates with noindex-based precedence checks.
+    # Phase 2 — Deferred stock updates with tanggal-based precedence checks.
     updated_lines = await execute_query(
         pool,
-        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
+        "SELECT stockid, noindex, tanggal FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
     noindex_map = {r['stockid']: r['noindex'] for r in updated_lines}
+    tanggal_map = {r['stockid']: r['tanggal'] for r in updated_lines}
 
     from services.stock_restore import (
         has_newer_hjual_update, get_previous_hjual, get_init_hjual,
@@ -419,11 +420,12 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
     for item in items:
         artno = item['artno']
         ni = noindex_map.get(artno)
+        tgl = tanggal_map.get(artno)
         stock = before_map.get(artno)
-        if not ni or not stock:
+        if not ni or not tgl or not stock:
             continue
 
-        if await has_newer_hjual_update(pool, artno, ni):
+        if await has_newer_hjual_update(pool, artno, tgl, ni):
             continue  # Newer PH/FP has already overwritten stock hjual
 
         try:
@@ -467,9 +469,10 @@ async def update_ph(pool, ph_number: str, items: list[dict], userid: str = '', u
         if artno in new_artnos:
             continue
         old_ni = old['noindex']
-        if await has_newer_hjual_update(pool, artno, old_ni):
+        old_tgl = old.get('tanggal') or today
+        if await has_newer_hjual_update(pool, artno, old_tgl, old_ni):
             continue
-        prev = await get_previous_hjual(pool, artno, old_ni)
+        prev = await get_previous_hjual(pool, artno, old_tgl, old_ni)
         if not prev:
             prev = await get_init_hjual(pool, artno)
         if prev:
@@ -502,20 +505,21 @@ async def delete_ph(pool, ph_number: str) -> dict:
 
     becreff = header['becreff']
 
-    # Get sthist lines for price restoration
+    # Get sthist lines for price restoration (include tanggal for precedence checks)
     lines = await execute_query(
         pool,
-        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 0",
+        "SELECT stockid, noindex, tanggal FROM sthist WHERE becreff = %s AND tipetrans = 0",
         (becreff,),
     )
 
-    # Build per-item noindex range
+    # Build per-item noindex range + tanggal
     item_noindex = {}
     for line in lines:
         artno = line['stockid']
         ni = line['noindex']
+        tgl = line['tanggal']
         if artno not in item_noindex:
-            item_noindex[artno] = {'min': ni, 'max': ni}
+            item_noindex[artno] = {'min': ni, 'max': ni, 'tanggal': tgl}
         else:
             item_noindex[artno]['min'] = min(item_noindex[artno]['min'], ni)
             item_noindex[artno]['max'] = max(item_noindex[artno]['max'], ni)
@@ -543,9 +547,10 @@ async def delete_ph(pool, ph_number: str) -> dict:
     )
 
     for artno, ni in item_noindex.items():
-        if await has_newer_hjual_update(pool, artno, ni['max']):
+        tgl = ni['tanggal']
+        if await has_newer_hjual_update(pool, artno, tgl, ni['max']):
             continue
-        prev = await get_previous_hjual(pool, artno, ni['min'])
+        prev = await get_previous_hjual(pool, artno, tgl, ni['min'])
         if not prev:
             prev = await get_init_hjual(pool, artno)
         if prev:
@@ -685,7 +690,7 @@ async def get_price_change_from_fp(pool, report_date: date | None = None) -> lis
     rows = await execute_query(
         pool,
         """SELECT s.nofaktur, s.stockid AS artno, s.artpabrik, s.artname, s.noindex,
-                  s.hjual, s.posttime, b.userid
+                  s.tanggal, s.hjual, s.posttime, b.userid
            FROM sthist s
            LEFT JOIN icbym b ON b.nofaktur = s.nofaktur AND b.tipe = '1'
            WHERE s.tipetrans = 1 AND s.isupdateprice = 1 AND s.tanggal = %s
@@ -696,14 +701,17 @@ async def get_price_change_from_fp(pool, report_date: date | None = None) -> lis
     for r in rows:
         artno = r['artno']
         new_hjual = float(r['hjual'] or 0)
-        # Find previous hjual from sthist
+        tgl = r['tanggal']
+        ni = r['noindex']
+        # Find previous hjual from sthist (tanggal-based ordering)
         prev = await execute_single(
             pool,
             """SELECT hjual FROM sthist
-               WHERE stockid = %s AND noindex < %s
+               WHERE stockid = %s
+                 AND (tanggal < %s OR (tanggal = %s AND noindex < %s))
                  AND (tipetrans = 0 OR (tipetrans = 1 AND isupdateprice = 1))
-               ORDER BY noindex DESC LIMIT 1""",
-            (artno, r['noindex']),
+               ORDER BY tanggal DESC, noindex DESC LIMIT 1""",
+            (artno, tgl, tgl, ni),
         )
         old_hjual = float(prev['hjual'] or 0) if prev else 0
         if old_hjual != new_hjual and new_hjual > 0:

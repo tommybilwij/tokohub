@@ -8,14 +8,16 @@ use tauri::Manager;
 use tauri::RunEvent;
 use tauri::Url;
 
-const PORT: u16 = 5000;
+const HTTP_PORT: u16 = 5000;
+const HTTPS_PORT: u16 = 5001;
 const HEALTH_URL_HTTP: &str = "http://127.0.0.1:5000/health";
-const HEALTH_URL_HTTPS: &str = "https://127.0.0.1:5000/health";
+const HEALTH_URL_HTTPS: &str = "https://127.0.0.1:5001/health";
 const APP_URL_HTTP: &str = "http://127.0.0.1:5000";
-const APP_URL_HTTPS: &str = "https://127.0.0.1:5000";
+const APP_URL_HTTPS: &str = "https://127.0.0.1:5001";
 const HEALTH_POLL_MS: u64 = 500;
 const HEALTH_TIMEOUT_S: u64 = 30;
 const MONITOR_INTERVAL_S: u64 = 3;
+const RESPAWN_WAIT_S: u64 = 5;
 
 struct SidecarState {
     child: Option<Child>,
@@ -67,7 +69,7 @@ fn do_spawn(sidecar_path: &PathBuf) -> Option<Child> {
     let logs = log_dir();
 
     match Command::new(sidecar_path)
-        .args(["--port", &PORT.to_string(), "--host", "127.0.0.1"])
+        .args(["--port", &HTTP_PORT.to_string(), "--host", "127.0.0.1"])
         .envs(&envrc_vars)
         .stdout(
             std::fs::File::options()
@@ -189,8 +191,26 @@ fn monitor_sidecar(app_handle: tauri::AppHandle) {
             };
 
             if needs_respawn {
-                // Wait for port to be released by the OS
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                // Kill any lingering process on our ports before respawn
+                #[cfg(unix)]
+                {
+                    for port in [HTTP_PORT, HTTPS_PORT] {
+                        let _ = std::process::Command::new("fuser")
+                            .args(["-k", &format!("{}/tcp", port)])
+                            .output();
+                    }
+                }
+                #[cfg(windows)]
+                {
+                    for port in [HTTP_PORT, HTTPS_PORT] {
+                        let _ = std::process::Command::new("cmd")
+                            .args(["/C", &format!("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :{} ^| findstr LISTENING') do taskkill /F /PID %a", port)])
+                            .output();
+                    }
+                }
+
+                // Wait for ports to be fully released
+                tokio::time::sleep(Duration::from_secs(RESPAWN_WAIT_S)).await;
 
                 let sidecar_path = {
                     let state = app_handle.state::<Mutex<SidecarState>>();

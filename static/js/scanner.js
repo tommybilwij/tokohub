@@ -374,7 +374,7 @@
       .then(function(res) { return res.json(); })
       .then(function(data) {
         hideBarcodeAlert();
-        if (data.length > 0) {
+        if (data.length > 0 && (data[0].match_type === 'barcode' || data[0].match_type === 'alias')) {
           displayStockDetail(data[0]);
         } else {
           showNoResult();

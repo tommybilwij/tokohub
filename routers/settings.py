@@ -157,13 +157,19 @@ async def api_restart():
                 subprocess.Popen([sys.executable] + sys.argv)
             os._exit(0)
         else:
-            # Unix: close inherited file descriptors, then exec
+            # Unix: set close-on-exec on inherited fds (avoids kqueue assertion crash)
             try:
                 import resource
                 soft, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
             except ImportError:
                 soft = 1024
-            os.closerange(3, soft)
+            import fcntl
+            for fd in range(3, soft):
+                try:
+                    flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+                    fcntl.fcntl(fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
+                except OSError:
+                    pass
             if is_frozen:
                 os.execv(sys.executable, sys.argv)
             else:

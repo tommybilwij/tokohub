@@ -105,6 +105,21 @@ def _cert_is_valid(cert_path: Path, min_remaining_days: int = 30) -> bool:
         return False
 
 
+def _cert_has_current_ip(cert_path: Path) -> bool:
+    """Check if the certificate's SANs include the current LAN IP."""
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        cert_ips = {str(ip) for ip in san.value.get_values_for_type(x509.IPAddress)}
+        local_ip = _get_local_ip()
+        if not local_ip:
+            return True  # Can't detect IP, assume cert is fine
+        return local_ip in cert_ips
+    except Exception as exc:
+        logger.warning("Could not check SSL cert SANs: %s", exc)
+        return False
+
+
 def ensure_ssl_cert(
     cert_dir: Path | str = _DEFAULT_CERT_DIR,
     mdns_hostname: str = 'tokohub',
@@ -115,6 +130,8 @@ def ensure_ssl_cert(
     key_path = cert_dir / _KEY_FILENAME
 
     if cert_path.exists() and key_path.exists() and _cert_is_valid(cert_path):
-        return str(cert_path), str(key_path)
+        if _cert_has_current_ip(cert_path):
+            return str(cert_path), str(key_path)
+        logger.info("LAN IP changed, regenerating SSL cert")
 
     return generate_self_signed_cert(cert_dir, mdns_hostname=mdns_hostname)

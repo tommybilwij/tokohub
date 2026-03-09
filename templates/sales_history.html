@@ -74,9 +74,18 @@
         <button class="btn btn-sm btn-outline-success" id="shBtnExport">
           <i class="bi bi-filetype-csv"></i> CSV
         </button>
-        <button class="btn btn-sm btn-outline-danger" id="shBtnExportPdf">
-          <i class="bi bi-filetype-pdf"></i> PDF
-        </button>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-danger" id="shBtnExportPdf" data-orientation="landscape">
+            <i class="bi bi-filetype-pdf"></i> PDF
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-danger dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+            <span class="visually-hidden">Toggle</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item sh-pdf-orient" href="#" data-orientation="landscape"><i class="bi bi-phone-landscape"></i> Landscape</a></li>
+            <li><a class="dropdown-item sh-pdf-orient" href="#" data-orientation="portrait"><i class="bi bi-phone"></i> Portrait</a></li>
+          </ul>
+        </div>
       </div>
     </div>
     <div class="table-responsive">

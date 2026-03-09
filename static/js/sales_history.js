@@ -335,11 +335,21 @@
   // -----------------------------------------------------------------------
   // Export PDF
   // -----------------------------------------------------------------------
+  // Dropdown orientation selection
+  document.querySelectorAll('.sh-pdf-orient').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      elBtnExportPdf.dataset.orientation = this.dataset.orientation;
+      elBtnExportPdf.click();
+    });
+  });
+
   elBtnExportPdf.addEventListener('click', function () {
     if (!rows.length) return;
 
+    var orient = this.dataset.orientation || 'landscape';
     var jsPDF = window.jspdf.jsPDF;
-    var doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    var doc = new jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
 
     var from = elFrom.value.replace('T', ' ');
     var to = elTo.value.replace('T', ' ');
@@ -376,7 +386,10 @@
     pdfHeadRow.push('Qty');
     if (showTotal) pdfHeadRow.push('Total');
     var pdfHead = [pdfHeadRow];
-    var pdfColStyles = { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 14 } };
+    var pdfColStyles = {
+      0: { halign: 'center', cellWidth: 8 },
+      3: { halign: 'center', cellWidth: 18 },
+    };
     // Right-align numeric columns (after the base 5 text columns)
     for (var ci = 5; ci < pdfHeadRow.length; ci++) pdfColStyles[ci] = { halign: 'right' };
 

@@ -163,7 +163,7 @@ def main():
             from services.ssl import ensure_ssl_cert
             cert_file, key_file = ensure_ssl_cert(mdns_hostname=settings.mdns_hostname)
 
-            https_port = 443
+            https_port = 8443
             import socket, time as _time
             max_retries = 10
             for attempt in range(1, max_retries + 1):
@@ -174,9 +174,8 @@ def main():
                     break
                 except (PermissionError, OSError) as e:
                     if attempt == max_retries:
-                        raise RuntimeError(f"Cannot bind HTTPS port 443 after {max_retries} attempts: {e}. Run with sudo for port 443.") from e
-                    logger.warning("Port 443 unavailable (attempt %d/%d): %s — retrying in 2s", attempt, max_retries, e)
-                    _time.sleep(2)
+                        raise RuntimeError(f"Cannot bind HTTPS port {https_port} after {max_retries} attempts: {e}") from e
+                    logger.warning("Port %d unavailable (attempt %d/%d): %s — retrying in %ds", https_port, attempt, max_retries, e, attempt * 2)
                     _time.sleep(attempt * 2)
 
             if https_port:
@@ -207,6 +206,7 @@ def main():
                     https_config = uvicorn.Config(
                         app, host='0.0.0.0', port=https_port,
                         ssl_certfile=cert_file, ssl_keyfile=key_file, log_level='info',
+                        timeout_keep_alive=120,
                     )
                     http_server = uvicorn.Server(http_config)
                     https_server = uvicorn.Server(https_config)

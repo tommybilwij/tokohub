@@ -880,51 +880,54 @@ async def get_fp_detail(pool, fp_number):
 
 
 async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid=None, shipping_cost=0, update_price=True, due_date=None, uraian=None):
-    """Update an existing Faktur Pembelian: reverse old stock, replace sthist lines, apply new stock.
+    """Update an existing Faktur Pembelian.
 
-    Same two-phase approach as commit_fp.
+    Uses in-place UPDATE of sthist rows to preserve original noindex ordering,
+    ensuring that newer PH/FP entries correctly take precedence over older ones.
+
+    Phase 1 (atomic): UPDATE/INSERT/DELETE sthist, reverse+apply stlastbal, update header.
+    Phase 2 (deferred): apply stock prices only when no newer transaction has overwritten.
     """
     if not userid:
         raise POCreationError("userid is required")
     order_date = order_date or date.today()
 
-    # Look up existing FP record
     header = await execute_single(
         pool,
-        "SELECT nofaktur, becreff, suppid FROM icbym WHERE nofaktur = %s AND tipe = '1'",
-        (fp_number,)
+        "SELECT nofaktur, becreff, suppid, isupdateprice FROM icbym WHERE nofaktur = %s AND tipe = '1'",
+        (fp_number,),
     )
     if not header:
         raise POCreationError(f"Faktur not found: {fp_number}")
     fp_becreff = header['becreff']
+    old_had_update_price = header['isupdateprice']
 
-    # Get old lines from sthist for stlastbal reversal
+    # Get old sthist lines with noindex for in-place update
     old_lines = await execute_query(
         pool,
-        "SELECT stockid, qty, packing, qtybonus FROM sthist WHERE becreff = %s AND tipetrans = 1",
-        (fp_becreff,)
+        "SELECT stockid, qty, packing, qtybonus, noindex FROM sthist WHERE becreff = %s AND tipetrans = 1",
+        (fp_becreff,),
     )
+    old_map = {line['stockid']: line for line in old_lines}
 
-    # Build new preview
     preview = await preview_fp(pool, supplier_id, items, order_date, shipping_cost=shipping_cost)
+    new_artnos = {line['artno'] for line in preview['lines']}
 
+    # Phase 1 — Atomic transaction
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
             try:
-                # Reverse old stlastbal
+                # Reverse stlastbal for all old items
                 for old in old_lines:
-                    old_qty_small = float(Decimal(str(old['qty'])) * Decimal(str(old['packing'] or 1))) + float(old.get('qtybonus') or 0)
+                    old_qty_small = float(
+                        Decimal(str(old['qty'])) * Decimal(str(old['packing'] or 1))
+                    ) + float(old.get('qtybonus') or 0)
                     await cursor.execute(
-                        """UPDATE stlastbal
-                           SET curqty = curqty - %s
-                           WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
-                        (old_qty_small, old['stockid'])
+                        "UPDATE stlastbal SET curqty = curqty - %s WHERE artno = %s AND warehouseid = 'LAPANGAN'",
+                        (old_qty_small, old['stockid']),
                     )
 
-                # Delete old sthist lines
-                await cursor.execute("DELETE FROM sthist WHERE becreff = %s AND tipetrans = 1", (fp_becreff,))
-
-                # Update header
+                # Update icbym header
                 _due = due_date or order_date
                 await cursor.execute(
                     """UPDATE icbym
@@ -933,79 +936,115 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                            isupdate = 1
                        WHERE nofaktur = %s AND tipe = '1'""",
                     (supplier_id, order_date, _due,
-                     preview['grand_total'], userid, uraian, 1 if update_price else 0, fp_number)
+                     preview['grand_total'], userid, uraian, 1 if update_price else 0, fp_number),
                 )
 
-                # Insert new sthist lines
+                iup = 1 if update_price else 0
+
+                # Update or insert sthist lines
                 for line in preview['lines']:
+                    artno = line['artno']
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
 
-                    iup = 1 if update_price else 0
-                    await cursor.execute(
-                        """INSERT INTO sthist
-                           (stockid, artpabrik, artname, tanggal,
-                            qty, beli, packing, satuanbsr, satuankcl,
-                            hbelibsr, hbelikcl, hbelinetto,
-                            pctdisc1, pctdisc2, pctdisc3,
-                            jlhdisc1, jlhdisc2, jlhdisc3,
-                            pctppn, jlhppn,
-                            hjual, hjual2, hjual3, hjual4, hjual5,
-                            ispaketprc, over1, over2,
-                            hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
-                            hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
-                            amount, qtybonus,
-                            suppid, whid, nofaktur, becreff, tipetrans,
-                            isupdateprice, isupdatepurchprice)
-                           VALUES (%s, %s, %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s, %s, %s, %s,
-                                   %s, %s,
-                                   %s, 'LAPANGAN', %s, %s, 1,
-                                   %s, %s)""",
-                        (line['artno'], line['artpabrik'], line['artname'], order_date,
-                         line['qty'], float(qty_small), line['packing'],
-                         line['satuanbsr'], line['satuankcl'],
-                         line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
-                         line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                         line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
-                         line['pctppn'], line['jlhppn'],
-                         line['hjual'], line['hjual2'], line['hjual3'],
-                         line['hjual4'], line['hjual5'],
-                         _bundling_flag(line),
-                         _bundling_val(line, 'bundling1', 'min_qty'),
-                         _bundling_val(line, 'bundling2', 'min_qty'),
-                         _bundling_val(line, 'bundling1', 'hjual1'),
-                         _bundling_val(line, 'bundling1', 'hjual2'),
-                         _bundling_val(line, 'bundling1', 'hjual3'),
-                         _bundling_val(line, 'bundling1', 'hjual4'),
-                         _bundling_val(line, 'bundling1', 'hjual5'),
-                         _bundling_val(line, 'bundling2', 'hjual1'),
-                         _bundling_val(line, 'bundling2', 'hjual2'),
-                         _bundling_val(line, 'bundling2', 'hjual3'),
-                         _bundling_val(line, 'bundling2', 'hjual4'),
-                         _bundling_val(line, 'bundling2', 'hjual5'),
-                         line['amount'], line.get('foc', 0),
-                         supplier_id, fp_number, fp_becreff,
-                         iup, iup)
+                    # Common field values shared between UPDATE and INSERT
+                    data_vals = (
+                        line['artpabrik'], line['artname'], order_date,
+                        line['qty'], float(qty_small), line['packing'],
+                        line['satuanbsr'], line['satuankcl'],
+                        line['hbelibsr'], line['hbelikcl'], line['hbelinetto'],
+                        line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                        line['jlhdisc1'], line['jlhdisc2'], line['jlhdisc3'],
+                        line['pctppn'], line['jlhppn'],
+                        line['hjual'], line['hjual2'], line['hjual3'],
+                        line['hjual4'], line['hjual5'],
+                        _bundling_flag(line),
+                        _bundling_val(line, 'bundling1', 'min_qty'),
+                        _bundling_val(line, 'bundling2', 'min_qty'),
+                        _bundling_val(line, 'bundling1', 'hjual1'),
+                        _bundling_val(line, 'bundling1', 'hjual2'),
+                        _bundling_val(line, 'bundling1', 'hjual3'),
+                        _bundling_val(line, 'bundling1', 'hjual4'),
+                        _bundling_val(line, 'bundling1', 'hjual5'),
+                        _bundling_val(line, 'bundling2', 'hjual1'),
+                        _bundling_val(line, 'bundling2', 'hjual2'),
+                        _bundling_val(line, 'bundling2', 'hjual3'),
+                        _bundling_val(line, 'bundling2', 'hjual4'),
+                        _bundling_val(line, 'bundling2', 'hjual5'),
+                        line['amount'], line.get('foc', 0),
+                        supplier_id, fp_number,
+                        iup, iup,
                     )
+
+                    if artno in old_map:
+                        # UPDATE existing sthist row by noindex (preserves chronological ordering)
+                        await cursor.execute(
+                            """UPDATE sthist SET
+                                artpabrik=%s, artname=%s, tanggal=%s,
+                                qty=%s, beli=%s, packing=%s, satuanbsr=%s, satuankcl=%s,
+                                hbelibsr=%s, hbelikcl=%s, hbelinetto=%s,
+                                pctdisc1=%s, pctdisc2=%s, pctdisc3=%s,
+                                jlhdisc1=%s, jlhdisc2=%s, jlhdisc3=%s,
+                                pctppn=%s, jlhppn=%s,
+                                hjual=%s, hjual2=%s, hjual3=%s, hjual4=%s, hjual5=%s,
+                                ispaketprc=%s, over1=%s, over2=%s,
+                                hjualo1=%s, hjual2o1=%s, hjual3o1=%s, hjual4o1=%s, hjual5o1=%s,
+                                hjualo2=%s, hjual2o2=%s, hjual3o2=%s, hjual4o2=%s, hjual5o2=%s,
+                                amount=%s, qtybonus=%s,
+                                suppid=%s, nofaktur=%s,
+                                isupdateprice=%s, isupdatepurchprice=%s,
+                                posttime=NOW()
+                            WHERE noindex=%s""",
+                            (*data_vals, old_map[artno]['noindex']),
+                        )
+                    else:
+                        # INSERT new sthist row (gets new auto-increment noindex)
+                        await cursor.execute(
+                            """INSERT INTO sthist
+                               (stockid, artpabrik, artname, tanggal,
+                                qty, beli, packing, satuanbsr, satuankcl,
+                                hbelibsr, hbelikcl, hbelinetto,
+                                pctdisc1, pctdisc2, pctdisc3,
+                                jlhdisc1, jlhdisc2, jlhdisc3,
+                                pctppn, jlhppn,
+                                hjual, hjual2, hjual3, hjual4, hjual5,
+                                ispaketprc, over1, over2,
+                                hjualo1, hjual2o1, hjual3o1, hjual4o1, hjual5o1,
+                                hjualo2, hjual2o2, hjual3o2, hjual4o2, hjual5o2,
+                                amount, qtybonus,
+                                suppid, whid, nofaktur, becreff, tipetrans,
+                                isupdateprice, isupdatepurchprice)
+                               VALUES (%s, %s, %s, %s,
+                                       %s, %s, %s, %s, %s,
+                                       %s, %s, %s,
+                                       %s, %s, %s,
+                                       %s, %s, %s,
+                                       %s, %s,
+                                       %s, %s, %s, %s, %s,
+                                       %s, %s, %s,
+                                       %s, %s, %s, %s, %s,
+                                       %s, %s, %s, %s, %s,
+                                       %s, %s,
+                                       %s, 'LAPANGAN', %s, %s, 1,
+                                       %s, %s)""",
+                            (artno, *data_vals, fp_becreff),
+                        )
+
+                # Delete removed items from sthist
+                for artno, old in old_map.items():
+                    if artno not in new_artnos:
+                        await cursor.execute(
+                            "DELETE FROM sthist WHERE noindex = %s",
+                            (old['noindex'],),
+                        )
 
                 # Apply new stlastbal
                 for line in preview['lines']:
                     foc = Decimal(str(line.get('foc', 0)))
                     qty_small = Decimal(str(line['qty'])) * Decimal(str(line['packing'])) + foc
                     await cursor.execute(
-                        """UPDATE stlastbal
-                           SET curqty = curqty + %s
-                           WHERE artno = %s AND warehouseid = 'LAPANGAN'""",
-                        (float(qty_small), line['artno'])
+                        "UPDATE stlastbal SET curqty = curqty + %s WHERE artno = %s AND warehouseid = 'LAPANGAN'",
+                        (float(qty_small), line['artno']),
                     )
 
                 await conn.commit()
@@ -1015,90 +1054,115 @@ async def update_fp(pool, fp_number, supplier_id, items, order_date=None, userid
                 logger.exception("Faktur update failed (Phase 1)")
                 raise
 
-    # Phase 2 — Deferred stock updates.
-    # Harga beli, discounts, tax, satuan, packing: ALWAYS updated.
-    # Harga jual + bundling: only when update_price=True.
-    # When update_price=False, revert hjual + bundling to previous sthist state.
+    # Phase 2 — Deferred stock updates with noindex-based precedence checks.
+    # Only update stock when no newer transaction has already overwritten the field.
+    updated_lines = await execute_query(
+        pool,
+        "SELECT stockid, noindex FROM sthist WHERE becreff = %s AND tipetrans = 1",
+        (fp_becreff,),
+    )
+    noindex_map = {r['stockid']: r['noindex'] for r in updated_lines}
+
+    from services.stock_restore import (
+        has_newer_hbeli_update, has_newer_hjual_update,
+        get_latest_hjual, get_init_hjual,
+        get_previous_hbeli, get_previous_hjual,
+        get_init_hbeli,
+        RESTORE_HBELI_SQL, hbeli_params, RESTORE_HJUAL_SQL, hjual_params,
+    )
 
     for line in preview['lines']:
+        artno = line['artno']
+        ni = noindex_map.get(artno)
+        if not ni:
+            continue
+
+        # hbeli + discounts + packing: always from FP, but only if no newer FP has overwritten
+        try:
+            if not await has_newer_hbeli_update(pool, artno, ni):
+                await execute_modify(
+                    pool,
+                    """UPDATE stock
+                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
+                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
+                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
+                           pctppn = %s, jlhppn = %s,
+                           satbesar = %s, packing = %s
+                       WHERE artno = %s""",
+                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
+                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
+                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
+                     line['pctppn'], line['jlhppn_kcl'],
+                     line['satuanbsr'], line['packing'],
+                     artno),
+                )
+        except Exception:
+            logger.warning("Deferred hbeli update failed for %s", artno, exc_info=True)
+
+        # hjual + bundling
         try:
             if update_price:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock
-                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
-                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
-                           pctppn = %s, jlhppn = %s,
-                           hjual = %s, hjual2 = %s, hjual3 = %s,
-                           hjual4 = %s, hjual5 = %s,
-                           satbesar = %s, packing = %s
-                       WHERE artno = %s""",
-                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
-                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
-                     line['pctppn'], line['jlhppn_kcl'],
-                     line['hjual'], line['hjual2'], line['hjual3'],
-                     line['hjual4'], line['hjual5'],
-                     line['satuanbsr'], line['packing'],
-                     line['artno']),
-                )
+                if not await has_newer_hjual_update(pool, artno, ni):
+                    await execute_modify(
+                        pool,
+                        """UPDATE stock
+                           SET hjual = %s, hjual2 = %s, hjual3 = %s,
+                               hjual4 = %s, hjual5 = %s
+                           WHERE artno = %s""",
+                        (line['hjual'], line['hjual2'], line['hjual3'],
+                         line['hjual4'], line['hjual5'], artno),
+                    )
+                    b1 = line.get('bundling1') or {}
+                    b2 = line.get('bundling2') or {}
+                    has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
+                    await execute_modify(
+                        pool,
+                        """UPDATE stock
+                           SET ispaketprc = %s,
+                               over1 = %s,
+                               hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
+                               over2 = %s,
+                               hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
+                           WHERE artno = %s""",
+                        (has_bundling,
+                         b1.get('min_qty') or 0,
+                         b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
+                         b1.get('hjual4') or 0, b1.get('hjual5') or 0,
+                         b2.get('min_qty') or 0,
+                         b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
+                         b2.get('hjual4') or 0, b2.get('hjual5') or 0,
+                         artno),
+                    )
             else:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock
-                       SET hbelibsr = %s, hbelikcl = %s, hbelinetto = %s,
-                           pctdisc1 = %s, pctdisc2 = %s, pctdisc3 = %s,
-                           jlhdisc1 = %s, jlhdisc2 = %s, jlhdisc3 = %s,
-                           pctppn = %s, jlhppn = %s,
-                           satbesar = %s, packing = %s
-                       WHERE artno = %s""",
-                    (line['hbelibsr'], line['hbelikcl'], line['hbelinetto_kcl'],
-                     line['pctdisc1'], line['pctdisc2'], line['pctdisc3'],
-                     line['jlhdisc1_kcl'], line['jlhdisc2_kcl'], line['jlhdisc3_kcl'],
-                     line['pctppn'], line['jlhppn_kcl'],
-                     line['satuanbsr'], line['packing'],
-                     line['artno']),
-                )
-                # Revert hjual + bundling from previous sthist entry
-                # New sthist lines have isupdateprice=0, so get_latest_hjual skips them
-                from services.stock_restore import get_latest_hjual, get_init_hjual, RESTORE_HJUAL_SQL, hjual_params
-                prev_hjual = await get_latest_hjual(pool, line['artno'])
+                # Revert hjual + bundling to latest price-updating entry
+                prev_hjual = await get_latest_hjual(pool, artno)
                 if not prev_hjual:
-                    prev_hjual = await get_init_hjual(pool, line['artno'])
+                    prev_hjual = await get_init_hjual(pool, artno)
                 if prev_hjual:
-                    try:
-                        await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev_hjual, line['artno']))
-                    except Exception:
-                        logger.warning("Revert hjual from sthist failed for %s", line['artno'], exc_info=True)
+                    await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev_hjual, artno))
         except Exception:
-            logger.warning("Deferred stock price update failed for %s", line['artno'], exc_info=True)
+            logger.warning("Deferred hjual update failed for %s", artno, exc_info=True)
 
-        if update_price:
-            b1 = line.get('bundling1') or {}
-            b2 = line.get('bundling2') or {}
-            has_bundling = 1 if (b1.get('min_qty') or b2.get('min_qty')) else 0
-            try:
-                await execute_modify(
-                    pool,
-                    """UPDATE stock
-                       SET ispaketprc = %s,
-                           over1 = %s,
-                           hjualo1 = %s, hjual2o1 = %s, hjual3o1 = %s, hjual4o1 = %s, hjual5o1 = %s,
-                           over2 = %s,
-                           hjualo2 = %s, hjual2o2 = %s, hjual3o2 = %s, hjual4o2 = %s, hjual5o2 = %s
-                       WHERE artno = %s""",
-                    (has_bundling,
-                     b1.get('min_qty') or 0,
-                     b1.get('hjual1') or 0, b1.get('hjual2') or 0, b1.get('hjual3') or 0,
-                     b1.get('hjual4') or 0, b1.get('hjual5') or 0,
-                     b2.get('min_qty') or 0,
-                     b2.get('hjual1') or 0, b2.get('hjual2') or 0, b2.get('hjual3') or 0,
-                     b2.get('hjual4') or 0, b2.get('hjual5') or 0,
-                     line['artno']),
-                )
-            except Exception:
-                logger.warning("Deferred bundling update failed for %s", line['artno'], exc_info=True)
+    # Handle removed items: restore stock prices from previous sthist entries
+    for artno, old in old_map.items():
+        if artno in new_artnos:
+            continue
+        old_ni = old['noindex']
+        try:
+            if not await has_newer_hbeli_update(pool, artno, old_ni):
+                prev = await get_previous_hbeli(pool, artno, old_ni)
+                if not prev:
+                    prev = await get_init_hbeli(pool, artno)
+                if prev:
+                    await execute_modify(pool, RESTORE_HBELI_SQL, hbeli_params(prev, artno))
+            if old_had_update_price and not await has_newer_hjual_update(pool, artno, old_ni):
+                prev = await get_previous_hjual(pool, artno, old_ni)
+                if not prev:
+                    prev = await get_init_hjual(pool, artno)
+                if prev:
+                    await execute_modify(pool, RESTORE_HJUAL_SQL, hjual_params(prev, artno))
+        except Exception:
+            logger.warning("Deferred stock restore failed for removed item %s", artno, exc_info=True)
 
     from services.stock_search import invalidate_cache
     invalidate_cache()

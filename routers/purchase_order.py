@@ -54,6 +54,7 @@ async def api_save_po(request: Request, db: aiomysql.Pool = Depends(get_db)):
         date_from=body['date_from'],
         date_to=body['date_to'],
         created_by=body.get('created_by', ''),
+        keterangan=body.get('keterangan', ''),
     )
     if 'error' in result:
         return JSONResponse(result, status_code=400)
@@ -70,6 +71,7 @@ async def api_update_po(po_number: str, request: Request, db: aiomysql.Pool = De
         order_date=body['order_date'],
         date_from=body['date_from'],
         date_to=body['date_to'],
+        keterangan=body.get('keterangan', ''),
     )
     if 'error' in result:
         return JSONResponse(result, status_code=400)

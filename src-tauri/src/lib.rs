@@ -4,6 +4,9 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use tauri::Manager;
 use tauri::RunEvent;
 use tauri::Url;
@@ -68,10 +71,15 @@ fn do_spawn(sidecar_path: &PathBuf) -> Option<Child> {
     let envrc_vars = load_envrc();
     let logs = log_dir();
 
-    match Command::new(sidecar_path)
-        .args(["--port", &HTTP_PORT.to_string(), "--host", "127.0.0.1"])
-        .envs(&envrc_vars)
-        .stdout(
+    let mut cmd = Command::new(sidecar_path);
+    cmd.args(["--port", &HTTP_PORT.to_string(), "--host", "127.0.0.1"])
+        .envs(&envrc_vars);
+
+    // Hide console window on Windows
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    match cmd.stdout(
             std::fs::File::options()
                 .append(true)
                 .create(true)
@@ -205,6 +213,7 @@ fn monitor_sidecar(app_handle: tauri::AppHandle) {
                     for port in [HTTP_PORT, HTTPS_PORT] {
                         let _ = std::process::Command::new("cmd")
                             .args(["/C", &format!("for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :{} ^| findstr LISTENING') do taskkill /F /PID %a", port)])
+                            .creation_flags(0x08000000) // CREATE_NO_WINDOW
                             .output();
                     }
                 }

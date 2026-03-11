@@ -78,6 +78,11 @@
     return Math.floor(n * 100) / 100;
   }
 
+  function fmtPct(n) {
+    if (n == null) return '';
+    return (Math.round(n * 100) / 100).toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
   function computeQty(item) {
     return item.qtyBesar || 0;
   }
@@ -910,12 +915,15 @@
     const amtMap = { disc1: net.d1, disc2: net.d2, disc3: net.d3, ppn: net.ppnAmt };
     ['disc1','disc2','disc3','ppn'].forEach(f => {
       const amtEl = document.querySelector(`.edit-disc-amt[data-idx="${idx}"][data-field="${f}"]`);
-      if (amtEl && document.activeElement !== amtEl) amtEl.value = amtMap[f] ? formatNumber(amtMap[f]) : '';
+      // Use user-entered amount override if available, otherwise recalculated from %
+      const overrides = item._discAmts || {};
+      const displayAmt = (overrides[f] != null) ? overrides[f] : (amtMap[f] ? Math.round(amtMap[f] * 100) / 100 : 0);
+      if (amtEl && document.activeElement !== amtEl) amtEl.value = displayAmt ? formatNumber(displayAmt) : '';
       const totalEl = document.querySelector(`.edit-disc-total[data-idx="${idx}"][data-field="${f}"]`);
-      if (totalEl && document.activeElement !== totalEl) totalEl.value = amtMap[f] ? formatNumber(amtMap[f] * qtyBsr) : '';
+      if (totalEl && document.activeElement !== totalEl) totalEl.value = displayAmt ? formatNumber(displayAmt * qtyBsr) : '';
       const pcsEl = document.querySelector(`.disc-pcs[data-idx="${idx}"][data-field="${f}"]`);
       if (pcsEl) {
-        const amtPcs = (qtyKcl > 0 && amtMap[f]) ? amtMap[f] / qtyKcl : 0;
+        const amtPcs = (qtyKcl > 0 && displayAmt) ? Math.round((displayAmt / qtyKcl) * 100) / 100 : 0;
         const pcsInput = pcsEl.querySelector('input');
         if (pcsInput) pcsInput.value = amtPcs ? formatNumber(amtPcs) : '0';
       }
@@ -1231,8 +1239,8 @@
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc1"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td class="disc-pcs" data-idx="${idx}" data-field="disc1"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc1"
-                               value="${item.disc1 != null ? item.disc1 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                    <td><input type="text" class="pct-input edit-disc-pct" inputmode="decimal" data-idx="${idx}" data-field="disc1"
+                               value="${fmtPct(item.disc1)}" placeholder="—"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 2</td>
@@ -1241,8 +1249,8 @@
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc2"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td class="disc-pcs" data-idx="${idx}" data-field="disc2"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc2"
-                               value="${item.disc2 != null ? item.disc2 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                    <td><input type="text" class="pct-input edit-disc-pct" inputmode="decimal" data-idx="${idx}" data-field="disc2"
+                               value="${fmtPct(item.disc2)}" placeholder="—"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">PPN</td>
@@ -1251,8 +1259,8 @@
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="ppn"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td class="disc-pcs" data-idx="${idx}" data-field="ppn"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="ppn"
-                               value="${item.ppn != null ? item.ppn : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                    <td><input type="text" class="pct-input edit-disc-pct" inputmode="decimal" data-idx="${idx}" data-field="ppn"
+                               value="${fmtPct(item.ppn)}" placeholder="—"></td>
                   </tr>
                   <tr>
                     <td class="bt-label">Diskon 3</td>
@@ -1261,8 +1269,8 @@
                     <td><input type="text" class="amt-input edit-disc-amt" data-idx="${idx}" data-field="disc3"
                                value="" placeholder="0" inputmode="decimal"></td>
                     <td class="disc-pcs" data-idx="${idx}" data-field="disc3"><input type="text" class="amt-input" value="0" readonly tabindex="-1"></td>
-                    <td><input type="number" class="pct-input edit-disc-pct" data-idx="${idx}" data-field="disc3"
-                               value="${item.disc3 != null ? item.disc3 : ''}" placeholder="—" step="any" min="0" max="100"></td>
+                    <td><input type="text" class="pct-input edit-disc-pct" inputmode="decimal" data-idx="${idx}" data-field="disc3"
+                               value="${fmtPct(item.disc3)}" placeholder="—"></td>
                   </tr>
                 </tbody>
               </table>
@@ -1506,7 +1514,9 @@
         const idx = parseInt(el.dataset.idx);
         const field = el.dataset.field;
         const item = state.items[idx];
-        item[field] = el.value !== '' ? parseFloat(el.value) : null;
+        item[field] = el.value !== '' ? parseFloat(el.value.replace(/\./g, '').replace(',', '.')) : null;
+        // Clear amount override — user is entering % directly
+        if (item._discAmts) delete item._discAmts[field];
         _updateComputedPrices(idx);
         _saveStateDebounced();
       }
@@ -1522,13 +1532,17 @@
         const amt = parsePrice(el.value);
         if (!amt) {
           item[field] = null;
+          if (item._discAmts) delete item._discAmts[field];
         } else {
           const base = _discBase(item, field);
           item[field] = base > 0 ? Math.round((amt / base) * 1000000) / 10000 : 0;
+          // Store exact user-entered amount so display doesn't drift from % roundtrip
+          if (!item._discAmts) item._discAmts = {};
+          item._discAmts[field] = amt;
         }
         // Update the percentage input to reflect calculated %
         const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
-        if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
+        if (pctEl) pctEl.value = fmtPct(item[field]);
         _updateComputedPrices(idx);
         _saveStateDebounced();
       }
@@ -1549,13 +1563,17 @@
         const qtyBsr = item.qtyBesar || 1;
         if (!totalAmt) {
           item[field] = null;
+          if (item._discAmts) delete item._discAmts[field];
         } else {
           const perUnit = totalAmt / qtyBsr;
           const base = _discBase(item, field);
           item[field] = base > 0 ? Math.round((perUnit / base) * 1000000) / 10000 : 0;
+          // Store exact per-unit amount from total input
+          if (!item._discAmts) item._discAmts = {};
+          item._discAmts[field] = perUnit;
         }
         const pctEl = document.querySelector(`.edit-disc-pct[data-idx="${idx}"][data-field="${field}"]`);
-        if (pctEl) pctEl.value = item[field] != null ? item[field] : '';
+        if (pctEl) pctEl.value = fmtPct(item[field]);
         _updateComputedPrices(idx);
         _saveStateDebounced();
       }

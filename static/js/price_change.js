@@ -633,6 +633,35 @@
       }
     }
 
+    // Validate: prices must be filled for Satuan and enabled Bundling tiers
+    var errors = [];
+    toSend.forEach((i, idx) => {
+      const label = i.artname || i.artno;
+      // Satuan: at least one harga jual must be filled
+      const hasAnySatuan = i.newHjual || i.newHjual2 || i.newHjual3 || i.newHjual4 || i.newHjual5;
+      if (!hasAnySatuan) errors.push(`${label}: Harga Satuan belum diisi`);
+      // Bundling 1: if enabled, QTY > 0 and at least one harga must be filled
+      if (i.bundling1.enabled) {
+        if (!i.bundling1.minQty || i.bundling1.minQty <= 0)
+          errors.push(`${label}: Bundling 1 QTY harus > 0`);
+        const hasAnyB1 = i.bundling1.newHjual1 || i.bundling1.newHjual2 || i.bundling1.newHjual3 || i.bundling1.newHjual4 || i.bundling1.newHjual5;
+        if (!hasAnyB1)
+          errors.push(`${label}: Harga Bundling 1 belum diisi`);
+      }
+      // Bundling 2: if enabled, QTY > 0 and at least one harga must be filled
+      if (i.bundling2.enabled) {
+        if (!i.bundling2.minQty || i.bundling2.minQty <= 0)
+          errors.push(`${label}: Bundling 2 QTY harus > 0`);
+        const hasAnyB2 = i.bundling2.newHjual1 || i.bundling2.newHjual2 || i.bundling2.newHjual3 || i.bundling2.newHjual4 || i.bundling2.newHjual5;
+        if (!hasAnyB2)
+          errors.push(`${label}: Harga Bundling 2 belum diisi`);
+      }
+    });
+    if (errors.length) {
+      window.showToast && showToast(errors.join('<br>'), 'warning');
+      return;
+    }
+
     const confirmed = await (window.showConfirm
       ? showConfirm(`Simpan perubahan harga untuk ${toSend.length} item?`)
       : Promise.resolve(confirm(`Simpan perubahan harga untuk ${toSend.length} item?`)));

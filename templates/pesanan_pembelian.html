@@ -55,6 +55,7 @@
             <th class="sh-sortable text-center" data-col="total_items">Items <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="date_from">Periode Sales <i class="bi bi-chevron-expand"></i></th>
             <th class="sh-sortable" data-col="created_by">User <i class="bi bi-chevron-expand"></i></th>
+            <th class="text-center">Ket</th>
             <th></th>
           </tr>
         </thead>
@@ -124,6 +125,8 @@
 
   var storeName = {{ store_name | default('', true) | tojson }};
   var storeLocation = {{ store_location | default('', true) | tojson }};
+
+  function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   var pageEl = document.querySelector('.sh-page');
   var canEdit = pageEl.dataset.canEdit === 'true';
@@ -251,6 +254,7 @@
             + '<td class="text-center">' + (o.total_items || 0) + '</td>'
             + '<td>' + (o.date_from || '') + ' ~ ' + (o.date_to || '') + '</td>'
             + '<td>' + (o.created_by || '') + '</td>'
+            + '<td class="text-center">' + (o.keterangan ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.keterangan) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
             + '<td class="text-nowrap">' + actions + '</td>';
           elBody.appendChild(tr);
         });
@@ -307,6 +311,7 @@
         + '<td class="text-center">' + (o.total_items || 0) + '</td>'
         + '<td>' + (o.date_from || '') + ' ~ ' + (o.date_to || '') + '</td>'
         + '<td>' + (o.created_by || '') + '</td>'
+        + '<td class="text-center">' + (o.keterangan ? '<span class="text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="' + esc(o.keterangan) + '" style="cursor:help"><i class="bi bi-chat-left-text"></i></span>' : '<span class="text-muted opacity-25">-</span>') + '</td>'
         + '<td class="text-nowrap">' + actions + '</td>';
       elBody.appendChild(tr);
     });
@@ -356,6 +361,10 @@
   }
 
   function bindListButtons() {
+    // Init Bootstrap tooltips for keterangan icons
+    document.querySelectorAll('#hTableBody [data-bs-toggle="tooltip"]').forEach(function(el) {
+      new bootstrap.Tooltip(el);
+    });
     document.querySelectorAll('#hTableBody .btn-view-po').forEach(function(btn) {
       btn.addEventListener('click', async function() {
         var po = btn.dataset.po;

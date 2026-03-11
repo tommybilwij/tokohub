@@ -69,6 +69,13 @@
           <input type="number" id="poTargetDays" class="form-control" value="30" min="1" step="1">
         </div>
 
+        <hr>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Keterangan</label>
+          <input type="text" id="poKeterangan" class="form-control" maxlength="200" placeholder="Opsional, maks 200 karakter">
+        </div>
+
         <button class="btn btn-primary-app w-100" id="poLoadItems">
           <i class="bi bi-arrow-repeat"></i> Muat Data
         </button>
@@ -218,6 +225,7 @@
       salesFrom: document.getElementById('poSalesFrom').value,
       salesTo: document.getElementById('poSalesTo').value,
       targetDays: document.getElementById('poTargetDays').value,
+      keterangan: (document.getElementById('poKeterangan') || {}).value || '',
       orders: orders,
       extraItems: extraItems,
       hasData: poItems.length > 0,
@@ -250,6 +258,7 @@
     if (draft.salesFrom) document.getElementById('poSalesFrom').value = draft.salesFrom.substring(0, 7);
     if (draft.salesTo) document.getElementById('poSalesTo').value = draft.salesTo.substring(0, 7);
     if (draft.targetDays) document.getElementById('poTargetDays').value = draft.targetDays;
+    if (draft.keterangan) document.getElementById('poKeterangan').value = draft.keterangan;
 
     // If there was data loaded, auto-reload and apply saved orders
     if (draft.hasData) {
@@ -1034,6 +1043,7 @@
       if (data.tgl_pesanan) document.getElementById('poOrderDate').value = data.tgl_pesanan;
       if (data.date_from) document.getElementById('poSalesFrom').value = data.date_from.substring(0, 7);
       if (data.date_to) document.getElementById('poSalesTo').value = data.date_to.substring(0, 7);
+      if (data.keterangan) document.getElementById('poKeterangan').value = data.keterangan;
 
       // Build order map from existing PO lines: {artno: {bsr, kcl}}
       var orderMap = {};
@@ -1121,6 +1131,7 @@
         order_date: orderDate,
         date_from: salesRange.from,
         date_to: salesRange.to,
+        keterangan: (document.getElementById('poKeterangan') || {}).value || '',
       };
       if (!isEdit) payload.created_by = currentUser;
 

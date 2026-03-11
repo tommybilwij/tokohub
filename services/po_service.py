@@ -243,7 +243,7 @@ async def _generate_po_number(cursor, order_date: date) -> str:
 
 async def save_pesanan(pool, suppid: str, items: list[dict],
                        order_date: str, date_from: str, date_to: str,
-                       created_by: str) -> dict:
+                       created_by: str, keterangan: str = '') -> dict:
     """Save a pesanan pembelian.
 
     items: list of {artno, artpabrik, artname, packing, satbesar, satkecil, qty_order, hbelibsr}
@@ -268,10 +268,10 @@ async def save_pesanan(pool, suppid: str, items: list[dict],
 
             await cur.execute(
                 """INSERT INTO tokohub.pesanan_pembelian
-                   (po_number, suppid, tgl_pesanan, date_from, date_to, total_items, created_by)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                   (po_number, suppid, tgl_pesanan, date_from, date_to, total_items, keterangan, created_by)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                 (po_number, suppid, order_date, date_from, date_to,
-                 len(order_items), created_by),
+                 len(order_items), keterangan or '', created_by),
             )
 
             for it in order_items:
@@ -296,7 +296,8 @@ async def save_pesanan(pool, suppid: str, items: list[dict],
 
 
 async def update_pesanan(pool, po_number: str, items: list[dict],
-                         order_date: str, date_from: str, date_to: str) -> dict:
+                         order_date: str, date_from: str, date_to: str,
+                         keterangan: str = '') -> dict:
     """Update an existing pesanan pembelian (replace all detail lines)."""
     header = await execute_single(
         pool,
@@ -327,9 +328,9 @@ async def update_pesanan(pool, po_number: str, items: list[dict],
             # Update header
             await cur.execute(
                 """UPDATE tokohub.pesanan_pembelian
-                   SET tgl_pesanan = %s, date_from = %s, date_to = %s, total_items = %s
+                   SET tgl_pesanan = %s, date_from = %s, date_to = %s, total_items = %s, keterangan = %s
                    WHERE po_number = %s""",
-                (order_date, date_from, date_to, len(order_items), po_number),
+                (order_date, date_from, date_to, len(order_items), keterangan or '', po_number),
             )
 
             # Insert new detail lines
@@ -384,7 +385,7 @@ async def get_po_list(pool, page: int = 1, per_page: int = 20,
     rows = await execute_query(
         pool,
         f"""SELECT p.po_number, p.suppid, p.tgl_pesanan, p.date_from, p.date_to,
-                   p.total_items, p.created_by, p.created_at,
+                   p.total_items, p.keterangan, p.created_by, p.created_at,
                    v.name AS supplier_name
             FROM tokohub.pesanan_pembelian p
             LEFT JOIN vendor v ON v.id = p.suppid
@@ -404,6 +405,7 @@ async def get_po_list(pool, page: int = 1, per_page: int = 20,
             'date_to': str(r['date_to']) if r['date_to'] else '',
             'total_items': r['total_items'],
             'supplier_name': r['supplier_name'] or r['suppid'],
+            'keterangan': r['keterangan'] or '',
             'created_by': r['created_by'] or '',
             'created_at': str(r['created_at']) if r['created_at'] else '',
         })
@@ -416,7 +418,7 @@ async def get_po_detail(pool, po_number: str) -> dict:
     header = await execute_single(
         pool,
         """SELECT p.po_number, p.suppid, p.tgl_pesanan, p.date_from, p.date_to,
-                  p.total_items, p.created_by, p.created_at,
+                  p.total_items, p.keterangan, p.created_by, p.created_at,
                   v.name AS supplier_name
            FROM tokohub.pesanan_pembelian p
            LEFT JOIN vendor v ON v.id = p.suppid
@@ -443,6 +445,7 @@ async def get_po_detail(pool, po_number: str) -> dict:
         'date_from': str(header['date_from']) if header['date_from'] else '',
         'date_to': str(header['date_to']) if header['date_to'] else '',
         'total_items': header['total_items'],
+        'keterangan': header['keterangan'] or '',
         'created_by': header['created_by'] or '',
         'lines': [
             {

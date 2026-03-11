@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS tokohub.pesanan_pembelian (
   date_from DATE NOT NULL,
   date_to DATE NOT NULL,
   total_items INT NOT NULL DEFAULT 0,
+  keterangan VARCHAR(200) NOT NULL DEFAULT '',
   created_by VARCHAR(30) NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

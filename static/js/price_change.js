@@ -349,6 +349,7 @@
       // Bundling 1
       bundling1: {
         enabled: !!(b1.qty),
+        _origMinQty: b1.qty || 0,
         minQty: b1.qty || 0,
         hjual1: b1.hjual1 || 0, hjual2: b1.hjual2 || 0, hjual3: b1.hjual3 || 0,
         hjual4: b1.hjual4 || 0, hjual5: b1.hjual5 || 0,
@@ -358,6 +359,7 @@
       // Bundling 2
       bundling2: {
         enabled: !!(b2.qty),
+        _origMinQty: b2.qty || 0,
         minQty: b2.qty || 0,
         hjual1: b2.hjual1 || 0, hjual2: b2.hjual2 || 0, hjual3: b2.hjual3 || 0,
         hjual4: b2.hjual4 || 0, hjual5: b2.hjual5 || 0,
@@ -619,12 +621,19 @@
       toSend = items.filter(i => {
         const mainChanged = i.newHjual !== i.hjual || i.newHjual2 !== i.hjual2 ||
           i.newHjual3 !== i.hjual3 || i.newHjual4 !== i.hjual4 || i.newHjual5 !== i.hjual5;
-        const b1Changed = i.bundling1.enabled && (
-          i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
-          i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 || i.bundling1.newHjual5 !== i.bundling1.hjual5);
-        const b2Changed = i.bundling2.enabled && (
-          i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
-          i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 || i.bundling2.newHjual5 !== i.bundling2.hjual5);
+        // Bundling changed if: was enabled & now unchecked, enabled & prices changed, or enabled & qty changed
+        const b1WasEnabled = !!(i.bundling1.hjual1 || i.bundling1.hjual2 || i.bundling1.hjual3 || i.bundling1.hjual4 || i.bundling1.hjual5);
+        const b1Changed = (!i.bundling1.enabled && b1WasEnabled) ||
+          (i.bundling1.enabled && (
+            i.bundling1.newHjual1 !== i.bundling1.hjual1 || i.bundling1.newHjual2 !== i.bundling1.hjual2 ||
+            i.bundling1.newHjual3 !== i.bundling1.hjual3 || i.bundling1.newHjual4 !== i.bundling1.hjual4 ||
+            i.bundling1.newHjual5 !== i.bundling1.hjual5 || i.bundling1.minQty !== (i.bundling1._origMinQty ?? i.bundling1.minQty)));
+        const b2WasEnabled = !!(i.bundling2.hjual1 || i.bundling2.hjual2 || i.bundling2.hjual3 || i.bundling2.hjual4 || i.bundling2.hjual5);
+        const b2Changed = (!i.bundling2.enabled && b2WasEnabled) ||
+          (i.bundling2.enabled && (
+            i.bundling2.newHjual1 !== i.bundling2.hjual1 || i.bundling2.newHjual2 !== i.bundling2.hjual2 ||
+            i.bundling2.newHjual3 !== i.bundling2.hjual3 || i.bundling2.newHjual4 !== i.bundling2.hjual4 ||
+            i.bundling2.newHjual5 !== i.bundling2.hjual5 || i.bundling2.minQty !== (i.bundling2._origMinQty ?? i.bundling2.minQty)));
         return mainChanged || b1Changed || b2Changed;
       });
       if (!toSend.length) {
@@ -678,20 +687,17 @@
           hjual4: i.newHjual4,
           hjual5: i.newHjual5,
         };
-        if (i.bundling1.enabled) {
-          p.bundling1 = {
-            min_qty: i.bundling1.minQty,
-            hjual1: i.bundling1.newHjual1, hjual2: i.bundling1.newHjual2, hjual3: i.bundling1.newHjual3,
-            hjual4: i.bundling1.newHjual4, hjual5: i.bundling1.newHjual5,
-          };
-        }
-        if (i.bundling2.enabled) {
-          p.bundling2 = {
-            min_qty: i.bundling2.minQty,
-            hjual1: i.bundling2.newHjual1, hjual2: i.bundling2.newHjual2, hjual3: i.bundling2.newHjual3,
-            hjual4: i.bundling2.newHjual4, hjual5: i.bundling2.newHjual5,
-          };
-        }
+        // Always send bundling data — zeroes when unchecked to clear DB
+        p.bundling1 = i.bundling1.enabled ? {
+          min_qty: i.bundling1.minQty,
+          hjual1: i.bundling1.newHjual1, hjual2: i.bundling1.newHjual2, hjual3: i.bundling1.newHjual3,
+          hjual4: i.bundling1.newHjual4, hjual5: i.bundling1.newHjual5,
+        } : { min_qty: 0, hjual1: 0, hjual2: 0, hjual3: 0, hjual4: 0, hjual5: 0 };
+        p.bundling2 = i.bundling2.enabled ? {
+          min_qty: i.bundling2.minQty,
+          hjual1: i.bundling2.newHjual1, hjual2: i.bundling2.newHjual2, hjual3: i.bundling2.newHjual3,
+          hjual4: i.bundling2.newHjual4, hjual5: i.bundling2.newHjual5,
+        } : { min_qty: 0, hjual1: 0, hjual2: 0, hjual3: 0, hjual4: 0, hjual5: 0 };
         return p;
       });
       const apiUrl = editPH
@@ -804,6 +810,7 @@
             newHjual5: line.hjual5 || 0,
             bundling1: {
               enabled: !!b1Qty,
+              _origMinQty: b1Qty,
               minQty: b1Qty,
               hjual1: line.hjualo1 || 0, hjual2: line.hjual2o1 || 0, hjual3: line.hjual3o1 || 0,
               hjual4: line.hjual4o1 || 0, hjual5: line.hjual5o1 || 0,
@@ -812,6 +819,7 @@
             },
             bundling2: {
               enabled: !!b2Qty,
+              _origMinQty: b2Qty,
               minQty: b2Qty,
               hjual1: line.hjualo2 || 0, hjual2: line.hjual2o2 || 0, hjual3: line.hjual3o2 || 0,
               hjual4: line.hjual4o2 || 0, hjual5: line.hjual5o2 || 0,
